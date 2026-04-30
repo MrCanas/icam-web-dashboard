@@ -112,3 +112,63 @@ export function segmentKPIs(data: Proyecto[]): SegmentKPIs {
     culminado: computeKPIs(culminado),
   };
 }
+
+export interface BucketCount {
+  label: string;
+  count: number;
+}
+
+export function getTIRBuckets(data: Proyecto[]): BucketCount[] {
+  const buckets: BucketCount[] = [
+    { label: "<5%", count: 0 },
+    { label: "5-10%", count: 0 },
+    { label: "10-15%", count: 0 },
+    { label: "15-20%", count: 0 },
+    { label: "≥20%", count: 0 },
+  ];
+
+  data
+    .map((item) => toNumber(item.tir_desp_is))
+    .filter((tir) => tir > 0)
+    .forEach((tir) => {
+      if (tir < 0.05) buckets[0].count += 1;
+      else if (tir < 0.1) buckets[1].count += 1;
+      else if (tir < 0.15) buckets[2].count += 1;
+      else if (tir < 0.2) buckets[3].count += 1;
+      else buckets[4].count += 1;
+    });
+
+  return buckets;
+}
+
+export function getMultiploBuckets(data: Proyecto[]): BucketCount[] {
+  const buckets: BucketCount[] = [
+    { label: "<1.3x", count: 0 },
+    { label: "1.3-1.5x", count: 0 },
+    { label: "1.5-1.7x", count: 0 },
+    { label: "≥1.7x", count: 0 },
+  ];
+
+  data
+    .map((item) => toNumber(item.multiplo))
+    .filter((value) => value > 0)
+    .forEach((multiplo) => {
+      if (multiplo < 1.3) buckets[0].count += 1;
+      else if (multiplo < 1.5) buckets[1].count += 1;
+      else if (multiplo < 1.7) buckets[2].count += 1;
+      else buckets[3].count += 1;
+    });
+
+  return buckets;
+}
+
+export function getHighTIRInvestment(data: Proyecto[], threshold = 0.15): number {
+  return data.reduce((acc, item) => {
+    const tir = toNumber(item.tir_desp_is);
+    const inversion = toNumber(item.inversion_total);
+    if (tir >= threshold && inversion > 0) {
+      return acc + inversion;
+    }
+    return acc;
+  }, 0);
+}
