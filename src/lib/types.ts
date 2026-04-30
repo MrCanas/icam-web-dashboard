@@ -20,7 +20,7 @@ export interface Proyecto {
   holding_period: number | null;
   superficie_edificable: number | null;
   es_ultima_fila: number;
-  fecha_inicio?: string | null;
+  fecha_inicio: string | null;
   created_at?: string | null;
 }
 

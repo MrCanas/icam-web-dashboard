@@ -12,7 +12,9 @@ export default async function TendenciasPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("proyectos")
-    .select("*")
+    .select(
+      "id,proyecto,situacion,tipo_proyecto,inversion_total,total_ingresos_venta,beneficios,unidades_totales,tir_desp_is,roe_desp_is,multiplo,project_irr,bcr,ubicacion,equity,holding_period,superficie_edificable,es_ultima_fila,fecha_inicio,created_at",
+    )
     .eq("es_ultima_fila", 1)
     .order("proyecto", { ascending: true });
 
@@ -42,10 +44,12 @@ export default async function TendenciasPage() {
         <p className="mt-1 text-sm text-text-muted">Evolución del portfolio · 2014-2025</p>
       </section>
 
-      <VintageChart data={vintageRows} />
-      <VintageTIRChart data={vintageRows} />
+      {vintageRows.length > 0 && <VintageChart data={vintageRows} />}
+      {vintageRows.some((item) => item.tirPonderada > 0) && <VintageTIRChart data={vintageRows} />}
       <PortfolioComparison activos={activos} culminados={culminados} />
-      <HoldingPeriodChart data={holdingBuckets} averageMonths={holdingAvg} />
+      {holdingBuckets.some((item) => item.activos > 0 || item.culminados > 0) && (
+        <HoldingPeriodChart data={holdingBuckets} averageMonths={holdingAvg} />
+      )}
       <MethodologyNotes />
     </div>
   );

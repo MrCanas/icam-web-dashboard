@@ -181,10 +181,21 @@ export function getTIRColorClass(tir: number): string {
 }
 
 function getProjectYear(project: Proyecto): string | null {
-  const rawDate = project.fecha_inicio ?? project.created_at ?? null;
-  if (!rawDate) return null;
-  const year = String(rawDate).slice(0, 4);
-  return /^\d{4}$/.test(year) ? year : null;
+  if (project.fecha_inicio) {
+    const parsed = new Date(project.fecha_inicio);
+    if (!Number.isNaN(parsed.getTime())) {
+      return String(parsed.getFullYear());
+    }
+  }
+
+  if (project.created_at) {
+    const parsed = new Date(project.created_at);
+    if (!Number.isNaN(parsed.getTime())) {
+      return String(parsed.getFullYear());
+    }
+  }
+
+  return null;
 }
 
 export interface VintageGroup {
