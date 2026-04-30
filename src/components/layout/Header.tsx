@@ -17,11 +17,14 @@ export function Header() {
       <div className="hidden lg:block">
         <NavTabs />
       </div>
-      <div className="text-white/40 text-[10px] text-right leading-tight">
-        Confidencial · Comité
-        <br />
-        Datos actualizados
-      </div>
+      <form action="/api/auth/logout" method="post">
+        <button
+          type="submit"
+          className="text-white/40 text-[10px] text-right leading-tight hover:text-white/70 transition cursor-pointer"
+        >
+          Cerrar sesión
+        </button>
+      </form>
     </header>
   );
 }
