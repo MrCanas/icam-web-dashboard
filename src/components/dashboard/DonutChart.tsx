@@ -14,7 +14,7 @@ interface DonutChartProps {
   data: DonutChartDatum[];
 }
 
-const palette = ["#1E2A56", "#2B3668", "#B89660", "#A0824F", "#8A8A8A"];
+const palette = ["#1E2A56", "#9b7f57", "#B89660", "#A0824F", "#8A8A8A"];
 
 export function DonutChart({ title, data }: DonutChartProps) {
   const totalCount = data.reduce((acc, item) => acc + item.count, 0);
