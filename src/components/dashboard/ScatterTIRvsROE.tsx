@@ -4,6 +4,7 @@ import { fmtMEuros, fmtPct } from "@/lib/formatters";
 import { Proyecto } from "@/lib/types";
 import {
   CartesianGrid,
+  LabelList,
   ReferenceLine,
   Scatter,
   ScatterChart,
@@ -27,6 +28,25 @@ interface ScatterPoint {
 
 function isValidPoint(item: Proyecto): item is Proyecto & { tir_desp_is: number; roe_desp_is: number } {
   return (item.tir_desp_is ?? 0) > 0 && (item.roe_desp_is ?? 0) > 0;
+}
+
+function renderProjectLabel(props: {
+  x?: string | number;
+  y?: string | number;
+  value?: unknown;
+}) {
+  const x = typeof props.x === "string" ? Number(props.x) : props.x;
+  const y = typeof props.y === "string" ? Number(props.y) : props.y;
+
+  if (typeof x !== "number" || typeof y !== "number" || Number.isNaN(x) || Number.isNaN(y)) {
+    return null;
+  }
+
+  return (
+    <text x={x + 8} y={y + 3} fontSize={9} fill="#8A8A8A">
+      {String(props.value ?? "")}
+    </text>
+  );
 }
 
 export function ScatterTIRvsROE({ data }: ScatterTIRvsROEProps) {
@@ -84,8 +104,12 @@ export function ScatterTIRvsROE({ data }: ScatterTIRvsROEProps) {
             }}
             labelFormatter={(_label, payload) => payload?.[0]?.payload?.proyecto ?? ""}
           />
-          <Scatter name="En Marcha" data={enMarcha} fill="#1E2A56" />
-          <Scatter name="Culminado" data={culminado} fill="#B89660" />
+          <Scatter name="En Marcha" data={enMarcha} fill="#1E2A56">
+            <LabelList dataKey="proyecto" content={renderProjectLabel} />
+          </Scatter>
+          <Scatter name="Culminado" data={culminado} fill="#B89660">
+            <LabelList dataKey="proyecto" content={renderProjectLabel} />
+          </Scatter>
         </ScatterChart>
       </div>
     </section>

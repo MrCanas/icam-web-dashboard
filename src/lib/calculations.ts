@@ -172,3 +172,108 @@ export function getHighTIRInvestment(data: Proyecto[], threshold = 0.15): number
     return acc;
   }, 0);
 }
+
+export function getTIRColorClass(tir: number): string {
+  if (tir >= 0.2) return "bg-[#2D8B4E]";
+  if (tir >= 0.15) return "bg-icam-900";
+  if (tir >= 0.1) return "bg-icam-gold";
+  return "bg-text-muted";
+}
+
+function getProjectYear(project: Proyecto): string | null {
+  const rawDate = project.fecha_inicio ?? project.created_at ?? null;
+  if (!rawDate) return null;
+  const year = String(rawDate).slice(0, 4);
+  return /^\d{4}$/.test(year) ? year : null;
+}
+
+export interface VintageGroup {
+  year: string;
+  count: number;
+  invActivos: number;
+  invCulminados: number;
+  invTotal: number;
+  tirPonderada: number;
+  proyectos: Proyecto[];
+}
+
+export function groupByVintage(data: Proyecto[]): Record<string, VintageGroup> {
+  const grouped = data.reduce<Record<string, VintageGroup>>((acc, project) => {
+    const year = getProjectYear(project);
+    if (!year) return acc;
+
+    const inversion = toNumber(project.inversion_total);
+    const key = year;
+    const current = acc[key] ?? {
+      year,
+      count: 0,
+      invActivos: 0,
+      invCulminados: 0,
+      invTotal: 0,
+      tirPonderada: 0,
+      proyectos: [],
+    };
+
+    current.count += 1;
+    current.invTotal += inversion;
+    if (project.situacion === "En Marcha") current.invActivos += inversion;
+    if (project.situacion === "Culminado") current.invCulminados += inversion;
+    current.proyectos.push(project);
+
+    acc[key] = current;
+    return acc;
+  }, {});
+
+  Object.values(grouped).forEach((item) => {
+    const weightedRows = item.proyectos
+      .map((project) => ({
+        tir: toNumber(project.tir_desp_is),
+        inversion: toNumber(project.inversion_total),
+      }))
+      .filter((row) => row.tir > 0 && row.inversion > 0);
+
+    const weightedDividend = weightedRows.reduce((acc, row) => acc + row.tir * row.inversion, 0);
+    const weightedDivisor = weightedRows.reduce((acc, row) => acc + row.inversion, 0);
+    item.tirPonderada = weightedDivisor > 0 ? weightedDividend / weightedDivisor : 0;
+  });
+
+  return grouped;
+}
+
+export function avgHoldingPeriod(data: Proyecto[]): number {
+  const values = data.map((item) => toNumber(item.holding_period)).filter((value) => value > 0);
+  return mean(values);
+}
+
+export interface HoldingBucket {
+  label: string;
+  activos: number;
+  culminados: number;
+}
+
+export function getHoldingPeriodBuckets(data: Proyecto[]): HoldingBucket[] {
+  const buckets: HoldingBucket[] = [
+    { label: "<24m", activos: 0, culminados: 0 },
+    { label: "24-36m", activos: 0, culminados: 0 },
+    { label: "36-48m", activos: 0, culminados: 0 },
+    { label: "48-60m", activos: 0, culminados: 0 },
+    { label: ">60m", activos: 0, culminados: 0 },
+  ];
+
+  data.forEach((project) => {
+    const months = toNumber(project.holding_period);
+    if (months <= 0) return;
+
+    let bucket: HoldingBucket;
+    if (months < 24) bucket = buckets[0];
+    else if (months <= 36) bucket = buckets[1];
+    else if (months <= 48) bucket = buckets[2];
+    else if (months <= 60) bucket = buckets[3];
+    else bucket = buckets[4];
+
+    if (project.situacion === "En Marcha") bucket.activos += 1;
+    if (project.situacion === "Culminado") bucket.culminados += 1;
+  });
+
+  return buckets;
+}
