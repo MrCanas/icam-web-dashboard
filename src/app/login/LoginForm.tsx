@@ -36,11 +36,11 @@ export function LoginForm() {
   }
 
   return (
-    <section className="min-h-screen bg-page flex items-center justify-center px-4">
+    <section className="min-h-screen bg-[#1c2e69] flex items-center justify-center px-4">
       <div className="w-full max-w-[400px] bg-card rounded-lg border border-subtle/50 shadow-sm p-6">
         <div className="flex justify-center mb-6">
           <Image
-            src="/logo-icam.png"
+            src="/IMPAR_CAPITAL_blue.png"
             alt="ICAM Asset Manager"
             width={220}
             height={32}
