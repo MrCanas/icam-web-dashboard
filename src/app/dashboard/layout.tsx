@@ -9,7 +9,9 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col bg-page">
       <Header />
-      <main className="flex-1 p-4 lg:p-6">{children}</main>
+      <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-full min-w-0 overflow-x-hidden">
+        {children}
+      </main>
       <Footer />
     </div>
   );

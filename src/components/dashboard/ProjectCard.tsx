@@ -23,10 +23,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <article className="bg-card rounded-lg border border-subtle/50 shadow-sm overflow-hidden">
       <div className={`h-1 ${getTIRColorClass(tir)}`} />
 
-      <header className="p-4 border-b border-subtle/60">
+      <header className="p-3 sm:p-4 border-b border-subtle/60">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-xl font-semibold text-icam-900">{project.proyecto}</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-icam-900 break-words">{project.proyecto}</h3>
             <p className="mt-1 text-xs text-text-muted">{project.ubicacion ?? "—"}</p>
           </div>
           <span className="px-2 py-1 rounded-md text-[10px] border border-subtle text-text-body">
@@ -35,8 +35,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
       </header>
 
-      <div className="p-4">
-        <div className="grid grid-cols-3 gap-3">
+      <div className="p-3 sm:p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
           <Metric label="Inversión" value={maybe(project.inversion_total, fmtMEuros)} />
           <Metric label="TIR" value={maybe(project.tir_desp_is, fmtPct)} />
           <Metric label="ROE" value={maybe(project.roe_desp_is, fmtPct)} />
@@ -45,7 +45,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <Metric label="Unidades" value={maybeInteger(project.unidades_totales)} />
         </div>
 
-        <footer className="mt-4 pt-3 border-t border-subtle/60 text-[10px] text-text-muted flex flex-wrap gap-x-4 gap-y-1">
+        <footer className="mt-4 pt-3 border-t border-subtle/60 text-xs sm:text-sm text-text-muted flex flex-wrap gap-x-3 gap-y-2">
           <span>Equity: {maybe(project.equity, fmtMEuros)}</span>
           <span>Holding Period: {maybeInteger(project.holding_period, " meses")}</span>
           <span>Superficie: {maybeInteger(project.superficie_edificable, " m²")}</span>
@@ -58,9 +58,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wide text-text-muted">{label}</p>
-      <p className="mt-1 text-base font-semibold text-icam-900">{value}</p>
+    <div className="min-w-0">
+      <p className="text-[10px] sm:text-xs uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="mt-1 text-sm sm:text-base font-semibold text-icam-900 break-words leading-tight">{value}</p>
     </div>
   );
 }

@@ -70,8 +70,8 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
   const inversionComprometida = baseRows.reduce((acc, row) => acc + toNumber(row.inversion_total), 0);
 
   return (
-    <div className="space-y-4">
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
+    <div className="space-y-3 sm:space-y-4 min-w-0">
+      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
         <h1 className="text-xl font-semibold text-text-primary">Proyectos Activos</h1>
         <p className="mt-1 text-sm text-text-muted">
           {baseRows.length} proyectos en marcha · Inversión comprometida:{" "}
@@ -81,7 +81,7 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
 
       <SortSelector selectedSort={selectedSort} basePath="/dashboard/proyectos" />
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}

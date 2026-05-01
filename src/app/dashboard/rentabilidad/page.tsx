@@ -60,8 +60,8 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
   const highTIRPctOfTotal = kpis.inversionTotal > 0 ? highTIRInvestment / kpis.inversionTotal : 0;
 
   return (
-    <div className="space-y-4">
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
+    <div className="space-y-3 sm:space-y-4 min-w-0">
+      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
         <h1 className="text-xl font-semibold text-text-primary">Análisis de Rentabilidad</h1>
         <p className="mt-1 text-sm text-text-muted">
           {kpis.tirValidCount} proyectos con datos financieros
@@ -74,26 +74,30 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
         basePath="/dashboard/rentabilidad"
       />
 
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
+      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
         <h3 className="text-base font-semibold text-text-primary mb-3">Resumen de rentabilidad</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          <div className="p-3 rounded-md border border-subtle/70">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+          <div className="p-2 sm:p-3 rounded-md border border-subtle/70 min-w-0">
             <p className="text-xs uppercase tracking-wide text-text-muted">TIR Ponderada</p>
-            <p className="mt-1 text-lg font-semibold text-text-primary">{fmtPct(kpis.tirPonderada)}</p>
+            <p className="mt-1 text-base sm:text-lg font-semibold text-text-primary break-words leading-tight">
+              {fmtPct(kpis.tirPonderada)}
+            </p>
           </div>
-          <div className="p-3 rounded-md border border-subtle/70">
+          <div className="p-2 sm:p-3 rounded-md border border-subtle/70 min-w-0">
             <p className="text-xs uppercase tracking-wide text-text-muted">Múltiplo Medio</p>
-            <p className="mt-1 text-lg font-semibold text-text-primary">{fmtMult(kpis.multiploMedio)}</p>
+            <p className="mt-1 text-base sm:text-lg font-semibold text-text-primary break-words leading-tight">
+              {fmtMult(kpis.multiploMedio)}
+            </p>
           </div>
-          <div className="p-3 rounded-md border border-subtle/70">
+          <div className="p-2 sm:p-3 rounded-md border border-subtle/70 min-w-0">
             <p className="text-xs uppercase tracking-wide text-text-muted">Proy. TIR ≥ 15%</p>
-            <p className="mt-1 text-lg font-semibold text-text-primary">
+            <p className="mt-1 text-base sm:text-lg font-semibold text-text-primary break-words leading-tight">
               {kpis.tirSup15} de {kpis.tirValidCount}
             </p>
           </div>
-          <div className="p-3 rounded-md border border-subtle/70">
+          <div className="p-2 sm:p-3 rounded-md border border-subtle/70 min-w-0 col-span-2 xl:col-span-1">
             <p className="text-xs uppercase tracking-wide text-text-muted">Inversión TIR ≥ 15%</p>
-            <p className="mt-1 text-lg font-semibold text-text-primary">
+            <p className="mt-1 text-base sm:text-lg font-semibold text-text-primary break-words leading-tight">
               {fmtMEuros(highTIRInvestment)} ({fmtPct(highTIRPctOfTotal)})
             </p>
           </div>
@@ -102,7 +106,7 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
 
       <ScatterTIRvsROE data={proyectos} />
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 min-w-0">
         <TIRDistribution data={tirBuckets} proyectos={proyectos} />
         <MultiploDistribution data={multiploBuckets} proyectos={proyectos} />
       </section>

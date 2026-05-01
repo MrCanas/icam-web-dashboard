@@ -69,10 +69,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const distributionRows = [...donutTipoData, ...donutSituacionData];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4 min-w-0">
       <FilterBar selectedSituacion={selectedSituacion} selectedTipo={selectedTipo} />
 
-      <section className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <KPICard
           title="Nº Proyectos"
           value={fmtInt(kpis.nProyectos)}
@@ -101,15 +101,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
         <Top10BarChart data={top10} />
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4 min-w-0">
           <DonutChart title="Distribución por tipo de proyecto" data={donutTipoData} />
           <DonutChart title="Distribución por situación" data={donutSituacionData} />
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
         <DistributionBlock rows={distributionRows} />
         <ConsolidatedKPIs segmented={segmented} />
       </section>

@@ -112,7 +112,7 @@ function SortHeader({ label, sortKey, activeKey, dir, align, onSort }: SortHeade
   const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
   return (
     <th
-      className={`py-2 ${align === "right" ? "text-right pr-3" : "text-left pr-3"} cursor-pointer select-none hover:bg-subtle/30 transition-colors`}
+      className={`min-h-11 py-2 ${align === "right" ? "text-right pr-3" : "text-left pr-3"} cursor-pointer select-none hover:bg-subtle/30 transition-colors align-middle bg-card`}
       onClick={() => onSort(sortKey)}
       scope="col"
     >
@@ -142,11 +142,22 @@ export function RentabilidadTable({ data }: RentabilidadTableProps) {
   const rows = useMemo(() => sortRows(data, sortKey, sortDir), [data, sortKey, sortDir]);
 
   return (
-    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
-      <h3 className="text-base font-semibold text-text-primary mb-3">Rentabilidad por proyecto</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-[12px] text-text-body">
-          <thead className="sticky top-0 bg-card z-10">
+    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
+      <h3 className="text-base font-semibold text-text-primary mb-2 sm:mb-3">Rentabilidad por proyecto</h3>
+      <p className="sm:hidden text-xs text-text-muted mb-2 flex items-center gap-1">
+        <span className="text-icam-gold" aria-hidden>
+          →
+        </span>
+        Desliza horizontalmente para ver todas las columnas
+      </p>
+      <div className="relative rounded-md max-h-[min(70vh,560px)] overflow-y-auto">
+        <div
+          className="pointer-events-none absolute right-0 top-8 bottom-0 w-8 z-[5] bg-gradient-to-l from-card to-transparent sm:hidden"
+          aria-hidden
+        />
+        <div className="overflow-x-auto overscroll-x-contain">
+          <table className="w-full min-w-[1100px] text-sm text-text-body">
+            <thead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_#EAEBEE]">
             <tr className="border-b border-subtle text-text-muted">
               <SortHeader
                 label="Proyecto"
@@ -233,6 +244,7 @@ export function RentabilidadTable({ data }: RentabilidadTableProps) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   );
