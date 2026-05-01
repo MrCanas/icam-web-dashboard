@@ -118,48 +118,89 @@ export interface BucketCount {
   count: number;
 }
 
+export const TIR_BUCKET_LABEL_ORDER = ["<5%", "5-10%", "10-15%", "15-20%", "≥20%"] as const;
+
+export type TirBucketLabel = (typeof TIR_BUCKET_LABEL_ORDER)[number];
+
+export function tirBucketLabelForValue(tir: number): TirBucketLabel | null {
+  if (tir <= 0) return null;
+  if (tir < 0.05) return "<5%";
+  if (tir < 0.1) return "5-10%";
+  if (tir < 0.15) return "10-15%";
+  if (tir < 0.2) return "15-20%";
+  return "≥20%";
+}
+
 export function getTIRBuckets(data: Proyecto[]): BucketCount[] {
-  const buckets: BucketCount[] = [
-    { label: "<5%", count: 0 },
-    { label: "5-10%", count: 0 },
-    { label: "10-15%", count: 0 },
-    { label: "15-20%", count: 0 },
-    { label: "≥20%", count: 0 },
-  ];
+  const counts = new Map<string, number>();
+  TIR_BUCKET_LABEL_ORDER.forEach((label) => counts.set(label, 0));
 
-  data
-    .map((item) => toNumber(item.tir_desp_is))
-    .filter((tir) => tir > 0)
-    .forEach((tir) => {
-      if (tir < 0.05) buckets[0].count += 1;
-      else if (tir < 0.1) buckets[1].count += 1;
-      else if (tir < 0.15) buckets[2].count += 1;
-      else if (tir < 0.2) buckets[3].count += 1;
-      else buckets[4].count += 1;
-    });
+  data.forEach((item) => {
+    const label = tirBucketLabelForValue(toNumber(item.tir_desp_is));
+    if (label) {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  });
 
-  return buckets;
+  return TIR_BUCKET_LABEL_ORDER.map((label) => ({
+    label,
+    count: counts.get(label) ?? 0,
+  }));
+}
+
+export function listProjectsInTIRBucket(
+  proyectos: Proyecto[],
+  label: string,
+): { proyecto: string; value: number }[] {
+  if (!TIR_BUCKET_LABEL_ORDER.includes(label as TirBucketLabel)) {
+    return [];
+  }
+  return proyectos
+    .filter((p) => tirBucketLabelForValue(toNumber(p.tir_desp_is)) === label)
+    .map((p) => ({ proyecto: p.proyecto, value: toNumber(p.tir_desp_is) }))
+    .sort((a, b) => b.value - a.value);
+}
+
+export const MULTIPLO_BUCKET_LABEL_ORDER = ["<1.3x", "1.3-1.5x", "1.5-1.7x", "≥1.7x"] as const;
+
+export type MultiploBucketLabel = (typeof MULTIPLO_BUCKET_LABEL_ORDER)[number];
+
+export function multiploBucketLabelForValue(multiplo: number): MultiploBucketLabel | null {
+  if (multiplo <= 0) return null;
+  if (multiplo < 1.3) return "<1.3x";
+  if (multiplo < 1.5) return "1.3-1.5x";
+  if (multiplo < 1.7) return "1.5-1.7x";
+  return "≥1.7x";
 }
 
 export function getMultiploBuckets(data: Proyecto[]): BucketCount[] {
-  const buckets: BucketCount[] = [
-    { label: "<1.3x", count: 0 },
-    { label: "1.3-1.5x", count: 0 },
-    { label: "1.5-1.7x", count: 0 },
-    { label: "≥1.7x", count: 0 },
-  ];
+  const counts = new Map<string, number>();
+  MULTIPLO_BUCKET_LABEL_ORDER.forEach((label) => counts.set(label, 0));
 
-  data
-    .map((item) => toNumber(item.multiplo))
-    .filter((value) => value > 0)
-    .forEach((multiplo) => {
-      if (multiplo < 1.3) buckets[0].count += 1;
-      else if (multiplo < 1.5) buckets[1].count += 1;
-      else if (multiplo < 1.7) buckets[2].count += 1;
-      else buckets[3].count += 1;
-    });
+  data.forEach((item) => {
+    const label = multiploBucketLabelForValue(toNumber(item.multiplo));
+    if (label) {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  });
 
-  return buckets;
+  return MULTIPLO_BUCKET_LABEL_ORDER.map((label) => ({
+    label,
+    count: counts.get(label) ?? 0,
+  }));
+}
+
+export function listProjectsInMultiploBucket(
+  proyectos: Proyecto[],
+  label: string,
+): { proyecto: string; value: number }[] {
+  if (!MULTIPLO_BUCKET_LABEL_ORDER.includes(label as MultiploBucketLabel)) {
+    return [];
+  }
+  return proyectos
+    .filter((p) => multiploBucketLabelForValue(toNumber(p.multiplo)) === label)
+    .map((p) => ({ proyecto: p.proyecto, value: toNumber(p.multiplo) }))
+    .sort((a, b) => b.value - a.value);
 }
 
 export function getHighTIRInvestment(data: Proyecto[], threshold = 0.15): number {

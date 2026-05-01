@@ -74,15 +74,6 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
         basePath="/dashboard/rentabilidad"
       />
 
-      <ScatterTIRvsROE data={proyectos} />
-
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <TIRDistribution data={tirBuckets} />
-        <MultiploDistribution data={multiploBuckets} />
-      </section>
-
-      <RentabilidadTable data={proyectos} />
-
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
         <h3 className="text-base font-semibold text-text-primary mb-3">Resumen de rentabilidad</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -108,6 +99,15 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
           </div>
         </div>
       </section>
+
+      <ScatterTIRvsROE data={proyectos} />
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <TIRDistribution data={tirBuckets} proyectos={proyectos} />
+        <MultiploDistribution data={multiploBuckets} proyectos={proyectos} />
+      </section>
+
+      <RentabilidadTable data={proyectos} />
     </div>
   );
 }
