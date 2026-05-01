@@ -57,37 +57,53 @@ export function PortfolioComparison({ activos, culminados }: PortfolioComparison
   ] as const;
 
   return (
-    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
-      <h3 className="text-base font-semibold text-text-primary mb-3">
+    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
+      <h3 className="text-base font-semibold text-text-primary mb-2 sm:mb-3">
         Comparativa: Portfolio Activo vs Culminado
       </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-subtle text-text-muted">
-              <th className="text-left py-2 pr-3">Métrica</th>
-              <th className="text-right py-2 pr-3">En Marcha ({activosMetrics.n})</th>
-              <th className="text-right py-2">Culminado ({culmMetrics.n})</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const betterA = row.better === "high" ? row.a > row.c : row.a < row.c;
-              const betterC = row.better === "high" ? row.c > row.a : row.c < row.a;
-              return (
-                <tr key={row.label} className="border-b border-subtle/60 text-text-body">
-                  <td className="py-2 pr-3">{row.label}</td>
-                  <td className={`py-2 pr-3 text-right ${betterA ? "bg-[rgba(45,139,78,0.08)]" : ""}`}>
-                    {row.fmt(row.a)}
-                  </td>
-                  <td className={`py-2 text-right ${betterC ? "bg-[rgba(45,139,78,0.08)]" : ""}`}>
-                    {row.fmt(row.c)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <p className="sm:hidden text-xs text-text-muted mb-2 flex items-center gap-1">
+        <span className="text-icam-gold" aria-hidden>
+          →
+        </span>
+        Desliza horizontalmente para ver todas las columnas
+      </p>
+      <div className="relative rounded-md">
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-[1] bg-gradient-to-l from-card to-transparent sm:hidden"
+          aria-hidden
+        />
+        <div className="overflow-x-auto overscroll-x-contain -mx-1 px-1">
+          <table className="w-full text-sm min-w-[340px]">
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_#EAEBEE]">
+              <tr className="border-b border-subtle text-text-muted">
+                <th className="text-left py-2 pr-3 bg-card">Métrica</th>
+                <th className="text-right py-2 pr-3 bg-card whitespace-nowrap">
+                  En Marcha ({activosMetrics.n})
+                </th>
+                <th className="text-right py-2 bg-card whitespace-nowrap">
+                  Culminado ({culmMetrics.n})
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const betterA = row.better === "high" ? row.a > row.c : row.a < row.c;
+                const betterC = row.better === "high" ? row.c > row.a : row.c < row.a;
+                return (
+                  <tr key={row.label} className="border-b border-subtle/60 text-text-body">
+                    <td className="py-2 pr-3">{row.label}</td>
+                    <td className={`py-2 pr-3 text-right whitespace-nowrap ${betterA ? "bg-[rgba(45,139,78,0.08)]" : ""}`}>
+                      {row.fmt(row.a)}
+                    </td>
+                    <td className={`py-2 text-right whitespace-nowrap ${betterC ? "bg-[rgba(45,139,78,0.08)]" : ""}`}>
+                      {row.fmt(row.c)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

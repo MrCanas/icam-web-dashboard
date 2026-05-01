@@ -16,13 +16,13 @@ export function DistributionBlock({ rows }: DistributionBlockProps) {
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
       <h3 className="text-base font-semibold text-text-primary mb-4">Distribución del portfolio</h3>
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {rows.map((row) => {
           const width = `${(row.count / maxCount) * 100}%`;
 
           return (
             <div key={row.label}>
-              <div className="flex items-center justify-between text-sm mb-1">
+              <div className="flex items-center justify-between text-sm mb-1 gap-2 min-w-0">
                 <span className="text-text-body font-medium">{row.label}</span>
                 <span className="text-text-muted">
                   {row.count} proy · {fmtMEuros(row.inversion)}

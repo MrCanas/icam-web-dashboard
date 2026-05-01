@@ -38,8 +38,8 @@ export default async function TendenciasPage() {
   const holdingAvg = avgHoldingPeriod(proyectos);
 
   return (
-    <div className="space-y-4">
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
+    <div className="space-y-3 sm:space-y-4 min-w-0">
+      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
         <h1 className="text-xl font-semibold text-text-primary">Tendencias e Histórico</h1>
         <p className="mt-1 text-sm text-text-muted">Evolución del portfolio · 2014-2025</p>
       </section>
