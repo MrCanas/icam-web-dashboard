@@ -9,7 +9,7 @@ import { createDashboardReadClient } from "@/lib/supabase/dashboard-read";
 import { Proyecto } from "@/lib/types";
 
 export default async function TendenciasPage() {
-  const supabase = createDashboardReadClient();
+  const supabase = await createDashboardReadClient();
 
   const [{ count: portfolioCount, error: countError }, rowsResult] = await Promise.all([
     supabase

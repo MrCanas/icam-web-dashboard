@@ -22,7 +22,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedSituacion = params.situacion;
   const selectedTipo = params.tipo;
 
-  const supabase = createDashboardReadClient();
+  const supabase = await createDashboardReadClient();
 
   const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
     supabase
