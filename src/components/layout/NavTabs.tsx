@@ -8,6 +8,7 @@ const tabs = [
   { href: "/dashboard/rentabilidad", label: "Rentabilidad" },
   { href: "/dashboard/proyectos", label: "Proyectos" },
   { href: "/dashboard/tendencias", label: "Tendencias" },
+  { href: "/dashboard/data", label: "Data" },
 ];
 
 interface NavTabsProps {

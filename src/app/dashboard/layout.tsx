@@ -1,6 +1,9 @@
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function DashboardLayout({
   children,
 }: Readonly<{

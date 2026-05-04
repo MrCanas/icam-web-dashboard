@@ -4,10 +4,10 @@ import { DonutChart } from "@/components/dashboard/DonutChart";
 import { FilterBar } from "@/components/dashboard/FilterBar";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { Top10BarChart } from "@/components/dashboard/Top10BarChart";
+import { SupabaseEmptyProjectsBanner } from "@/components/dashboard/SupabaseEmptyProjectsBanner";
 import { computeKPIs, getTop10, groupByField, segmentKPIs } from "@/lib/calculations";
 import { fmtInt, fmtMEuros, fmtPct } from "@/lib/formatters";
-import { seedProyectos } from "@/lib/seedProyectos";
-import { createClient } from "@/lib/supabase/server";
+import { createDashboardReadClient } from "@/lib/supabase/dashboard-read";
 import { Proyecto } from "@/lib/types";
 
 interface DashboardPageProps {
@@ -22,29 +22,35 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedSituacion = params.situacion;
   const selectedTipo = params.tipo;
 
-  const supabase = await createClient();
-  let query = supabase.from("proyectos").select("*").eq("es_ultima_fila", 1);
+  const supabase = createDashboardReadClient();
 
-  if (selectedSituacion) {
-    query = query.eq("situacion", selectedSituacion);
-  }
+  const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
+    supabase
+      .from("proyectos")
+      .select("*", { count: "exact", head: true })
+      .eq("es_ultima_fila", 1),
+    (async () => {
+      let q = supabase.from("proyectos").select("*").eq("es_ultima_fila", 1);
+      if (selectedSituacion) q = q.eq("situacion", selectedSituacion);
+      if (selectedTipo) q = q.eq("tipo_proyecto", selectedTipo);
+      return q.order("proyecto", { ascending: true });
+    })(),
+  ]);
 
-  if (selectedTipo) {
-    query = query.eq("tipo_proyecto", selectedTipo);
-  }
+  const { data, error } = filteredResult;
 
-  const { data, error } = await query.order("proyecto", { ascending: true });
-
-  if (error) {
+  if (error || countError) {
+    const msg = error?.message ?? countError?.message ?? "Error desconocido";
     return (
       <section className="bg-card rounded-lg border border-red-200 p-6 text-red-700">
-        Error cargando proyectos: {error.message}
+        Error cargando proyectos: {msg}
       </section>
     );
   }
 
   const supabaseRows = (data ?? []) as Proyecto[];
-  const baseRows = supabaseRows.length > 0 ? supabaseRows : seedProyectos;
+  const showRlsEmpty = (portfolioCount ?? 0) === 0;
+  const baseRows = showRlsEmpty ? [] : supabaseRows;
   const proyectos = baseRows
     .filter((row) => row.es_ultima_fila === 1)
     .filter((row) => (selectedSituacion ? row.situacion === selectedSituacion : true))
@@ -70,6 +76,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
+      {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
       <FilterBar selectedSituacion={selectedSituacion} selectedTipo={selectedTipo} />
 
       <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { seedProyectos } from "@/lib/seedProyectos";
 import { Proyecto } from "@/lib/types";
 
 interface UseProyectosParams {
@@ -43,8 +42,7 @@ export function useProyectos({ situacion, tipoProyecto }: UseProyectosParams = {
         setData([]);
       } else {
         const result = ((rows ?? []) as Proyecto[]).filter((row) => row.es_ultima_fila === 1);
-        const baseRows = result.length > 0 ? result : seedProyectos;
-        const filtered = baseRows
+        const filtered = result
           .filter((row) => (situacion ? row.situacion === situacion : true))
           .filter((row) => (tipoProyecto ? row.tipo_proyecto === tipoProyecto : true));
         setData(filtered);

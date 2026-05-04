@@ -5,8 +5,17 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
+  const isPublicAuthApi =
+    pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/logout");
+  const isProtectedDataApi =
+    pathname.startsWith("/api/upload-excel") ||
+    pathname.startsWith("/api/upload-logs") ||
+    pathname.startsWith("/api/replace-proyectos-status");
 
-  if (isApiRoute) {
+  if (isApiRoute && !isPublicAuthApi) {
+    if (isProtectedDataApi && authCookie?.value !== "authenticated") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
     return NextResponse.next();
   }
 
