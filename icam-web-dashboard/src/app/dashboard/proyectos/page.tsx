@@ -42,7 +42,7 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
   const params = await searchParams;
   const selectedSort = sanitizeSort(params.sort);
 
-  const supabase = createDashboardReadClient();
+  const supabase = await createDashboardReadClient();
 
   const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
     supabase
