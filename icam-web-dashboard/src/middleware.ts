@@ -5,14 +5,15 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
-  const isPublicAuthApi =
-    pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/logout");
   const isProtectedDataApi =
     pathname.startsWith("/api/upload-excel") ||
     pathname.startsWith("/api/upload-logs") ||
     pathname.startsWith("/api/replace-proyectos-status");
 
-  if (isApiRoute && !isPublicAuthApi) {
+  // Todas las rutas /api/*: solo las de datos exigen cookie. Si no, el POST a
+  // /api/auth/login caería en !isAuthenticated y se redirigiría a /login sin
+  // ejecutar el handler (nunca se enviaría Set-Cookie).
+  if (isApiRoute) {
     if (isProtectedDataApi && authCookie?.value !== "authenticated") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
