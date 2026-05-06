@@ -1,22 +1,21 @@
-/** Paleta corporativa: frío → cálido (~17 tonos). */
+/** Paleta fija PM por orden_hito (17º reutiliza 1º). */
 const FALLBACK_SEQUENCE = [
-  "#1E3A5F",
-  "#2563EB",
-  "#3B82C4",
-  "#0E7490",
-  "#0D9488",
-  "#059669",
-  "#16A34A",
-  "#65A30D",
-  "#B89660",
-  "#CA9A5C",
-  "#D4A574",
-  "#EAB308",
-  "#F59E0B",
-  "#EA580C",
-  "#DC2626",
-  "#991B1B",
-  "#7F1D1D",
+  "#508F7A", // 1 ARRAS
+  "#9B7F57", // 2 COMPRA EDIFICIO
+  "#475F7D", // 3 Anteproyecto
+  "#98416B", // 4 Proyecto basico
+  "#573569", // 5 Proyecto Ejecutivo
+  "#B59350", // 6 Solicitud de licencia
+  "#396657", // 7 Obtencion licencia
+  "#811E2D", // 8 Lanzamiento Licitacion
+  "#AD4426", // 9 Inicio de obra
+  "#3D7A8A", // 10 Fin de obra
+  "#7A5C3E", // 11 Tramites final de Obra
+  "#5B7A4E", // 12 Inspeccion Turismo
+  "#6B4E7A", // 13 Entrega llaves Operador
+  "#7A3E4E", // 14 Incio/Inicio pago renta
+  "#3E6B7A", // 15 Salida del Vehiculo
+  "#8A7A3D", // 16 Inicio comercializacion
 ] as const;
 
 function normKey(s: string): string {
@@ -27,24 +26,32 @@ function normKey(s: string): string {
     .trim();
 }
 
-/** Prioridad keyword → índice en FALLBACK_SEQUENCE (tonos agrupados por fase). */
-function keywordBucket(name: string): number | null {
+/** Mapa de hitos nominales -> índice (0-based) de la paleta fija. */
+function explicitHitoIndex(name: string): number | null {
   const u = normKey(name);
-  if (/ARRAS|COMPRA|SUELO|ADQUISICION/.test(u)) return 0;
-  if (/ANTEPROYECTO|BASIC|EJECUTIV|DISENO|PROYECTO\s*B/.test(u)) return 4;
-  if (/SOLICITUD|LICENCIA|LICEN/.test(u)) return 8;
-  if (/LICITACION|ADJUDICACION/.test(u)) return 10;
-  if (/INICIO\s*OBRA|FIN\s*OBRA|OBRA/.test(u)) return 11;
-  if (/TRAMITE|ENTREGA|SALIDA|VENTA|FINAL/.test(u)) return 14;
+  if (u === "ARRAS") return 0;
+  if (u === "COMPRA EDIFICIO") return 1;
+  if (u === "ANTEPROYECTO") return 2;
+  if (u === "PROYECTO BASICO") return 3;
+  if (u === "PROYECTO EJECUTIVO") return 4;
+  if (u === "SOLICITUD DE LICENCIA") return 5;
+  if (u === "OBTENCION LICENCIA") return 6;
+  if (u === "LANZAMIENTO LICITACION") return 7;
+  if (u === "INICIO DE OBRA") return 8;
+  if (u === "FIN DE OBRA") return 9;
+  if (u === "TRAMITES FINAL DE OBRA") return 10;
+  if (u === "INSPECCION TURISMO") return 11;
+  if (u === "ENTREGA LLAVES OPERADOR") return 12;
+  if (u === "INCIO PAGO RENTA" || u === "INICIO PAGO RENTA") return 13;
+  if (u === "SALIDA DEL VEHICULO") return 14;
+  if (u === "INICIO COMERCIALIZACION") return 15;
+  if (u === "FIN COMERCIALIZACION") return 0;
   return null;
 }
 
 export function getHitoColor(hitoName: string, fallbackIndex: number): string {
-  const bucket = keywordBucket(hitoName);
-  const idx =
-    bucket !== null
-      ? Math.min(bucket + (fallbackIndex % 3), FALLBACK_SEQUENCE.length - 1)
-      : fallbackIndex % FALLBACK_SEQUENCE.length;
+  const explicit = explicitHitoIndex(hitoName);
+  const idx = explicit !== null ? explicit : fallbackIndex % FALLBACK_SEQUENCE.length;
   return FALLBACK_SEQUENCE[idx] ?? FALLBACK_SEQUENCE[0];
 }
 
