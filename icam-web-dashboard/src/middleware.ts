@@ -10,7 +10,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/api/upload-pm-excel") ||
     pathname.startsWith("/api/upload-logs") ||
     pathname.startsWith("/api/replace-proyectos-status") ||
-    pathname.startsWith("/api/replace-pm-portfolio-status");
+    pathname.startsWith("/api/replace-pm-portfolio-status") ||
+    pathname.startsWith("/api/monday");
 
   // Todas las rutas /api/*: solo las de datos exigen cookie. Si no, el POST a
   // /api/auth/login caería en !isAuthenticated y se redirigiría a /login sin
