@@ -1,7 +1,11 @@
 {
-  "dependencies": {
-    "@supabase/ssr": "^0.10.2",
-    "@supabase/supabase-js": "^2.105.1",
-    "recharts": "^3.8.1"
+  "name": "icam-dashboard-repo",
+  "private": true,
+  "workspaces": ["icam-web-dashboard"],
+  "scripts": {
+    "build": "npm run build -w icam-web-dashboard",
+    "dev": "npm run dev -w icam-web-dashboard",
+    "start": "npm run start -w icam-web-dashboard",
+    "lint": "npm run lint -w icam-web-dashboard"
   }
 }
