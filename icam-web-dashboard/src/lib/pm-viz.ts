@@ -44,12 +44,117 @@ export function clipToVisibleWindow(
   return { start: new Date(ds), end: new Date(de) };
 }
 
+/** Fecha del hito para el snapshot (solo normalización; sin clip a dominio legacy). */
 export function fechaForSnapshotNormalized(
   hito: PmHitoEnriched,
   snapshot: string,
 ): Date | null {
   const iso = fechaForSnapshot(hito, snapshot);
-  return dateInChartDomain(normalizePmDate(iso));
+  return normalizePmDate(iso);
+}
+
+export function addCalendarMonths(d: Date, months: number): Date {
+  const x = new Date(d.getTime());
+  x.setMonth(x.getMonth() + months);
+  return x;
+}
+
+export function extentWithQuarterMargin(min: Date, max: Date): [Date, Date] {
+  return [addCalendarMonths(min, -3), addCalendarMonths(max, 3)];
+}
+
+function extentFromDateCollection(dates: Date[]): [Date, Date] {
+  if (dates.length === 0) {
+    const now = new Date();
+    const y = now.getFullYear();
+    return extentWithQuarterMargin(new Date(y - 2, 0, 1), new Date(y + 2, 11, 31));
+  }
+  let minT = Infinity;
+  let maxT = -Infinity;
+  for (const d of dates) {
+    const t = d.getTime();
+    if (t < minT) minT = t;
+    if (t > maxT) maxT = t;
+  }
+  return extentWithQuarterMargin(new Date(minT), new Date(maxT));
+}
+
+export function computeGanttExtentForPortfolio(
+  rows: PmPortfolioRow[],
+  snapshot: string,
+): [Date, Date] {
+  const dates: Date[] = [];
+  for (const row of rows) {
+    for (const h of row.hitos) {
+      const d = fechaForSnapshotNormalized(h, snapshot);
+      if (d) dates.push(d);
+    }
+  }
+  return extentFromDateCollection(dates);
+}
+
+export function computeGanttExtentFromHitos(hitos: PmHitoEnriched[], snapshot: string): [Date, Date] {
+  const dates: Date[] = [];
+  for (const h of hitos) {
+    const d = fechaForSnapshotNormalized(h, snapshot);
+    if (d) dates.push(d);
+  }
+  return extentFromDateCollection(dates);
+}
+
+export function computeGanttExtentForProject(row: PmPortfolioRow, snapshot: string): [Date, Date] {
+  return computeGanttExtentFromHitos(row.hitos, snapshot);
+}
+
+export function computeEvolutionExtent(hitos: PmHitoEnriched[], codes: string[]): [Date, Date] {
+  const dates: Date[] = [];
+  for (const h of hitos) {
+    for (const code of codes) {
+      const iso = code === "fecha_actual" ? h.fecha_actual : h.snapshots[code];
+      const d = normalizePmDate(iso ?? null);
+      if (d) dates.push(d);
+    }
+  }
+  return extentFromDateCollection(dates);
+}
+
+/** Hitos puntuales: siempre barra de exactamente un trimestre. */
+export function isPmPuntoHito(hitoName: string): boolean {
+  const n = hitoName
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .trim()
+    .toLowerCase();
+  if (n === "arras") return true;
+  if (n.includes("obtencion licencia")) return true;
+  if (n.includes("salida del vehiculo")) return true;
+  if (n.includes("entrega llaves operador")) return true;
+  return false;
+}
+
+export function clipToVisibleWindowOnly(
+  start: Date,
+  end: Date,
+  winStart: Date,
+  winEnd: Date,
+): { start: Date; end: Date } | null {
+  const ds = Math.max(start.getTime(), winStart.getTime());
+  const de = Math.min(end.getTime(), winEnd.getTime());
+  if (de <= ds) return null;
+  return { start: new Date(ds), end: new Date(de) };
+}
+
+/** Redondeo estándar PM: días → meses para UI. */
+export function deviationDaysToMonths(days: number | null | undefined): number | null {
+  if (days == null || !Number.isFinite(days)) return null;
+  return Math.round(days / 30);
+}
+
+export function formatDeviationMonths(days: number | null | undefined): string {
+  const m = deviationDaysToMonths(days);
+  if (m == null) return "N/A";
+  const sign = m > 0 ? "+" : "";
+  return `${sign}${m} m`;
 }
 
 /** Baseline plan original (levantamiento) solo para tooltips / desviaciones. */
@@ -68,8 +173,8 @@ export interface GanttSegmentModel {
 }
 
 /**
- * Segmentos [fecha_i, fecha_{i+1}) por hito ordenado; último hito hasta fin de ventana visible.
- * Solo fechas dentro del dominio 2020–2035 participan en el inicio del segmento.
+ * Segmentos por hito ordenado: duración real hasta el siguiente hito con fecha,
+ * con mínimo visual de un trimestre; hitos puntuales siempre un trimestre exacto.
  */
 export function buildGanttSegmentsForProject(
   hitos: PmHitoEnriched[],
@@ -83,22 +188,32 @@ export function buildGanttSegmentsForProject(
     start: fechaForSnapshotNormalized(h, snapshot),
   }));
 
-  const winEnd = new Date(Math.min(visibleEnd.getTime(), PM_DOMAIN_END.getTime()));
   const segments: GanttSegmentModel[] = [];
 
   for (let i = 0; i < dates.length; i++) {
     const { hito, start } = dates[i];
     if (!start) continue;
 
+    const puntual = isPmPuntoHito(hito.hito);
     let end: Date;
-    const next = dates[i + 1]?.start;
-    if (next) {
-      end = next;
+
+    if (puntual) {
+      end = addCalendarMonths(start, 3);
     } else {
-      end = winEnd;
+      let next: Date | null = null;
+      for (let j = i + 1; j < dates.length; j++) {
+        if (dates[j].start) {
+          next = dates[j].start!;
+          break;
+        }
+      }
+      const rawEnd = next ?? visibleEnd;
+      end = rawEnd;
+      const minEnd = addCalendarMonths(start, 3);
+      if (end.getTime() < minEnd.getTime()) end = minEnd;
     }
 
-    const clipped = clipToVisibleWindow(start, end, visibleStart, visibleEnd);
+    const clipped = clipToVisibleWindowOnly(start, end, visibleStart, visibleEnd);
     if (!clipped) continue;
 
     const baseline = levantamientoDate(hito);
@@ -235,9 +350,11 @@ export function buildPmDeviationRows(
 
     let trend: PmDeviationTrend | null = null;
     if (deviationDays != null && dPrev != null) {
-      const delta = deviationDays - dPrev;
-      if (delta > 7) trend = "worse";
-      else if (delta < -7) trend = "better";
+      const curM = deviationDaysToMonths(deviationDays)!;
+      const prevM = deviationDaysToMonths(dPrev)!;
+      const delta = curM - prevM;
+      if (delta > 1) trend = "worse";
+      else if (delta < -1) trend = "better";
       else trend = "stable";
     }
 

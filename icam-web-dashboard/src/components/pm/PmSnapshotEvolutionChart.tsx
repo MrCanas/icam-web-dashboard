@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PmHitoEnriched } from "@/lib/pm-queries";
+import { axisTopPadding, buildPmAxisModel } from "@/lib/pm-axis";
 import {
-  PM_DOMAIN_END,
-  PM_DOMAIN_START,
-  dateInChartDomain,
+  computeEvolutionExtent,
   formatSnapshotLabel,
   normalizePmDate,
 } from "@/lib/pm-viz";
@@ -16,8 +15,7 @@ import { PmTimelineRangeControl } from "@/components/pm/PmTimelineRangeControl";
 const ROW_H = 28;
 const LABEL_W = 200;
 const PAD_R = 32;
-const PAD_T = 28;
-const PAD_B = 40;
+const PAD_B = 28;
 
 const QUARTER_LINE_COLORS = ["#2563EB", "#0D9488", "#65A30D", "#B89660", "#EA580C", "#DC2626"];
 
@@ -45,7 +43,43 @@ export interface PmSnapshotEvolutionChartProps {
 export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvolutionChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [chartW, setChartW] = useState(960);
-  const [range, setRange] = useState<[Date, Date]>([PM_DOMAIN_START, PM_DOMAIN_END]);
+
+  const sortedHitos = useMemo(
+    () => [...hitos].sort((a, b) => a.orden_hito - b.orden_hito),
+    [hitos],
+  );
+
+  const autoExtent = useMemo(
+    () => computeEvolutionExtent(hitos, orderedCodes),
+    [hitos, orderedCodes],
+  );
+
+  const contextKey = useMemo(
+    () => `${orderedCodes.join("|")}::${sortedHitos.map((h) => h.id).join(",")}`,
+    [orderedCodes, sortedHitos],
+  );
+  const prevCtxRef = useRef("");
+  const userAdjustedRangeRef = useRef(false);
+
+  const [range, setRange] = useState<[Date, Date]>(autoExtent);
+
+  useEffect(() => {
+    if (sortedHitos.length === 0) return;
+    const ctxChanged = prevCtxRef.current !== contextKey;
+    if (ctxChanged) {
+      prevCtxRef.current = contextKey;
+      userAdjustedRangeRef.current = false;
+    }
+    if (!userAdjustedRangeRef.current) {
+      setRange(autoExtent);
+    }
+  }, [contextKey, autoExtent, sortedHitos.length]);
+
+  const onRangeChange = useCallback((next: [Date, Date]) => {
+    userAdjustedRangeRef.current = true;
+    setRange(next);
+  }, []);
+
   const quarterCodesOrdered = useMemo(
     () => orderedCodes.filter((c) => c !== "fecha_actual"),
     [orderedCodes],
@@ -74,11 +108,6 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
     return () => ro.disconnect();
   }, []);
 
-  const sortedHitos = useMemo(
-    () => [...hitos].sort((a, b) => a.orden_hito - b.orden_hito),
-    [hitos],
-  );
-
   const chronoVisible = useMemo(
     () => orderedCodes.filter((c) => visible.has(c)),
     [orderedCodes, visible],
@@ -89,13 +118,16 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
       const points: { code: string; date: Date }[] = [];
       for (const code of chronoVisible) {
         const iso = fechaForSnapshot(h, code);
-        const d = dateInChartDomain(normalizePmDate(iso));
+        const d = normalizePmDate(iso);
         if (!d) continue;
         points.push({ code, date: d });
       }
       return { hito: h, hitoIndex, points };
     });
   }, [sortedHitos, chronoVisible]);
+
+  const axisModel = useMemo(() => buildPmAxisModel(range[0], range[1]), [range]);
+  const PAD_T = axisTopPadding(axisModel);
 
   const innerW = chartW - LABEL_W - PAD_R;
   const plotH = Math.max(1, sortedHitos.length) * ROW_H;
@@ -111,7 +143,17 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
     [innerW, winStart, winSpan],
   );
 
-  const yCenter = useCallback((rowIdx: number) => PAD_T + rowIdx * ROW_H + ROW_H / 2, []);
+  const yCenter = useCallback(
+    (rowIdx: number) => PAD_T + rowIdx * ROW_H + ROW_H / 2,
+    [PAD_T],
+  );
+
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const todayT = today.getTime();
+  const showTodayLine = todayT >= winStart && todayT <= winEnd;
+
+  const hoyLabelY = axisModel.kind === "quarterly" ? PAD_T - 34 : PAD_T - 24;
 
   const toggleCode = (code: string) => {
     setVisible((prev) => {
@@ -172,7 +214,12 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
         <span className="text-[10px] text-text-muted">Doble clic: destacar serie</span>
       </div>
 
-      <PmTimelineRangeControl value={range} onChange={setRange} />
+      <PmTimelineRangeControl
+        extentMin={autoExtent[0]}
+        extentMax={autoExtent[1]}
+        value={range}
+        onChange={onRangeChange}
+      />
 
       <div className="overflow-x-auto rounded-lg border border-subtle/50 bg-card">
         <svg
@@ -182,6 +229,87 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
           role="img"
           aria-label="Evolución de previsiones por snapshot"
         >
+          {axisModel.kind === "annual" ? (
+            <>
+              {axisModel.yearLines.map((t) => (
+                <line
+                  key={`y-${t}`}
+                  x1={xScale(t)}
+                  y1={PAD_T}
+                  x2={xScale(t)}
+                  y2={PAD_T + plotH}
+                  className="stroke-subtle/55"
+                  strokeWidth={1}
+                />
+              ))}
+              {axisModel.yearLines.map((t) => (
+                <text
+                  key={`yl-${t}`}
+                  x={xScale(t) + 4}
+                  y={PAD_T - 10}
+                  className="fill-text-muted text-[10px]"
+                >
+                  {new Date(t).getFullYear()}
+                </text>
+              ))}
+            </>
+          ) : (
+            <>
+              {axisModel.quarterLines.map((t) => {
+                const isYear = axisModel.yearLines.includes(t);
+                return (
+                  <line
+                    key={`q-${t}`}
+                    x1={xScale(t)}
+                    y1={PAD_T}
+                    x2={xScale(t)}
+                    y2={PAD_T + plotH}
+                    className={isYear ? "stroke-subtle/55" : "stroke-subtle/28"}
+                    strokeWidth={isYear ? 1 : 0.75}
+                  />
+                );
+              })}
+              {axisModel.labels.map(({ t, showYear, year, quarterText }) => {
+                const x = xScale(t) + 3;
+                return (
+                  <g key={`lb-${t}`}>
+                    {showYear ? (
+                      <text x={x} y={PAD_T - 22} className="fill-text-muted text-[11px] font-medium">
+                        {year}
+                      </text>
+                    ) : null}
+                    <text x={x} y={PAD_T - 7} className="fill-text-muted text-[9px]">
+                      {quarterText}
+                    </text>
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {showTodayLine ? (
+            <g>
+              <line
+                x1={xScale(todayT)}
+                y1={PAD_T}
+                x2={xScale(todayT)}
+                y2={PAD_T + plotH}
+                stroke="#64748b"
+                strokeWidth={1.25}
+                strokeDasharray="5 4"
+                opacity={0.9}
+              />
+              <text
+                x={xScale(todayT)}
+                y={hoyLabelY}
+                textAnchor="middle"
+                className="fill-text-muted text-[9px]"
+              >
+                Hoy
+              </text>
+            </g>
+          ) : null}
+
           {sortedHitos.map((h, i) => {
             const cy = yCenter(i);
             return (
@@ -241,7 +369,9 @@ export function PmSnapshotEvolutionChart({ hitos, orderedCodes }: PmSnapshotEvol
                       strokeWidth={1}
                       opacity={op}
                       className="cursor-crosshair"
-                      style={{ transition: "cx 400ms ease-out, cy 400ms ease-out, opacity 300ms ease-out" }}
+                      style={{
+                        transition: "cx 400ms ease-out, cy 400ms ease-out, opacity 300ms ease-out",
+                      }}
                       onMouseEnter={(e) => {
                         setTooltip({
                           x: e.clientX,

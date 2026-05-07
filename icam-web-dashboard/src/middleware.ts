@@ -7,8 +7,10 @@ export function middleware(request: NextRequest) {
   const isApiRoute = pathname.startsWith("/api/");
   const isProtectedDataApi =
     pathname.startsWith("/api/upload-excel") ||
+    pathname.startsWith("/api/upload-pm-excel") ||
     pathname.startsWith("/api/upload-logs") ||
-    pathname.startsWith("/api/replace-proyectos-status");
+    pathname.startsWith("/api/replace-proyectos-status") ||
+    pathname.startsWith("/api/replace-pm-portfolio-status");
 
   // Todas las rutas /api/*: solo las de datos exigen cookie. Si no, el POST a
   // /api/auth/login caería en !isAuthenticated y se redirigiría a /login sin
@@ -23,7 +25,7 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = authCookie?.value === "authenticated";
 
   if (isLoginPage && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/dashboard/portfolio", request.url));
   }
 
   if (isLoginPage) {

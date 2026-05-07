@@ -1,0 +1,153 @@
+// ============================================================
+// MEDIDAS DAX — Executive Summary (Page 1)
+// Formato TMDL para pbi-tools / PBIP
+// Tabla destino: 'Tabla madre'
+// REGLA CRÍTICA: Solo filas donde [Es Ultima Fila ] = 1
+//   (el filtro debe estar en Power Query; si no, usar CALCULATE + FILTER)
+// ============================================================
+
+measure 'Tabla madre'[Nº Proyectos] = COUNTROWS('Tabla madre')
+    formatString: #,##0
+
+measure 'Tabla madre'[Proyectos Activos] = 
+    COUNTROWS(
+        FILTER('Tabla madre', 'Tabla madre'[Situacion] = "En Marcha")
+    )
+    formatString: #,##0
+
+measure 'Tabla madre'[Proyectos Culminados] = 
+    COUNTROWS(
+        FILTER('Tabla madre', 'Tabla madre'[Situacion] = "Culminado")
+    )
+    formatString: #,##0
+
+measure 'Tabla madre'[Unidades] = SUM('Tabla madre'[Unidades Totales])
+    formatString: #,##0
+
+measure 'Tabla madre'[Inversión Total] = SUM('Tabla madre'[Inversión total])
+    formatString: #,##0.0,, "M€"
+
+measure 'Tabla madre'[GDV Total] = SUM('Tabla madre'[Total Ingresos por venta ])
+    formatString: #,##0.0,, "M€"
+
+measure 'Tabla madre'[Beneficio Total] = SUM('Tabla madre'[Beneficios])
+    formatString: #,##0.0,, "M€"
+
+measure 'Tabla madre'[Margen %] = DIVIDE([Beneficio Total], [Inversión Total], 0)
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[Inversión Media] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[Inversión total] > 0),
+        'Tabla madre'[Inversión total]
+    )
+    formatString: #,##0.0,, "M€"
+
+measure 'Tabla madre'[Beneficio Medio] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[Beneficios] > 0),
+        'Tabla madre'[Beneficios]
+    )
+    formatString: #,##0.0,, "M€"
+
+measure 'Tabla madre'[TIR Media] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] > 0),
+        'Tabla madre'[TIR desp. IS]
+    )
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[TIR Pond.] = 
+    DIVIDE(
+        SUMX(
+            FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] > 0),
+            'Tabla madre'[TIR desp. IS] * 'Tabla madre'[Inversión total]
+        ),
+        SUMX(
+            FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] > 0),
+            'Tabla madre'[Inversión total]
+        )
+    )
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[ROE Medio] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[ROE desp. IS] > 0),
+        'Tabla madre'[ROE desp. IS]
+    )
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[Múltiplo Medio] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[Múltiplo] > 0),
+        'Tabla madre'[Múltiplo]
+    )
+    formatString: 0.00"x"
+
+measure 'Tabla madre'[PIRR Medio] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[Project IRR] > 0),
+        'Tabla madre'[Project IRR]
+    )
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[Unidades Medias] = 
+    AVERAGEX(
+        FILTER('Tabla madre', 'Tabla madre'[Unidades Totales] > 0),
+        'Tabla madre'[Unidades Totales]
+    )
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy TIR Alta] = 
+    COUNTROWS(FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] >= 0.15))
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy TIR Media] = 
+    COUNTROWS(
+        FILTER('Tabla madre',
+            'Tabla madre'[TIR desp. IS] >= 0.10 && 'Tabla madre'[TIR desp. IS] < 0.15
+        )
+    )
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy TIR Baja] = 
+    COUNTROWS(FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] < 0.10 && 'Tabla madre'[TIR desp. IS] > 0))
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy TIR Sup15] = 
+    COUNTROWS(FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] >= 0.15))
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy con Datos] = 
+    COUNTROWS(FILTER('Tabla madre', 'Tabla madre'[TIR desp. IS] > 0))
+    formatString: #,##0
+
+measure 'Tabla madre'[Proy Fondo] = 
+    COUNTROWS(FILTER('Tabla madre', 'Tabla madre'[Tipo de Proyecto] = "Fondo"))
+    formatString: #,##0
+
+measure 'Tabla madre'[Pct Fondo] = 
+    DIVIDE([Proy Fondo], [Nº Proyectos], 0)
+    formatString: 0.0%;-0.0%
+
+measure 'Tabla madre'[Unidades Activos] = 
+    CALCULATE(SUM('Tabla madre'[Unidades Totales]), 'Tabla madre'[Situacion] = "En Marcha")
+    formatString: #,##0
+
+measure 'Tabla madre'[Unidades Culminados] = 
+    CALCULATE(SUM('Tabla madre'[Unidades Totales]), 'Tabla madre'[Situacion] = "Culminado")
+    formatString: #,##0
+
+measure 'Tabla madre'[Subtitulo Proyectos] = 
+    VAR nAct = [Proyectos Activos]
+    VAR nCulm = [Proyectos Culminados]
+    RETURN nAct & " activos · " & nCulm & " culminados"
+    formatString: @
+
+measure 'Tabla madre'[Subtitulo GDV] = 
+    "Margen: " & FORMAT([Margen %], "0.0%")
+    formatString: @
+
+measure 'Tabla madre'[Subtitulo TIR] = 
+    [Proy TIR Sup15] & " de " & [Proy con Datos] & " proyectos > 15%"
+    formatString: @

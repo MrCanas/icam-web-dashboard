@@ -5,6 +5,26 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/dashboard/portfolio", permanent: false },
+      {
+        source: "/dashboard/rentabilidad",
+        destination: "/dashboard/portfolio/rentabilidad",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/proyectos",
+        destination: "/dashboard/portfolio/proyectos",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/tendencias",
+        destination: "/dashboard/portfolio/tendencias",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

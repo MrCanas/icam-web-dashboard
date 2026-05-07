@@ -1,0 +1,60 @@
+{
+  "name": "ICAM Corporate Executive",
+  "dataColors": [
+    "#1E2A56", "#2B3668", "#B89660", "#4A6FA5", "#6B8EBF",
+    "#8AAAD4", "#A0824F", "#3D5A80", "#7B9CC0", "#C4A97D"
+  ],
+  "background": "#F5F5F5",
+  "foreground": "#1E2A56",
+  "tableAccent": "#B89660",
+  "maximum": "#1E2A56",
+  "center": "#B89660",
+  "minimum": "#EAEBEE",
+  "textClasses": {
+    "callout": { "fontSize": 28, "fontFace": "Segoe UI Semibold", "color": "#1E2A56" },
+    "title":   { "fontSize": 14, "fontFace": "Segoe UI Semibold", "color": "#1E2A56" },
+    "header":  { "fontSize": 11, "fontFace": "Segoe UI Semibold", "color": "#1E2A56" },
+    "label":   { "fontSize": 9,  "fontFace": "Segoe UI",          "color": "#8A8A8A" }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [{ "color": { "solid": { "color": "#FFFFFF" } }, "transparency": 0 }],
+        "border":     [{ "color": { "solid": { "color": "#EAEBEE" } }, "radius": 6 }],
+        "title":      [{ "fontColor": { "solid": { "color": "#1E2A56" } }, "fontSize": 11, "fontFamily": "Segoe UI Semibold" }],
+        "visualHeader": [{ "show": false }]
+      }
+    },
+    "card": {
+      "*": {
+        "labels":         [{ "color": { "solid": { "color": "#1E2A56" } }, "fontSize": 28, "fontFamily": "Segoe UI Semibold" }],
+        "categoryLabels": [{ "show": false }]
+      }
+    },
+    "slicer": {
+      "*": {
+        "data":   [{ "mode": { "expr": { "Literal": { "Value": "'Dropdown'" } } } }],
+        "items":  [{ "fontColor": { "solid": { "color": "#2C2C2C" } }, "fontSize": 9 }],
+        "header": [{ "fontColor": { "solid": { "color": "#1E2A56" } }, "fontSize": 10 }]
+      }
+    },
+    "donutChart": {
+      "*": {
+        "legend": [{ "show": true, "position": "Right", "fontSize": 9, "fontFamily": "Segoe UI", "labelColor": { "solid": { "color": "#2C2C2C" } } }],
+        "labels": [{ "show": true, "labelStyle": "Category, percent of total", "fontSize": 9 }]
+      }
+    },
+    "barChart": {
+      "*": {
+        "dataPoint":  [{ "fill": { "solid": { "color": "#1E2A56" } } }],
+        "categoryAxis": [{ "labelColor": { "solid": { "color": "#2C2C2C" } }, "fontSize": 9 }],
+        "valueAxis":    [{ "labelColor": { "solid": { "color": "#8A8A8A" } }, "fontSize": 8, "gridlineShow": true, "gridlineColor": { "solid": { "color": "#EAEBEE" } } }]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [{ "color": { "solid": { "color": "#F5F5F5" } }, "transparency": 0 }]
+      }
+    }
+  }
+}

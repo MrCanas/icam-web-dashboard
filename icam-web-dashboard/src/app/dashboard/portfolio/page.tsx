@@ -17,7 +17,7 @@ interface DashboardPageProps {
   }>;
 }
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+export default async function PortfolioExecutivePage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const selectedSituacion = params.situacion;
   const selectedTipo = params.tipo;
@@ -77,7 +77,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
       {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
-      <FilterBar selectedSituacion={selectedSituacion} selectedTipo={selectedTipo} />
+      <FilterBar
+        selectedSituacion={selectedSituacion}
+        selectedTipo={selectedTipo}
+        basePath="/dashboard/portfolio"
+      />
 
       <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <KPICard

@@ -10,6 +10,7 @@ import {
   trafficLightForActiv,
 } from "@/lib/pm-kpis";
 import { fetchPmPortfolio } from "@/lib/pm-queries";
+import { deviationDaysToMonths } from "@/lib/pm-viz";
 import { createDashboardReadClient } from "@/lib/supabase/dashboard-read";
 
 interface PageProps {
@@ -62,13 +63,17 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
         />
         <KPICard
           title="Desv. media portfolio"
-          value={kpis.desviacionMediaPortfolio != null ? `${kpis.desviacionMediaPortfolio} d` : "—"}
-          subtitle="vs levantamiento (|días|)"
+          value={
+            kpis.desviacionMediaPortfolio != null
+              ? `${deviationDaysToMonths(kpis.desviacionMediaPortfolio)} m`
+              : "—"
+          }
+          subtitle="vs levantamiento (|meses|)"
         />
         <KPICard
           title="Mayor retraso"
           value={kpis.proyectoMayorRetraso ?? "—"}
-          subtitle="Por media |días|"
+          subtitle="Por media |meses|"
         />
       </section>
 
@@ -116,7 +121,7 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
                       : "—"}
                   </td>
                   <td className="p-3">
-                    {mean != null ? `${Math.round(mean)} d (media)` : "—"}
+                    {mean != null ? `${deviationDaysToMonths(mean)} m (media)` : "—"}
                   </td>
                   <td className="p-3">
                     <span

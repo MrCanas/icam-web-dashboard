@@ -86,7 +86,7 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
         </p>
       </section>
 
-      <SortSelector selectedSort={selectedSort} basePath="/dashboard/proyectos" />
+      <SortSelector selectedSort={selectedSort} basePath="/dashboard/portfolio/proyectos" />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {projects.map((project) => (

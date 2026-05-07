@@ -35,7 +35,7 @@ export function LoginForm() {
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace("/dashboard/portfolio");
     router.refresh();
   }
 

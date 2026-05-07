@@ -79,7 +79,7 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
       <FilterBar
         selectedSituacion={selectedSituacion}
         selectedTipo={selectedTipo}
-        basePath="/dashboard/rentabilidad"
+        basePath="/dashboard/portfolio/rentabilidad"
       />
 
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">

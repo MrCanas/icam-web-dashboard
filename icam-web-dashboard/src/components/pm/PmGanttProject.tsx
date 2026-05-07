@@ -8,10 +8,11 @@ import {
   hitoColorIndex,
   type CanonicalHitoEntry,
 } from "@/lib/pm-hito-palette";
+import { axisTopPadding, buildPmAxisModel } from "@/lib/pm-axis";
 import {
-  PM_DOMAIN_END,
-  PM_DOMAIN_START,
   buildGanttSegmentsForProject,
+  computeGanttExtentFromHitos,
+  formatDeviationMonths,
   type GanttSegmentModel,
 } from "@/lib/pm-viz";
 import { PmChartTooltip } from "@/components/pm/PmChartTooltip";
@@ -21,7 +22,6 @@ import { PmTimelineRangeControl } from "@/components/pm/PmTimelineRangeControl";
 const ROW_H = 30;
 const LABEL_W = 200;
 const PAD_R = 28;
-const PAD_T = 36;
 const PAD_B = 36;
 const AXIS_H = 22;
 
@@ -31,25 +31,6 @@ function formatDmY(d: Date): string {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function quarterStartsBetween(start: Date, end: Date): Date[] {
-  const out: Date[] = [];
-  let y = start.getFullYear();
-  let q = Math.floor(start.getMonth() / 3);
-  const endT = end.getTime();
-  while (true) {
-    const d = new Date(y, q * 3, 1);
-    if (d.getTime() >= endT) break;
-    if (d.getTime() >= start.getTime()) out.push(d);
-    q++;
-    if (q >= 4) {
-      q = 0;
-      y++;
-    }
-    if (y > 2040) break;
-  }
-  return out;
 }
 
 interface TooltipState {
@@ -68,14 +49,45 @@ export interface PmGanttProjectProps {
 export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [chartW, setChartW] = useState(960);
-  const [range, setRange] = useState<[Date, Date]>([PM_DOMAIN_START, PM_DOMAIN_END]);
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [hoverSegKey, setHoverSegKey] = useState<string | null>(null);
 
   const sorted = useMemo(
     () => [...hitos].sort((a, b) => a.orden_hito - b.orden_hito),
     [hitos],
   );
+
+  const autoExtent = useMemo(
+    () => computeGanttExtentFromHitos(sorted, snapshot),
+    [sorted, snapshot],
+  );
+
+  const contextKey = useMemo(
+    () => `${snapshot}::${sorted.map((h) => h.id).join(",")}`,
+    [snapshot, sorted],
+  );
+  const prevCtxRef = useRef("");
+  const userAdjustedRangeRef = useRef(false);
+
+  const [range, setRange] = useState<[Date, Date]>(autoExtent);
+
+  useEffect(() => {
+    if (sorted.length === 0) return;
+    const ctxChanged = prevCtxRef.current !== contextKey;
+    if (ctxChanged) {
+      prevCtxRef.current = contextKey;
+      userAdjustedRangeRef.current = false;
+    }
+    if (!userAdjustedRangeRef.current) {
+      setRange(autoExtent);
+    }
+  }, [contextKey, autoExtent, sorted.length]);
+
+  const onRangeChange = useCallback((next: [Date, Date]) => {
+    userAdjustedRangeRef.current = true;
+    setRange(next);
+  }, []);
+
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [hoverSegKey, setHoverSegKey] = useState<string | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -92,6 +104,9 @@ export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
     () => collectCanonicalHitosFromHitos(sorted),
     [sorted],
   );
+
+  const axisModel = useMemo(() => buildPmAxisModel(range[0], range[1]), [range]);
+  const PAD_T = axisTopPadding(axisModel);
 
   const innerW = chartW - LABEL_W - PAD_R;
   const plotH = sorted.length * ROW_H;
@@ -112,20 +127,6 @@ export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
   const todayT = today.getTime();
   const showTodayLine = snapshot !== "fecha_actual" && todayT >= winStart && todayT <= winEnd;
 
-  const yearTicks = useMemo(() => {
-    const ys: number[] = [];
-    for (let y = 2020; y <= 2035; y++) {
-      const t = new Date(y, 0, 1).getTime();
-      if (t >= winStart && t <= winEnd) ys.push(t);
-    }
-    return ys;
-  }, [winStart, winEnd]);
-
-  const quarterTicks = useMemo(
-    () => quarterStartsBetween(new Date(winStart), new Date(winEnd)),
-    [winStart, winEnd],
-  );
-
   const segmentsFull = useMemo(
     () => buildGanttSegmentsForProject(sorted, snapshot, range[0], range[1]),
     [sorted, snapshot, range],
@@ -137,7 +138,12 @@ export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
 
   return (
     <div ref={wrapRef} className="space-y-4 min-w-0">
-      <PmTimelineRangeControl value={range} onChange={setRange} />
+      <PmTimelineRangeControl
+        extentMin={autoExtent[0]}
+        extentMax={autoExtent[1]}
+        value={range}
+        onChange={onRangeChange}
+      />
 
       <div className="overflow-x-auto rounded-lg border border-subtle/50 bg-card">
         <svg
@@ -147,51 +153,67 @@ export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
           role="img"
           aria-label="Gantt de hitos del proyecto"
         >
-          {yearTicks.map((t) => {
-            const x = xScale(t);
-            return (
-              <line
-                key={`y-${t}`}
-                x1={x}
-                y1={PAD_T}
-                x2={x}
-                y2={PAD_T + plotH}
-                className="stroke-subtle/60"
-                strokeWidth={1}
-              />
-            );
-          })}
-
-          {quarterTicks.map((d, i) => {
-            const t = d.getTime();
-            if (d.getMonth() === 0 && d.getDate() === 1) return null;
-            const x = xScale(t);
-            return (
-              <line
-                key={`q-${i}-${t}`}
-                x1={x}
-                y1={PAD_T}
-                x2={x}
-                y2={PAD_T + plotH}
-                className="stroke-subtle/25"
-                strokeWidth={1}
-              />
-            );
-          })}
-
-          {yearTicks.map((t) => {
-            const x = xScale(t);
-            return (
-              <text
-                key={`yl-${t}`}
-                x={x + 4}
-                y={PAD_T - 10}
-                className="fill-text-muted text-[10px]"
-              >
-                {new Date(t).getFullYear()}
-              </text>
-            );
-          })}
+          {axisModel.kind === "annual" ? (
+            <>
+              {axisModel.yearLines.map((t) => {
+                const x = xScale(t);
+                return (
+                  <line
+                    key={`y-${t}`}
+                    x1={x}
+                    y1={PAD_T}
+                    x2={x}
+                    y2={PAD_T + plotH}
+                    className="stroke-subtle/55"
+                    strokeWidth={1}
+                  />
+                );
+              })}
+              {axisModel.yearLines.map((t) => (
+                <text
+                  key={`yl-${t}`}
+                  x={xScale(t) + 4}
+                  y={PAD_T - 10}
+                  className="fill-text-muted text-[10px]"
+                >
+                  {new Date(t).getFullYear()}
+                </text>
+              ))}
+            </>
+          ) : (
+            <>
+              {axisModel.quarterLines.map((t) => {
+                const isYear = axisModel.yearLines.includes(t);
+                const x = xScale(t);
+                return (
+                  <line
+                    key={`q-${t}`}
+                    x1={x}
+                    y1={PAD_T}
+                    x2={x}
+                    y2={PAD_T + plotH}
+                    className={isYear ? "stroke-subtle/55" : "stroke-subtle/28"}
+                    strokeWidth={isYear ? 1 : 0.75}
+                  />
+                );
+              })}
+              {axisModel.labels.map(({ t, showYear, year, quarterText }) => {
+                const x = xScale(t) + 3;
+                return (
+                  <g key={`lb-${t}`}>
+                    {showYear ? (
+                      <text x={x} y={PAD_T - 22} className="fill-text-muted text-[11px] font-medium">
+                        {year}
+                      </text>
+                    ) : null}
+                    <text x={x} y={PAD_T - 7} className="fill-text-muted text-[9px]">
+                      {quarterText}
+                    </text>
+                  </g>
+                );
+              })}
+            </>
+          )}
 
           {showTodayLine ? (
             <line
@@ -287,13 +309,24 @@ export function PmGanttProject({ hitos, snapshot }: PmGanttProjectProps) {
       <PmChartTooltip visible={tooltip !== null} x={tooltip?.x ?? 0} y={tooltip?.y ?? 0}>
         {tooltip ? (
           <div className="space-y-1">
-            <p className="font-semibold">{tooltip.seg.hitoName}</p>
+            <p className="font-semibold flex items-center gap-2">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-sm"
+                style={{
+                  backgroundColor: getHitoColor(
+                    tooltip.seg.hitoName,
+                    hitoColorIndex(canonicalHitos, tooltip.seg.hitoName),
+                  ),
+                }}
+              />
+              {tooltip.seg.hitoName}
+            </p>
             <p>Inicio: {formatDmY(tooltip.seg.start)}</p>
             <p>Fin segmento: {formatDmY(tooltip.seg.end)}</p>
             <p className="text-text-muted">
               Desv. vs plan original (levantamiento):{" "}
               {tooltip.seg.deviationVsBaselineDays != null
-                ? `${tooltip.seg.deviationVsBaselineDays >= 0 ? "+" : ""}${tooltip.seg.deviationVsBaselineDays} d`
+                ? formatDeviationMonths(tooltip.seg.deviationVsBaselineDays)
                 : "N/A"}
             </p>
           </div>

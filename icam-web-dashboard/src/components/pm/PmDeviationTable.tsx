@@ -1,6 +1,10 @@
 "use client";
 
-import type { PmDeviationTableRow, PmDeviationTrend } from "@/lib/pm-viz";
+import {
+  formatDeviationMonths,
+  type PmDeviationTableRow,
+  type PmDeviationTrend,
+} from "@/lib/pm-viz";
 
 function TrendCell({ trend }: { trend: PmDeviationTrend | null }) {
   if (!trend) return <span className="text-text-muted">—</span>;
@@ -34,7 +38,7 @@ export function PmDeviationTable({ rows }: { rows: PmDeviationTableRow[] }) {
             <th className="p-3 font-semibold text-[#1E2A56]">Hito</th>
             <th className="p-3 font-semibold text-[#1E2A56]">Fecha actual</th>
             <th className="p-3 font-semibold text-[#1E2A56]">Fecha levantamiento</th>
-            <th className="p-3 font-semibold text-[#1E2A56]">Desviación (días)</th>
+            <th className="p-3 font-semibold text-[#1E2A56]">Desviación (meses)</th>
             <th className="p-3 font-semibold text-[#1E2A56]">Tendencia</th>
           </tr>
         </thead>
@@ -45,7 +49,7 @@ export function PmDeviationTable({ rows }: { rows: PmDeviationTableRow[] }) {
               <td className="p-3 whitespace-nowrap">{r.fechaActual ?? "—"}</td>
               <td className="p-3 whitespace-nowrap">{r.fechaLevantamiento ?? "—"}</td>
               <td className="p-3 tabular-nums">
-                {r.deviationDays != null ? `${r.deviationDays >= 0 ? "+" : ""}${r.deviationDays}` : "—"}
+                {r.deviationDays != null ? formatDeviationMonths(r.deviationDays) : "—"}
               </td>
               <td className="p-3 text-lg leading-none">
                 <TrendCell trend={r.trend} />
