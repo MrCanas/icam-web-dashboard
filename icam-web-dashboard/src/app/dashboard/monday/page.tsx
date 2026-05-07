@@ -39,7 +39,7 @@ export default async function MondayDashboardPage({ searchParams }: MondayPagePr
       to: params.to,
       groups: selectedGroups,
     }),
-    fetchMondaySyncLogs(1),
+    fetchMondaySyncLogs(1).catch(() => []),
   ]);
 
   if (!data.kpis) {
