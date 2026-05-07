@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const primaryTabs = [
   { href: "/dashboard/portfolio", label: "Portfolio", prefix: "/dashboard/portfolio" },
   { href: "/dashboard/pm/overview", label: "PM", prefix: "/dashboard/pm" },
+  { href: "/dashboard/monday", label: "Monday", prefix: "/dashboard/monday" },
   { href: "/dashboard/data/upload", label: "Data", prefix: "/dashboard/data" },
 ] as const;
 
@@ -55,8 +56,17 @@ const dataSecondary = [
   },
 ] as const;
 
+const mondaySecondary = [
+  {
+    href: "/dashboard/monday",
+    label: "Dashboard",
+    match: (p: string) => p === "/dashboard/monday",
+  },
+] as const;
+
 function secondaryForPath(pathname: string) {
   if (pathname.startsWith("/dashboard/pm")) return pmSecondary;
+  if (pathname.startsWith("/dashboard/monday")) return mondaySecondary;
   if (pathname.startsWith("/dashboard/data")) return dataSecondary;
   return portfolioSecondary;
 }
