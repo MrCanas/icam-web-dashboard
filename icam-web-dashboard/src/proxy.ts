@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const authCookie = request.cookies.get("icam-auth");
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
@@ -13,9 +13,6 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/api/replace-pm-portfolio-status") ||
     pathname.startsWith("/api/monday");
 
-  // Todas las rutas /api/*: solo las de datos exigen cookie. Si no, el POST a
-  // /api/auth/login caería en !isAuthenticated y se redirigiría a /login sin
-  // ejecutar el handler (nunca se enviaría Set-Cookie).
   if (isApiRoute) {
     if (isProtectedDataApi && authCookie?.value !== "authenticated") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -43,3 +40,4 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-icam.png).*)"],
 };
+

@@ -29,18 +29,43 @@ function parseGroups(raw: string | string[] | undefined): MondayStatusGroup[] {
   return parsed.length ? parsed : ["en_analisis"];
 }
 
+async function loadMondayPageData(searchParams: Awaited<MondayPageProps["searchParams"]>) {
+  try {
+    const selectedGroups = parseGroups(searchParams.group);
+    const [data, latestLogs] = await Promise.all([
+      getMondayDashboardData({
+        boardId: searchParams.boardId,
+        from: searchParams.from,
+        to: searchParams.to,
+        groups: selectedGroups,
+      }),
+      fetchMondaySyncLogs(1).catch(() => []),
+    ]);
+    return { data, latestLogs, selectedGroups, error: null as string | null };
+  } catch (error) {
+    console.error("[dashboard/monday] SSR render failed", error);
+    return {
+      data: null,
+      latestLogs: [],
+      selectedGroups: ["en_analisis"] as MondayStatusGroup[],
+      error: "Error cargando dashboard Monday. Revisa variables de entorno y logs de servidor.",
+    };
+  }
+}
+
 export default async function MondayDashboardPage({ searchParams }: MondayPageProps) {
   const params = await searchParams;
-  const selectedGroups = parseGroups(params.group);
-  const [data, latestLogs] = await Promise.all([
-    getMondayDashboardData({
-      boardId: params.boardId,
-      from: params.from,
-      to: params.to,
-      groups: selectedGroups,
-    }),
-    fetchMondaySyncLogs(1).catch(() => []),
-  ]);
+  const loaded = await loadMondayPageData(params);
+
+  if (loaded.error || !loaded.data) {
+    return (
+      <section className="bg-card rounded-lg border border-red-200 p-6 text-red-700">
+        {loaded.error ?? "Error cargando dashboard Monday."}
+      </section>
+    );
+  }
+
+  const { data, latestLogs, selectedGroups } = loaded;
 
   if (!data.kpis) {
     return (

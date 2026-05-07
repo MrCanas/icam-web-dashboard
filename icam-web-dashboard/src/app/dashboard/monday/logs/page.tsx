@@ -37,7 +37,10 @@ async function loadMondayLogsData(params: { boardId?: string; limit?: string }) 
 
 export default async function MondayLogsPage({ searchParams }: MondayLogsPageProps) {
   const params = await searchParams;
-  const [data, syncLogs] = await Promise.all([loadMondayLogsData(params), fetchMondaySyncLogs(200)]);
+  const [data, syncLogs] = await Promise.all([
+    loadMondayLogsData(params),
+    fetchMondaySyncLogs(200).catch(() => []),
+  ]);
 
   return (
     <div className="space-y-4 min-w-0">

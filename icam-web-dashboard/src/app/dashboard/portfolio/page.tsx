@@ -17,27 +17,54 @@ interface DashboardPageProps {
   }>;
 }
 
+async function loadPortfolioData(searchParams: Awaited<DashboardPageProps["searchParams"]>) {
+  try {
+    const selectedSituacion = searchParams.situacion;
+    const selectedTipo = searchParams.tipo;
+
+    const supabase = await createDashboardReadClient();
+    const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
+      supabase
+        .from("proyectos")
+        .select("*", { count: "exact", head: true })
+        .eq("es_ultima_fila", 1),
+      (async () => {
+        let q = supabase.from("proyectos").select("*").eq("es_ultima_fila", 1);
+        if (selectedSituacion) q = q.eq("situacion", selectedSituacion);
+        if (selectedTipo) q = q.eq("tipo_proyecto", selectedTipo);
+        return q.order("proyecto", { ascending: true });
+      })(),
+    ]);
+
+    const { data, error } = filteredResult;
+    return { selectedSituacion, selectedTipo, portfolioCount, countError, data, error, fatal: null as string | null };
+  } catch (error) {
+    console.error("[dashboard/portfolio] SSR render failed", error);
+    return {
+      selectedSituacion: undefined,
+      selectedTipo: undefined,
+      portfolioCount: null,
+      countError: null,
+      data: null,
+      error: null,
+      fatal: "Error cargando Portfolio. Revisa variables de entorno y logs de servidor.",
+    };
+  }
+}
+
 export default async function PortfolioExecutivePage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
-  const selectedSituacion = params.situacion;
-  const selectedTipo = params.tipo;
+  const loaded = await loadPortfolioData(params);
 
-  const supabase = await createDashboardReadClient();
+  if (loaded.fatal) {
+    return (
+      <section className="bg-card rounded-lg border border-red-200 p-6 text-red-700">
+        {loaded.fatal}
+      </section>
+    );
+  }
 
-  const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
-    supabase
-      .from("proyectos")
-      .select("*", { count: "exact", head: true })
-      .eq("es_ultima_fila", 1),
-    (async () => {
-      let q = supabase.from("proyectos").select("*").eq("es_ultima_fila", 1);
-      if (selectedSituacion) q = q.eq("situacion", selectedSituacion);
-      if (selectedTipo) q = q.eq("tipo_proyecto", selectedTipo);
-      return q.order("proyecto", { ascending: true });
-    })(),
-  ]);
-
-  const { data, error } = filteredResult;
+  const { selectedSituacion, selectedTipo, portfolioCount, countError, data, error } = loaded;
 
   if (error || countError) {
     const msg = error?.message ?? countError?.message ?? "Error desconocido";
