@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack && node scripts/vercel-postbuild-fix.mjs",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint src --ext .ts,.tsx"
   },
