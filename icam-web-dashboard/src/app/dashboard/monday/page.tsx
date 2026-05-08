@@ -43,7 +43,15 @@ async function loadMondayPageData(searchParams: Awaited<MondayPageProps["searchP
     ]);
     return { data, latestLogs, selectedGroups, error: null as string | null };
   } catch (error) {
-    console.error("[dashboard/monday] SSR render failed", error);
+    const digest =
+      typeof error === "object" && error !== null && "digest" in error
+        ? String((error as { digest?: unknown }).digest ?? "")
+        : "";
+    console.error("[dashboard/monday] data load failed", {
+      error,
+      digest,
+      searchParams,
+    });
     return {
       data: null,
       latestLogs: [],

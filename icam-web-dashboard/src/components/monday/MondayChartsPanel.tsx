@@ -21,9 +21,9 @@ interface MondayChartsPanelProps {
 export function MondayChartsPanel({ stageMetrics, useMetrics }: MondayChartsPanelProps) {
   return (
     <section className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4">
-      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
+      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
         <h3 className="text-sm font-semibold text-text-primary mb-3">Activos por fase</h3>
-        <div className="h-[260px]">
+        <div className="h-[260px] min-h-[260px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stageMetrics} layout="vertical" margin={{ left: 10, right: 8 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -35,9 +35,9 @@ export function MondayChartsPanel({ stageMetrics, useMetrics }: MondayChartsPane
         </div>
       </article>
 
-      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
+      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
         <h3 className="text-sm font-semibold text-text-primary mb-3">Volumen por fase</h3>
-        <div className="h-[260px]">
+        <div className="h-[260px] min-h-[260px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stageMetrics} margin={{ left: 0, right: 8 }}>
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={70} />
@@ -49,9 +49,9 @@ export function MondayChartsPanel({ stageMetrics, useMetrics }: MondayChartsPane
         </div>
       </article>
 
-      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
+      <article className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
         <h3 className="text-sm font-semibold text-text-primary mb-3">Mix por uso</h3>
-        <div className="h-[260px]">
+        <div className="h-[260px] min-h-[260px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={useMetrics} dataKey="count" nameKey="label" innerRadius={50} outerRadius={86} paddingAngle={2}>
