@@ -7,7 +7,7 @@ export default async function LoginPage() {
   const authCookie = cookieStore.get("icam-auth");
 
   if (authCookie?.value === "authenticated") {
-    redirect("/dashboard");
+    redirect("/dashboard/portfolio");
   }
 
   return <LoginForm />;
