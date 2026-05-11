@@ -20,7 +20,7 @@ function buildHref(basePath: string, sort: SortKey): string {
   return `${basePath}?${params.toString()}`;
 }
 
-export function SortSelector({ selectedSort, basePath = "/dashboard/proyectos" }: SortSelectorProps) {
+export function SortSelector({ selectedSort, basePath = "/dashboard/portfolio/proyectos" }: SortSelectorProps) {
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

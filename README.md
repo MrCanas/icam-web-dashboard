@@ -33,8 +33,4 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-This repository uses **npm workspaces**: the Next.js app lives in `icam-web-dashboard/`, and the root `package.json` runs `npm run build` there. A root [`vercel.json`](vercel.json) sets the framework and uses `npm ci` + `npm run build` from the repo root.
-
-In Vercel → Project → Settings → General: keep **Root Directory** as **`.`** (repository root), or set **Root Directory** to **`icam-web-dashboard`** and rely on that folder’s `package.json` only (then you can ignore the workspace root files if your repo layout differs).
-
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

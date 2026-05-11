@@ -22,8 +22,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  DELETE FROM proyectos;
-
+  DELETE FROM proyectos WHERE true;
+  
   INSERT INTO proyectos (
     proyecto,
     situacion,

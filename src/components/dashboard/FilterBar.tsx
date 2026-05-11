@@ -32,7 +32,7 @@ const chipClass = (active: boolean) =>
 export function FilterBar({
   selectedSituacion,
   selectedTipo,
-  basePath = "/dashboard",
+  basePath = "/dashboard/portfolio",
 }: FilterBarProps) {
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
