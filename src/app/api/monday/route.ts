@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isIcamAuthenticated } from "@/lib/api-auth";
-import { MondayApiError } from "@/lib/monday/client";
-import { getMondayBoardColumns, getMondayBoardItems, getMondayBoards, getMondayMe } from "@/lib/monday/read";
+import { getCurrentUser } from "@/lib/auth/currentUser";
+import { MondayApiError } from "@/modules/monday/data/client";
+import { getMondayBoardColumns, getMondayBoardItems, getMondayBoards, getMondayMe } from "@/modules/monday/data/read";
 
 type MondayScope = "me" | "boards" | "columns" | "items";
 
@@ -14,7 +14,8 @@ function parseScope(value: string | null): MondayScope {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isIcamAuthenticated(request)) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
