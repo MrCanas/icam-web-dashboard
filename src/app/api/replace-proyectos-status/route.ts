@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isIcamAuthenticated } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/auth/currentUser";
 
 /**
  * Comprueba si PostgREST expone el RPC replace_proyectos (solo lectura del OpenAPI).
  * No llama al RPC ni modifica datos.
  */
 export async function GET(request: NextRequest) {
-  if (!isIcamAuthenticated(request)) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

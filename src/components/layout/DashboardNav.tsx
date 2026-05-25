@@ -2,73 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PLATFORM_NAV } from "@/registry/platform-nav";
+import { MODULES, MODULES_LIST } from "@/registry/modules";
+import type { ModuleRoute } from "@/registry/types";
 
 const primaryTabs = [
-  { href: "/dashboard/portfolio", label: "Portfolio", prefix: "/dashboard/portfolio" },
-  { href: "/dashboard/pm/overview", label: "PM", prefix: "/dashboard/pm" },
-  { href: "/dashboard/monday", label: "Monday", prefix: "/dashboard/monday" },
-  { href: "/dashboard/data/upload", label: "Data", prefix: "/dashboard/data" },
-] as const;
+  ...MODULES_LIST.map((mod) => ({
+    href: mod.defaultPath,
+    label: mod.label,
+    prefix: mod.pathPrefix,
+  })),
+  {
+    href: PLATFORM_NAV.defaultPath,
+    label: PLATFORM_NAV.label,
+    prefix: PLATFORM_NAV.pathPrefix,
+  },
+];
 
-const portfolioSecondary = [
-  { href: "/dashboard/portfolio", label: "Executive", match: (p: string) => p === "/dashboard/portfolio" },
-  {
-    href: "/dashboard/portfolio/rentabilidad",
-    label: "Rentabilidad",
-    match: (p: string) => p.startsWith("/dashboard/portfolio/rentabilidad"),
-  },
-  {
-    href: "/dashboard/portfolio/proyectos",
-    label: "Proyectos",
-    match: (p: string) => p.startsWith("/dashboard/portfolio/proyectos"),
-  },
-  {
-    href: "/dashboard/portfolio/tendencias",
-    label: "Tendencias",
-    match: (p: string) => p.startsWith("/dashboard/portfolio/tendencias"),
-  },
-] as const;
+function secondaryForPath(pathname: string): ModuleRoute[] {
+  const module = MODULES_LIST.find((mod) => pathname.startsWith(mod.pathPrefix));
+  if (module) return module.routes;
+  if (pathname.startsWith(PLATFORM_NAV.pathPrefix)) return PLATFORM_NAV.routes;
+  return MODULES.portfolio.routes;
+}
 
-const pmSecondary = [
-  {
-    href: "/dashboard/pm/overview",
-    label: "Overview",
-    match: (p: string) => p === "/dashboard/pm/overview",
-  },
-  {
-    href: "/dashboard/pm/detalle",
-    label: "Detalle proyecto",
-    match: (p: string) =>
-      p === "/dashboard/pm/detalle" || p.startsWith("/dashboard/pm/proyecto/"),
-  },
-] as const;
-
-const dataSecondary = [
-  {
-    href: "/dashboard/data/upload",
-    label: "Subir datos",
-    match: (p: string) => p.startsWith("/dashboard/data/upload"),
-  },
-  {
-    href: "/dashboard/data/activity",
-    label: "Actividad",
-    match: (p: string) => p.startsWith("/dashboard/data/activity"),
-  },
-] as const;
-
-const mondaySecondary = [
-  {
-    href: "/dashboard/monday",
-    label: "Dashboard",
-    match: (p: string) => p === "/dashboard/monday",
-  },
-] as const;
-
-function secondaryForPath(pathname: string) {
-  if (pathname.startsWith("/dashboard/pm")) return pmSecondary;
-  if (pathname.startsWith("/dashboard/monday")) return mondaySecondary;
-  if (pathname.startsWith("/dashboard/data")) return dataSecondary;
-  return portfolioSecondary;
+function isRouteActive(pathname: string, route: ModuleRoute): boolean {
+  if (route.match) return route.match(pathname);
+  return pathname === route.path || pathname.startsWith(`${route.path}/`);
 }
 
 interface DashboardNavProps {
@@ -129,12 +89,12 @@ export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNav
       aria-label="Subsección"
     >
       {secondary.map((tab) => {
-        const active = tab.match(pathname);
+        const active = isRouteActive(pathname, tab);
         if (isVertical) {
           return (
             <Link
-              key={tab.href}
-              href={tab.href}
+              key={tab.path}
+              href={tab.path}
               onClick={onNavigate}
               className={`min-h-11 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
                 active
@@ -148,8 +108,8 @@ export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNav
         }
         return (
           <Link
-            key={tab.href}
-            href={tab.href}
+            key={tab.path}
+            href={tab.path}
             className={`pb-2 text-sm transition ${
               active
                 ? "text-white border-b-[3px] border-icam-gold"

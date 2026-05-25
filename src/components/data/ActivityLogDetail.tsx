@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DataComparisonPanel } from "@/components/data/DataComparisonPanel";
-import type { PortfolioDiffResult } from "@/lib/portfolio-diff";
+import type { PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
 
 function isPortfolioDiffDetalle(d: unknown): d is PortfolioDiffResult {
   if (!d || typeof d !== "object") return false;

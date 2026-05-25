@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isIcamAuthenticated } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/auth/currentUser";
 import {
   isLikelyPmExcelBuffer,
   parsePmOverviewWorkbook,
   type PmReplaceRow,
-} from "@/lib/pm-excel-parser";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+} from "@/modules/pm/data/pm-excel-parser";
+import { insertPmImportLog, replacePmPortfolio } from "@/modules/pm/data/pmRepository";
 
 function previewPayload(
   rows: PmReplaceRow[],
@@ -50,7 +50,8 @@ function serializePmRow(r: PmReplaceRow): Record<string, unknown> {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isIcamAuthenticated(request)) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -110,24 +111,14 @@ export async function POST(request: NextRequest) {
   }
 
   const started = Date.now();
-  let supabase;
-  try {
-    supabase = createServiceRoleClient();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Configuración incompleta";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
   const payload = rows.map((r) => serializePmRow(r));
 
-  const { error: rpcError } = await supabase.rpc("replace_pm_portfolio", {
-    p_rows: payload,
-  });
+  const { error: rpcError } = await replacePmPortfolio(user, payload);
 
   const duracion_ms = Date.now() - started;
 
   if (rpcError) {
-    await supabase.from("pm_import_logs").insert({
+    await insertPmImportLog(user, {
       archivo: archivoNombre,
       estado: "error",
       duracion_ms,
@@ -149,7 +140,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await supabase.from("pm_import_logs").insert({
+  await insertPmImportLog(user, {
     archivo: archivoNombre,
     estado: "completado",
     duracion_ms,

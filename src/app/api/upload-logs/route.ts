@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isIcamAuthenticated } from "@/lib/api-auth";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/currentUser";
+import { listUploadLogs } from "@/modules/portfolio/data/uploadLogsRepository";
 
 export async function GET(request: NextRequest) {
-  if (!isIcamAuthenticated(request)) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   try {
-    const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
-      .from("upload_logs")
-      .select("*")
-      .order("fecha", { ascending: false })
-      .limit(200);
+    const { data, error } = await listUploadLogs(user, 200);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
