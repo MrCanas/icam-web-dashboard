@@ -27,6 +27,27 @@ export function formatLogEntryDate(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Fecha y hora para vista Acta (dd/mm/yyyy hh:mm). */
+export function formatActaEntryDateTime(isoDate: string): string {
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+/** Rango visible en cabecera Acta (solo fecha). */
+export function formatActaRangeDate(isoOrYmd: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrYmd)) {
+    const [y, m, d] = isoOrYmd.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  return formatLogEntryDate(isoOrYmd);
+}
+
 /** Texto para tooltip de entrada editada ("Editada hace 2 horas"). */
 export function formatEditedAgo(isoDate: string | null): string | null {
   if (!isoDate) return null;

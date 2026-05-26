@@ -4,11 +4,17 @@ import { ActasProjectSidebar } from "./ActasProjectSidebar";
 
 interface ActasShellProps {
   projects: ActasProjectListItem[];
+  archivedCount: number;
   loadError: string | null;
   children: React.ReactNode;
 }
 
-export function ActasShell({ projects, loadError, children }: ActasShellProps) {
+export function ActasShell({
+  projects,
+  archivedCount,
+  loadError,
+  children,
+}: ActasShellProps) {
   return (
     <div className="flex flex-col gap-4 min-h-0">
       <header className="bg-card rounded-lg border border-subtle/50 p-4 shrink-0">
@@ -25,7 +31,10 @@ export function ActasShell({ projects, loadError, children }: ActasShellProps) {
       ) : null}
 
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 min-w-0">
-        <ActasProjectSidebar projects={projects} />
+        <ActasProjectSidebar
+          projects={projects}
+          archivedCount={archivedCount}
+        />
         <div className="flex-1 min-w-0">{children}</div>
       </div>
     </div>

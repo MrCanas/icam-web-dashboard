@@ -13,6 +13,23 @@ export interface ActasProjectListItem {
   phase: ProjectPhase;
 }
 
+export interface ActasArchivedProjectListItem {
+  id: string;
+  code: string;
+  name: string;
+  phase: ProjectPhase;
+  /** ISO timestamp de archivado. */
+  archivedAt: string;
+}
+
+/** Proyecto archivado referenciado desde la ruta por código. */
+export interface ActasArchivedProjectRef {
+  id: string;
+  code: string;
+  name: string;
+  archivedAt: string;
+}
+
 export type ActasProjectTab = "operativo" | "acta" | "historico" | "ajustes";
 
 export const ACTAS_PROJECT_TABS: { key: ActasProjectTab; label: string }[] = [
@@ -82,4 +99,82 @@ export interface ActasOperativoCategory {
   sublotLabel: string | null;
   masterGroupId: string | null;
   elements: ActasOperativoElement[];
+}
+
+/** Preset de rango temporal en la vista Acta. */
+export type ActasActaRangePreset = "week" | "month" | "quarter" | "custom";
+
+export interface ActasActaFilterOption {
+  id: string;
+  label: string;
+}
+
+export interface ActasActaAuthorOption {
+  /** `null` = entradas migradas sin autor. */
+  id: string | null;
+  label: string;
+}
+
+export interface ActasActaElementSection {
+  id: string;
+  name: string;
+  depth: number;
+  orderIndex: number;
+  entryCount: number;
+  entries: ActasLogEntryItem[];
+}
+
+export interface ActasActaCategorySection {
+  id: string;
+  name: string;
+  displayName: string;
+  masterGroupId: string | null;
+  orderIndex: number;
+  entryCount: number;
+  elements: ActasActaElementSection[];
+}
+
+export interface ActasActaViewData {
+  categories: ActasActaCategorySection[];
+  totalEntryCount: number;
+  availableCategories: ActasActaFilterOption[];
+  availableAuthors: ActasActaAuthorOption[];
+}
+
+/** Opción en el buscador del hub Histórico. */
+export interface ActasHistoricoElementOption {
+  id: string;
+  name: string;
+  categoryLabel: string;
+  categoryId: string;
+  archived: boolean;
+}
+
+export interface ActasHistoricoElementDetail {
+  element: {
+    id: string;
+    name: string;
+    status: ElementStatus;
+    archivedAt: string | null;
+    createdAt: string;
+    lastActivityAt: string | null;
+    timelineStart: string | null;
+    timelineEnd: string | null;
+  };
+  category: {
+    id: string;
+    displayName: string;
+  };
+  owners: ActasElementOwner[];
+  /** Todas las entradas (incl. borradas), orden ASC por entry_date. */
+  entries: ActasLogEntryItem[];
+}
+
+export interface ActasActaQueryInput {
+  projectId: string;
+  dateFrom: string;
+  dateTo: string;
+  categoryIds?: string[];
+  authorIds?: (string | null)[];
+  onlyWithStatusChange?: boolean;
 }

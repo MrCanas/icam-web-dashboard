@@ -7,7 +7,11 @@ import { toElementStatus } from "../logic/element-status";
 import { mapLogEntryRow } from "./map-log-entry";
 import { resolveUserDisplayMap } from "../logic/user-display";
 import type {
+  ActasArchivedProjectListItem,
+  ActasArchivedProjectRef,
   ActasElementOwner,
+  ActasHistoricoElementDetail,
+  ActasHistoricoElementOption,
   ActasLogEntryItem,
   ActasOperativoCategory,
   ActasProjectDetail,
@@ -59,6 +63,103 @@ export async function fetchActasProjects(
   }));
 
   return { projects, error: null };
+}
+
+export interface FetchActasArchivedProjectsResult {
+  projects: ActasArchivedProjectListItem[];
+  error: string | null;
+}
+
+export async function fetchActasArchivedProjects(
+  ctx: UserContext,
+): Promise<FetchActasArchivedProjectsResult> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data, error } = await supabase
+    .from("project")
+    .select("id, code, name, phase, archived_at")
+    .not("archived_at", "is", null)
+    .order("archived_at", { ascending: false });
+
+  if (error) {
+    return { projects: [], error: error.message };
+  }
+
+  const projects: ActasArchivedProjectListItem[] = (data ?? []).map((row) => ({
+    id: row.id as string,
+    code: row.code as string,
+    name: row.name as string,
+    phase: toProjectPhase(row.phase as string),
+    archivedAt: row.archived_at as string,
+  }));
+
+  return { projects, error: null };
+}
+
+export async function fetchActasArchivedProjectsCount(
+  ctx: UserContext,
+): Promise<{ count: number; error: string | null }> {
+  const supabase = await getActasReadSupabase(ctx);
+  const { count, error } = await supabase
+    .from("project")
+    .select("id", { count: "exact", head: true })
+    .not("archived_at", "is", null);
+
+  if (error) {
+    return { count: 0, error: error.message };
+  }
+  return { count: count ?? 0, error: null };
+}
+
+export type ActasProjectRouteResolution =
+  | { kind: "active"; project: ActasProjectDetail }
+  | { kind: "archived"; project: ActasArchivedProjectRef }
+  | { kind: "not_found" };
+
+export async function resolveActasProjectRoute(
+  ctx: UserContext,
+  projectCode: string,
+): Promise<{ resolution: ActasProjectRouteResolution; error: string | null }> {
+  const supabase = await getActasReadSupabase(ctx);
+  const code = projectCode.trim();
+
+  const { data: row, error: rowErr } = await supabase
+    .from("project")
+    .select("id, code, name, archived_at")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (rowErr) {
+    return { resolution: { kind: "not_found" }, error: rowErr.message };
+  }
+  if (!row) {
+    return { resolution: { kind: "not_found" }, error: null };
+  }
+
+  if (row.archived_at) {
+    return {
+      resolution: {
+        kind: "archived",
+        project: {
+          id: row.id as string,
+          code: row.code as string,
+          name: row.name as string,
+          archivedAt: row.archived_at as string,
+        },
+      },
+      error: null,
+    };
+  }
+
+  const { project, error } = await fetchActasProjectDetail(ctx, code);
+  if (error) {
+    return { resolution: { kind: "not_found" }, error };
+  }
+  if (!project) {
+    return { resolution: { kind: "not_found" }, error: null };
+  }
+
+  return { resolution: { kind: "active", project }, error: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -401,4 +502,218 @@ export async function fetchElementLogEntries(
   );
 
   return { entries, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Tab Histórico (P8.3)
+// ---------------------------------------------------------------------------
+
+export interface FetchHistoricoElementOptionsResult {
+  options: ActasHistoricoElementOption[];
+  error: string | null;
+}
+
+export async function fetchHistoricoElementOptions(
+  ctx: UserContext,
+  projectId: string,
+): Promise<FetchHistoricoElementOptionsResult> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: catRows, error: catErr } = await supabase
+    .from("category")
+    .select("id, name, sublot_label")
+    .eq("project_id", projectId)
+    .is("archived_at", null)
+    .order("order_index", { ascending: true });
+
+  if (catErr) {
+    return { options: [], error: catErr.message };
+  }
+
+  const categories = catRows ?? [];
+  if (categories.length === 0) {
+    return { options: [], error: null };
+  }
+
+  const categoryMeta = new Map(
+    categories.map((c) => [
+      c.id as string,
+      formatCategoryDisplayName(
+        c.name as string,
+        (c.sublot_label as string | null) ?? null,
+      ),
+    ]),
+  );
+  const categoryIds = categories.map((c) => c.id as string);
+
+  const { data: elRows, error: elErr } = await supabase
+    .from("element")
+    .select("id, name, category_id, archived_at")
+    .in("category_id", categoryIds)
+    .order("name", { ascending: true });
+
+  if (elErr) {
+    return { options: [], error: elErr.message };
+  }
+
+  const options: ActasHistoricoElementOption[] = (elRows ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    categoryId: row.category_id as string,
+    categoryLabel: categoryMeta.get(row.category_id as string) ?? "",
+    archived: row.archived_at != null,
+  }));
+
+  return { options, error: null };
+}
+
+export type FetchHistoricoElementDetailResult =
+  | { detail: ActasHistoricoElementDetail; error: null }
+  | { detail: null; error: string | null; notFound?: boolean };
+
+export async function fetchHistoricoElementDetail(
+  ctx: UserContext,
+  projectId: string,
+  elementId: string,
+): Promise<FetchHistoricoElementDetailResult> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: elRow, error: elErr } = await supabase
+    .from("element")
+    .select(
+      "id, name, status, created_at, archived_at, timeline_start, timeline_end, category_id, category:category_id ( id, name, sublot_label, project_id, archived_at )",
+    )
+    .eq("id", elementId)
+    .maybeSingle();
+
+  if (elErr) {
+    return { detail: null, error: elErr.message };
+  }
+  if (!elRow) {
+    return { detail: null, error: null, notFound: true };
+  }
+
+  const categoryJoined = elRow.category as
+    | {
+        id: string;
+        name: string;
+        sublot_label: string | null;
+        project_id: string;
+        archived_at: string | null;
+      }
+    | {
+        id: string;
+        name: string;
+        sublot_label: string | null;
+        project_id: string;
+        archived_at: string | null;
+      }[]
+    | null;
+  const categoryRaw = Array.isArray(categoryJoined)
+    ? categoryJoined[0]
+    : categoryJoined;
+
+  if (!categoryRaw || categoryRaw.project_id !== projectId) {
+    return { detail: null, error: null, notFound: true };
+  }
+
+  const [ownerResult, logResult] = await Promise.all([
+    supabase
+      .from("element_owner")
+      .select("user_id")
+      .eq("element_id", elementId),
+    supabase
+      .from("log_entry")
+      .select(
+        "id, content, entry_date, deleted_at, status_before, status_after, author_id, source, edited_at",
+      )
+      .eq("element_id", elementId)
+      .order("entry_date", { ascending: true }),
+  ]);
+
+  if (ownerResult.error) {
+    return { detail: null, error: ownerResult.error.message };
+  }
+  if (logResult.error) {
+    return { detail: null, error: logResult.error.message };
+  }
+
+  const authorIds = [
+    ...new Set(
+      (logResult.data ?? [])
+        .map((r) => r.author_id as string | null)
+        .filter((id): id is string => id != null),
+    ),
+    ...(ownerResult.data ?? []).map((r) => r.user_id as string),
+  ];
+
+  let userDisplayMap: Map<string, ActasElementOwner>;
+  try {
+    userDisplayMap = await resolveUserDisplayMap(authorIds);
+  } catch (err) {
+    return {
+      detail: null,
+      error: err instanceof Error ? err.message : "Error resolviendo autores",
+    };
+  }
+
+  const entries: ActasLogEntryItem[] = (logResult.data ?? []).map((row) =>
+    mapLogEntryRow(
+      {
+        id: row.id as string,
+        content: row.content as string,
+        entry_date: row.entry_date as string,
+        deleted_at: (row.deleted_at as string | null) ?? null,
+        status_before: row.status_before as string | null,
+        status_after: row.status_after as string | null,
+        author_id: row.author_id as string | null,
+        source: row.source as string | null | undefined,
+        edited_at: row.edited_at as string | null | undefined,
+      },
+      userDisplayMap,
+    ),
+  );
+
+  const activeEntries = entries.filter((e) => e.deletedAt == null);
+  const lastActivityAt =
+    activeEntries.length > 0
+      ? activeEntries[activeEntries.length - 1]!.entryDate
+      : null;
+
+  const owners: ActasElementOwner[] = (ownerResult.data ?? []).map((row) => {
+    const uid = row.user_id as string;
+    return (
+      userDisplayMap.get(uid) ?? {
+        userId: uid,
+        email: null,
+        label: uid.slice(0, 8),
+        initials: uid.slice(0, 2).toUpperCase(),
+      }
+    );
+  });
+
+  return {
+    detail: {
+      element: {
+        id: elRow.id as string,
+        name: elRow.name as string,
+        status: toElementStatus(elRow.status as string),
+        archivedAt: (elRow.archived_at as string | null) ?? null,
+        createdAt: elRow.created_at as string,
+        lastActivityAt,
+        timelineStart: (elRow.timeline_start as string | null) ?? null,
+        timelineEnd: (elRow.timeline_end as string | null) ?? null,
+      },
+      category: {
+        id: categoryRaw.id,
+        displayName: formatCategoryDisplayName(
+          categoryRaw.name,
+          categoryRaw.sublot_label,
+        ),
+      },
+      owners,
+      entries,
+    },
+    error: null,
+  };
 }
