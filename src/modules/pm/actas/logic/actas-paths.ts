@@ -17,3 +17,15 @@ export function actasProjectTabPath(
   const base = actasProjectPath(projectCode);
   return tab === "operativo" ? base : `${base}?tab=${tab}`;
 }
+
+/** FASE 8 — histórico dedicado por elemento (stub: tab Histórico + query). */
+export function actasProjectElementHistoricoPath(
+  projectCode: string,
+  elementId: string,
+): string {
+  const params = new URLSearchParams({
+    tab: "historico",
+    element: elementId,
+  });
+  return `${actasProjectPath(projectCode)}?${params.toString()}`;
+}
