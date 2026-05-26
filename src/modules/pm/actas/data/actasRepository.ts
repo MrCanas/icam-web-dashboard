@@ -4,6 +4,7 @@ import { getActasReadSupabase } from "./readClient";
 import { formatCategoryDisplayName } from "../logic/actas-category-display";
 import { buildElementTree } from "../logic/build-element-tree";
 import { toElementStatus } from "../logic/element-status";
+import { mapLogEntryRow } from "./map-log-entry";
 import { resolveUserDisplayMap } from "../logic/user-display";
 import type {
   ActasElementOwner,
@@ -355,7 +356,7 @@ export async function fetchElementLogEntries(
   const { data: rows, error } = await supabase
     .from("log_entry")
     .select(
-      "id, content, entry_date, deleted_at, status_before, status_after, author_id",
+      "id, content, entry_date, deleted_at, status_before, status_after, author_id, source, edited_at",
     )
     .eq("element_id", elementId)
     .order("entry_date", { ascending: false });
@@ -382,22 +383,22 @@ export async function fetchElementLogEntries(
     };
   }
 
-  const entries = (rows ?? []).map((row) => {
-    const authorId = row.author_id as string | null;
-    const statusBefore = row.status_before as string | null;
-    const statusAfter = row.status_after as string | null;
-
-    return {
-      id: row.id as string,
-      content: row.content as string,
-      entryDate: row.entry_date as string,
-      deletedAt: (row.deleted_at as string | null) ?? null,
-      statusBefore:
-        statusBefore != null ? toElementStatus(statusBefore) : null,
-      statusAfter: statusAfter != null ? toElementStatus(statusAfter) : null,
-      author: authorId ? (userDisplayMap.get(authorId) ?? null) : null,
-    };
-  });
+  const entries = (rows ?? []).map((row) =>
+    mapLogEntryRow(
+      {
+        id: row.id as string,
+        content: row.content as string,
+        entry_date: row.entry_date as string,
+        deleted_at: (row.deleted_at as string | null) ?? null,
+        status_before: row.status_before as string | null,
+        status_after: row.status_after as string | null,
+        author_id: row.author_id as string | null,
+        source: row.source as string | null | undefined,
+        edited_at: row.edited_at as string | null | undefined,
+      },
+      userDisplayMap,
+    ),
+  );
 
   return { entries, error: null };
 }

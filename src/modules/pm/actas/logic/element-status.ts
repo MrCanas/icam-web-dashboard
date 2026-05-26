@@ -25,6 +25,18 @@ const ELEMENT_STATUSES = new Set<ElementStatus>([
   "done",
 ]);
 
+/** Valor del select de estado al crear entrada (vacío = sin cambio). */
+export const LOG_ENTRY_STATUS_OPTIONS: {
+  value: "" | ElementStatus;
+  label: string;
+}[] = [
+  { value: "", label: "Sin cambio" },
+  { value: "not_started", label: ELEMENT_STATUS_LABEL.not_started },
+  { value: "working_on_it", label: ELEMENT_STATUS_LABEL.working_on_it },
+  { value: "stuck", label: ELEMENT_STATUS_LABEL.stuck },
+  { value: "done", label: ELEMENT_STATUS_LABEL.done },
+];
+
 export function toElementStatus(value: string): ElementStatus {
   if (ELEMENT_STATUSES.has(value as ElementStatus)) {
     return value as ElementStatus;

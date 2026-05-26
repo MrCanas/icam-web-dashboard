@@ -12,7 +12,10 @@ export function initialsFromEmail(email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
-function ownerFromAuthUser(id: string, email: string | undefined): ActasElementOwner {
+export function ownerFromAuthUser(
+  id: string,
+  email: string | undefined,
+): ActasElementOwner {
   const mail = email?.trim() ?? "";
   const label = mail ? mail.split("@")[0]! : id.slice(0, 8);
   return {

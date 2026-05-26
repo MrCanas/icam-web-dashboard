@@ -27,6 +27,25 @@ export function formatLogEntryDate(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Texto para tooltip de entrada editada ("Editada hace 2 horas"). */
+export function formatEditedAgo(isoDate: string | null): string | null {
+  if (!isoDate) return null;
+  const past = new Date(isoDate).getTime();
+  if (Number.isNaN(past)) return null;
+  const diffMs = Date.now() - past;
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return "Editada hace un momento";
+  if (minutes < 60) {
+    return minutes === 1 ? "Editada hace 1 minuto" : `Editada hace ${minutes} minutos`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return hours === 1 ? "Editada hace 1 hora" : `Editada hace ${hours} horas`;
+  }
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "Editada hace 1 día" : `Editada hace ${days} días`;
+}
+
 /** Fecha relativa para última entrada de log ("hace 3 días"). */
 export function formatRelativeEntryDate(isoDate: string | null): string {
   const days = daysSince(isoDate);

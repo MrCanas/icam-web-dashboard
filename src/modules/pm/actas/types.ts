@@ -68,6 +68,9 @@ export interface ActasLogEntryItem {
   deletedAt: string | null;
   statusBefore: ElementStatus | null;
   statusAfter: ElementStatus | null;
+  authorId: string | null;
+  source: string | null;
+  editedAt: string | null;
   author: ActasElementOwner | null;
 }
 

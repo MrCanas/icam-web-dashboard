@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { actasProjectElementHistoricoPath } from "@/modules/pm/actas/logic/actas-paths";
 import { OPERATIVO_BOARD_MIN_WIDTH_PX } from "@/modules/pm/actas/logic/element-display";
-import { formatLogEntryDate } from "@/modules/pm/actas/logic/actas-time";
+import { pickLatestActiveEntry } from "@/modules/pm/actas/logic/log-entry-helpers";
 import type { ActasLogEntryItem } from "@/modules/pm/actas/types";
 
-import { ActasLogEntryStatusChip } from "./ActasLogEntryStatusChip";
+import { useActasLogEntryUndo } from "./ActasLogEntryUndoContext";
+import { ActasHistoryEntryItem } from "./ActasHistoryEntryItem";
 
 interface ActasElementHistoryPanelProps {
   elementId: string;
   elementName: string;
   projectCode: string;
   indentPx: number;
+  currentAuthUserId: string | null;
+  reloadNonce?: number;
+  onLastEntryChange?: (latest: ActasLogEntryItem | null) => void;
 }
 
 export function ActasElementHistoryPanel({
@@ -22,11 +27,23 @@ export function ActasElementHistoryPanel({
   elementName,
   projectCode,
   indentPx,
+  currentAuthUserId,
+  reloadNonce = 0,
+  onLastEntryChange,
 }: ActasElementHistoryPanelProps) {
+  const router = useRouter();
+  const { showUndo } = useActasLogEntryUndo();
   const [entries, setEntries] = useState<ActasLogEntryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+
+  const syncLastEntry = useCallback(
+    (list: ActasLogEntryItem[]) => {
+      onLastEntryChange?.(pickLatestActiveEntry(list));
+    },
+    [onLastEntryChange],
+  );
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -42,23 +59,56 @@ export function ActasElementHistoryPanel({
       if (!res.ok) {
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
-      setEntries(body.entries ?? []);
+      const loaded = body.entries ?? [];
+      setEntries(loaded);
+      syncLastEntry(loaded);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Error de carga");
       setEntries([]);
+      syncLastEntry([]);
     } finally {
       setLoading(false);
     }
-  }, [elementId]);
+  }, [elementId, syncLastEntry]);
 
   useEffect(() => {
     void loadEntries();
-  }, [loadEntries]);
+  }, [loadEntries, reloadNonce]);
 
   const visible = showDeleted
     ? entries
     : entries.filter((e) => e.deletedAt == null);
   const deletedCount = entries.filter((e) => e.deletedAt != null).length;
+
+  const applyEntryListChange = (updater: (prev: ActasLogEntryItem[]) => ActasLogEntryItem[]) => {
+    setEntries((prev) => {
+      const next = updater(prev);
+      syncLastEntry(next);
+      return next;
+    });
+  };
+
+  const handleEntryUpdated = (updated: ActasLogEntryItem) => {
+    applyEntryListChange((prev) =>
+      prev.map((e) => (e.id === updated.id ? updated : e)),
+    );
+  };
+
+  const handleEntryDeleted = (deleted: ActasLogEntryItem) => {
+    applyEntryListChange((prev) =>
+      prev.map((e) => (e.id === deleted.id ? deleted : e)),
+    );
+
+    showUndo({
+      logEntryId: deleted.id,
+      onRestored: (restored) => {
+        applyEntryListChange((prev) =>
+          prev.map((e) => (e.id === restored.id ? restored : e)),
+        );
+        router.refresh();
+      },
+    });
+  };
 
   return (
     <div
@@ -113,47 +163,15 @@ export function ActasElementHistoryPanel({
 
         {!loading && !loadError && visible.length > 0 ? (
           <ul className="space-y-3">
-            {visible.map((entry) => {
-              const hasStatusChange =
-                entry.statusBefore != null && entry.statusAfter != null;
-              const isDeleted = entry.deletedAt != null;
-
-              return (
-                <li
-                  key={entry.id}
-                  className={`rounded-md border border-subtle/60 bg-card p-3 ${
-                    isDeleted ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <span className="font-medium text-text-primary">
-                      {entry.author?.email ?? entry.author?.label ?? "Sin autor"}
-                    </span>
-                    <span className="text-text-muted">
-                      {formatLogEntryDate(entry.entryDate)}
-                    </span>
-                    {isDeleted ? (
-                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
-                        Borrada
-                      </span>
-                    ) : null}
-                    {hasStatusChange ? (
-                      <ActasLogEntryStatusChip
-                        statusBefore={entry.statusBefore!}
-                        statusAfter={entry.statusAfter!}
-                      />
-                    ) : null}
-                  </div>
-                  <p
-                    className={`mt-2 text-sm text-text-body whitespace-pre-wrap break-words ${
-                      isDeleted ? "line-through" : ""
-                    }`}
-                  >
-                    {entry.content}
-                  </p>
-                </li>
-              );
-            })}
+            {visible.map((entry) => (
+              <ActasHistoryEntryItem
+                key={entry.id}
+                entry={entry}
+                currentAuthUserId={currentAuthUserId}
+                onUpdated={handleEntryUpdated}
+                onDeleted={handleEntryDeleted}
+              />
+            ))}
           </ul>
         ) : null}
 

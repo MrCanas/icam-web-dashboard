@@ -1,4 +1,5 @@
 import type { UserContext } from "@/lib/auth/currentUser";
+import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { fetchActasProjectOperativo } from "@/modules/pm/actas/data/actasRepository";
 
 import { ActasOperativoBoard } from "./ActasOperativoBoard";
@@ -14,10 +15,11 @@ export async function ActasOperativoTab({
   projectId,
   projectCode,
 }: ActasOperativoTabProps) {
-  const { categories, error } = await fetchActasProjectOperativo(
-    ctx,
-    projectId,
-  );
+  const [operativoResult, currentAuthUserId] = await Promise.all([
+    fetchActasProjectOperativo(ctx, projectId),
+    resolveAuthUserIdByEmail(ctx.email),
+  ]);
+  const { categories, error } = operativoResult;
 
   if (error) {
     return (
@@ -28,6 +30,10 @@ export async function ActasOperativoTab({
   }
 
   return (
-    <ActasOperativoBoard categories={categories} projectCode={projectCode} />
+    <ActasOperativoBoard
+      categories={categories}
+      projectCode={projectCode}
+      currentAuthUserId={currentAuthUserId}
+    />
   );
 }

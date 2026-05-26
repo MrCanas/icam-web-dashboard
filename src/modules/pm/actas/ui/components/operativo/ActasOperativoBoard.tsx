@@ -3,15 +3,18 @@
 import type { ActasOperativoCategory } from "@/modules/pm/actas/types";
 
 import { ActasCategoryGroup } from "./ActasCategoryGroup";
+import { ActasLogEntryUndoProvider } from "./ActasLogEntryUndoContext";
 
 interface ActasOperativoBoardProps {
   categories: ActasOperativoCategory[];
   projectCode: string;
+  currentAuthUserId: string | null;
 }
 
 export function ActasOperativoBoard({
   categories,
   projectCode,
+  currentAuthUserId,
 }: ActasOperativoBoardProps) {
   if (categories.length === 0) {
     return (
@@ -24,24 +27,27 @@ export function ActasOperativoBoard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-b-lg border border-t-0 border-subtle/50 bg-page/40 p-4">
-      {categories.map((category) => (
-        <ActasCategoryGroup
-          key={category.id}
-          category={category}
-          projectCode={projectCode}
-        />
-      ))}
+    <ActasLogEntryUndoProvider>
+      <div className="flex flex-col gap-3 rounded-b-lg border border-t-0 border-subtle/50 bg-page/40 p-4">
+        {categories.map((category) => (
+          <ActasCategoryGroup
+            key={category.id}
+            category={category}
+            projectCode={projectCode}
+            currentAuthUserId={currentAuthUserId}
+          />
+        ))}
 
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-subtle bg-card px-4 py-3 text-sm font-medium text-icam-900 hover:bg-icam-900/5 transition-colors"
-      >
-        <span className="text-lg leading-none font-light" aria-hidden>
-          +
-        </span>
-        Añadir categoría
-      </button>
-    </div>
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-subtle bg-card px-4 py-3 text-sm font-medium text-icam-900 hover:bg-icam-900/5 transition-colors"
+        >
+          <span className="text-lg leading-none font-light" aria-hidden>
+            +
+          </span>
+          Añadir categoría
+        </button>
+      </div>
+    </ActasLogEntryUndoProvider>
   );
 }

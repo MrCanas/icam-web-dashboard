@@ -12,6 +12,7 @@ import { ActasOperativoColumnHeader } from "./ActasOperativoColumnHeader";
 interface ActasCategoryGroupProps {
   category: ActasOperativoCategory;
   projectCode: string;
+  currentAuthUserId: string | null;
   defaultExpanded?: boolean;
 }
 
@@ -30,6 +31,7 @@ function countElements(elements: ActasOperativoCategory["elements"]): number {
 export function ActasCategoryGroup({
   category,
   projectCode,
+  currentAuthUserId,
   defaultExpanded = true,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -77,6 +79,7 @@ export function ActasCategoryGroup({
                 key={el.id}
                 element={el}
                 projectCode={projectCode}
+                currentAuthUserId={currentAuthUserId}
               />
             ))
           )}
