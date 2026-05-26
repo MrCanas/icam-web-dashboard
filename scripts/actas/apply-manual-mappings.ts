@@ -17,6 +17,7 @@ function applyUserManual(): void {
       mapped: boolean;
       unmapped: boolean;
       monday_email: string | null;
+      notes?: string;
     }[];
     summary: Record<string, number>;
   };
