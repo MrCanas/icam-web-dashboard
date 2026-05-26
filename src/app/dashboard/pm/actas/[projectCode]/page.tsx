@@ -40,5 +40,7 @@ export default async function ActasProjectRoutePage({
     return <ActasNotFound projectCode={decoded} />;
   }
 
-  return <ActasProjectPage project={project} activeTab={activeTab} />;
+  return (
+    <ActasProjectPage ctx={ctx} project={project} activeTab={activeTab} />
+  );
 }
