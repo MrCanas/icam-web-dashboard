@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth/currentUser";
-import { fetchActasProjectDetail } from "@/modules/pm/actas/data/actasRepository";
+import { resolveActasProjectRoute } from "@/modules/pm/actas/data/actasRepository";
 import { ActasNotFound } from "@/modules/pm/actas/ui/components/ActasNotFound";
+import { ActasProjectArchivedScreen } from "@/modules/pm/actas/ui/components/ActasProjectArchivedScreen";
 import { ActasProjectPage } from "@/modules/pm/actas/ui/pages/ActasProjectPage";
 import type { ActasProjectTab } from "@/modules/pm/actas/types";
 import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
@@ -26,7 +27,7 @@ export default async function ActasProjectRoutePage({
       ? (tab as ActasProjectTab)
       : "operativo";
 
-  const { project, error } = await fetchActasProjectDetail(ctx, decoded);
+  const { resolution, error } = await resolveActasProjectRoute(ctx, decoded);
 
   if (error) {
     return (
@@ -36,11 +37,19 @@ export default async function ActasProjectRoutePage({
     );
   }
 
-  if (!project) {
+  if (resolution.kind === "not_found") {
     return <ActasNotFound projectCode={decoded} />;
   }
 
+  if (resolution.kind === "archived") {
+    return <ActasProjectArchivedScreen project={resolution.project} />;
+  }
+
   return (
-    <ActasProjectPage ctx={ctx} project={project} activeTab={activeTab} />
+    <ActasProjectPage
+      ctx={ctx}
+      project={resolution.project}
+      activeTab={activeTab}
+    />
   );
 }
