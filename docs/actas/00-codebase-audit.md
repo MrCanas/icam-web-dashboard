@@ -12,170 +12,153 @@
 | **Framework** | **Next.js 16.2.4** (App Router). No es Vite ni CRA. |
 | **UI runtime** | **React 19.2.4** / **react-dom 19.2.4** |
 | **Lenguaje** | TypeScript 5.x (`strict: true`, alias `@/*` → `./src/*`) |
-| **Estilos** | **Tailwind CSS 4** (`@tailwindcss/postcss`, `tailwind.config.js` con tokens ICAM) |
+| **Estilos** | **Tailwind CSS 4** (`@tailwindcss/postcss`, `globals.css` con `@import "tailwindcss"`). Tokens de marca en `tailwind.config.js` (icam-900, gold, page, card, text-*). |
 | **Gráficos** | **Recharts 3.8.1** (portfolio y visualizaciones PM donde aplica) |
 | **Excel** | **xlsx 0.18.5** (carga portfolio y PM) |
-| **UI library de componentes** | **Ninguna** (MUI, Chakra, shadcn, etc.). Componentes propios en `src/components/` y `src/modules/*/ui/`. |
-| **Bundler / dev** | `next dev` (Turbopack en dev según build cache); producción: `next build --webpack` |
+| **UI library de componentes** | **No hay** MUI, shadcn, Radix, etc. Componentes propios en `src/components/` y `src/modules/*/ui/`. |
+| **Build** | `next build --webpack` (producción con Webpack; dev usa Turbopack según `next.config.ts`) |
 
 ### Routing
 
 - **App Router** bajo `src/app/`.
-- Rutas de negocio bajo `/dashboard/<módulo>/...`.
-- Redirects en `next.config.ts`: `/dashboard` → portfolio; rutas legacy (`/dashboard/rentabilidad`, etc.) → portfolio.
-- **Navegación declarativa**: `src/registry/modules.ts` + `src/registry/platform-nav.ts`; renderizada en `src/components/layout/DashboardNav.tsx` (tabs primarios + secundarios).
-- **Middleware (Next 16)**: `src/proxy.ts` exporta `proxy()` — sustituye el patrón clásico `middleware.ts`; protege rutas no-API y APIs de datos sensibles.
+- Entrada raíz: `/` → redirecciones/landing según `src/app/page.tsx`.
+- Dashboard: `/dashboard/*` con layout compartido (`src/app/dashboard/layout.tsx`).
+- Redirects legacy en `next.config.ts` (`/dashboard` → portfolio, rutas antiguas de rentabilidad/proyectos/tendencias).
+- **Navegación declarativa**: `src/registry/modules.ts` + `src/registry/platform-nav.ts`; el shell (`DashboardNav`) deriva pestañas primarias y secundarias de esos registros.
 
 ### State management
 
-- **No hay** Redux, Zustand, Jotai ni React Query.
-- **Servidor**: Server Components cargan datos con `await getCurrentUser()` + repositorios en `modules/*/data/`.
-- **Cliente**:
-  - `CurrentUserProvider` + `useCurrentUser()` (`src/lib/auth/`) — identidad vía `GET /api/me`.
-  - Hooks locales puntuales, p. ej. `useProyectos` en portfolio (`src/modules/portfolio/ui/useProyectos.ts`).
-  - Estado UI local con `useState` / `useEffect` en componentes `"use client"`.
+- **Sin** Redux, Zustand, Jotai ni React Query.
+- **Server Components**: la mayoría de páginas de módulo cargan datos en el servidor con `await getCurrentUser()` + repositorios Supabase.
+- **Cliente**: estado local con `useState` / `useEffect` en componentes `"use client"` (p. ej. Gantt PM, `useProyectos`, menú móvil).
+- **Identidad global**: `CurrentUserProvider` + `useCurrentUser()` (`src/lib/auth/`), alimentado por `GET /api/me`.
 
 ### Data fetching
 
 | Patrón | Uso |
 |--------|-----|
-| **Supabase** (lectura/escritura) | Repositorios en `modules/*/data/*Repository.ts`; clientes en `lib/db/` y `modules/*/data/readClient.ts`. |
-| **Route Handlers** | `src/app/api/*` — uploads Excel, sync Monday, auth, estado de jobs async. |
-| **Monday.com** | API GraphQL vía módulo `monday` (`read.ts`, `dashboard-read.ts`), no Supabase para el board en vivo. |
-| **PM pages** | Fetch en Server Components (`fetchPmPortfolio`, etc.) directamente desde repositorio. |
+| Repositorios en `modules/*/data/*Repository.ts` | Lecturas/escrituras Supabase; primer argumento siempre `UserContext` |
+| Server Components | `fetchPmPortfolio`, `listProyectos`, etc. directamente en `ui/pages/*` |
+| Client hook | `useProyectos` llama al repositorio desde el navegador con usuario del contexto |
+| API Routes (`src/app/api/`) | Upload Excel, sync Monday, auth login/logout, estado de jobs replace |
+| Monday.com | GraphQL/API en `modules/monday/data/` (no Supabase para el board en vivo) |
 
 ---
 
 ## 2. Estructura de carpetas
 
 ```
-icam_dashboard/
-├── src/
-│   ├── app/                    # Rutas Next.js (entry points finos)
-│   │   ├── api/                # Route handlers REST
-│   │   ├── dashboard/          # Shell autenticado + páginas por módulo
-│   │   ├── login/
-│   │   ├── layout.tsx, globals.css, page.tsx
-│   │   └── proxy.ts            # Gate de sesión (middleware Next 16)
-│   ├── modules/                # Dominios de negocio
-│   │   ├── portfolio/          # data | logic | ui | module.ts | types.ts
-│   │   ├── pm/
-│   │   ├── monday/
-│   │   └── _template/          # Plantilla (no registrada en nav)
-│   ├── lib/                    # Infra compartida
-│   │   ├── auth/
-│   │   ├── db/                 # client | server | admin Supabase
-│   │   ├── audit/              # withAudit
-│   │   └── formatters.ts
-│   ├── registry/               # modules.ts, platform-nav.ts, types.ts
-│   └── components/             # Layout + workspace Data (compartido)
-├── scripts/supabase/           # SQL manual (PM, policies, RPC)
-├── supabase/migrations/        # Migraciones versionadas (RLS, audit_log)
-├── docs/                       # Documentación de negocio / actas
-├── ARCHITECTURE.md             # Convenciones canónicas del repo
-└── package.json
+src/
+  app/                    # Rutas Next.js (páginas finas, re-export)
+    api/                  # Route handlers REST
+    dashboard/            # Área autenticada
+    login/
+  modules/                # Dominios de negocio
+    portfolio/
+    pm/
+    monday/
+    _template/            # Plantilla (no registrada en nav)
+  lib/                    # Infra compartida (auth, db, audit, formatters)
+  registry/               # Catálogo de módulos y nav Data
+  components/             # Layout y workspace Data transversal
+  proxy.ts                # Middleware de sesión (Next 16: export proxy)
 ```
 
-### Dónde vive cada concepto
+| Concepto | Ubicación real |
+|----------|----------------|
+| **Pages (rutas)** | `src/app/**/page.tsx` — solo re-exportan desde `modules/*/ui/pages/` |
+| **Páginas de negocio** | `src/modules/<modulo>/ui/pages/*.tsx` |
+| **Components compartidos** | `src/components/` (layout, data upload, activity) |
+| **Components de módulo** | `src/modules/<modulo>/ui/` |
+| **Services** | **No existe** carpeta `services/`. La capa de servicio es `data/*Repository.ts` + `logic/` |
+| **Types** | `src/modules/<modulo>/types.ts` y tipos locales en `data/` (p. ej. `monday/data/types.ts`) |
+| **Hooks** | **No hay** carpeta `hooks/`. Hooks puntuales: `src/lib/auth/useCurrentUser.ts`, `src/modules/portfolio/ui/useProyectos.ts` |
 
-| Concepto | Ubicación real | Notas |
-|----------|----------------|-------|
-| **Pages (rutas)** | `src/app/**/page.tsx` | Casi siempre `export { default } from "@/modules/.../ui/pages/..."` |
-| **Implementación de pantallas** | `src/modules/<módulo>/ui/pages/` | Lógica de presentación y composición |
-| **Components compartidos** | `src/components/` (layout, data upload) | No hay carpeta global `src/components/ui` tipo design system grande |
-| **Services** | **No existe** carpeta `services/` | La capa de servicio es `modules/*/data/*Repository.ts` + `modules/*/logic/` |
-| **Types** | `src/modules/<módulo>/types.ts` + tipos locales en `data/` (p. ej. monday) | Registry: `src/registry/types.ts` |
-| **Hooks** | **No hay** `src/hooks/` | `useCurrentUser`, `useProyectos` colocados junto a su dominio |
+Documentación de referencia: `ARCHITECTURE.md` (raíz), `src/modules/_template/README.md`, `src/modules/portfolio/README.md` (si existe).
 
 ---
 
-## 3. Pestaña «PM» (estado actual)
+## 3. Pestaña «PM»
 
 ### Registro y navegación
 
-Definido en `src/modules/pm/module.ts` y registrado en `src/registry/modules.ts`:
+- Definida en `src/modules/pm/module.ts`, registrada en `src/registry/modules.ts` (`pm: pmModule`).
+- **Pestaña primaria** en el header: label **«PM»**, `pathPrefix: /dashboard/pm`, landing `defaultPath: /dashboard/pm/overview`.
+- **Subpestañas (nav secundario)** — sí, dos rutas declaradas:
 
-- **Tab primario:** label `"PM"`, `pathPrefix: "/dashboard/pm"`, landing `defaultPath: "/dashboard/pm/overview"`.
-- **Subpestañas (nav secundario):** sí, **2 rutas** en el registry:
-  1. **Overview** — `/dashboard/pm/overview`
-  2. **Detalle proyecto** — `/dashboard/pm/detalle` (activa también rutas `/dashboard/pm/proyecto/[id]` vía `match` custom)
+| Clave | Ruta | Label |
+|-------|------|-------|
+| `pm.overview` | `/dashboard/pm/overview` | Overview |
+| `pm.detalle` | `/dashboard/pm/detalle` | Detalle proyecto |
 
-No hay más subpestañas registradas (p. ej. no hay tab separado «Proyecto»; el detalle de un activo es ruta dinámica bajo el mismo tab «Detalle proyecto»).
+La ruta dinámica `/dashboard/pm/proyecto/[id]` **no es una tercera pestaña**; activa la subpestaña «Detalle proyecto» vía `match` en `module.ts` (`pathname.startsWith("/dashboard/pm/proyecto/")`).
 
 ### Rutas App Router
 
-| Ruta | Entry `app/` | Implementación |
-|------|----------------|----------------|
-| `/dashboard/pm/overview` | `src/app/dashboard/pm/overview/page.tsx` | `modules/pm/ui/pages/OverviewPage.tsx` |
-| `/dashboard/pm/detalle` | `src/app/dashboard/pm/detalle/page.tsx` | `modules/pm/ui/pages/DetallePage.tsx` |
-| `/dashboard/pm/proyecto/[id]` | `src/app/dashboard/pm/proyecto/[id]/page.tsx` | `modules/pm/ui/pages/ProyectoDetailPage.tsx` |
+| Archivo | Exporta |
+|---------|---------|
+| `src/app/dashboard/pm/overview/page.tsx` | `OverviewPage` |
+| `src/app/dashboard/pm/detalle/page.tsx` | `DetallePage` |
+| `src/app/dashboard/pm/proyecto/[id]/page.tsx` | `ProyectoDetailPage` |
 
-### Cómo se renderiza
+### Renderizado
 
-1. `src/app/dashboard/layout.tsx` — `Header` + `Footer`, `CurrentUserProvider`, `force-dynamic`.
-2. `Header` incluye `DashboardNav`, que detecta `pathname.startsWith("/dashboard/pm")` y muestra las subpestañas del módulo PM.
-3. Las páginas PM son **Server Components** async: obtienen `getCurrentUser()`, llaman `fetchPmPortfolio` / `fetchPmActivoBySlug`, renderizan Gantt, KPIs, tablas de desviación, selector de snapshot (`?snapshot=` en query).
+- **Overview**: Server Component async; `getCurrentUser()` → `fetchPmPortfolio(ctx)`; KPIs, selector de snapshot (`?snapshot=`), Gantt overview, tabla de proyectos con semáforos.
+- **Detalle**: listado de activos con enlaces a ficha por `id_activo`.
+- **Proyecto**: ficha con Gantt de hitos, evolución de snapshots, tabla de desviaciones; query `?snapshot=` para fecha de corte.
 
-### UI específica PM
+Lógica de dominio en `src/modules/pm/logic/` (`pm-kpis`, `pm-viz`, `pm-axis`, `pm-hito-palette`). UI específica en `src/modules/pm/ui/` (`PmGanttOverview`, `PmGanttProject`, etc.).
 
-- Componentes en `src/modules/pm/ui/`: `PmGanttOverview`, `PmGanttProject`, `PmSnapshotSelector`, `PmDeviationTable`, `PmDataUpload`, etc.
-- Lógica pura en `src/modules/pm/logic/`: KPIs, ejes temporales, paleta de hitos, visualización.
-- Reutiliza `KPICard` del módulo portfolio.
+### Carga de datos PM
 
-### Carga de datos
-
-- Lectura: tablas `pm_activos`, `pm_hitos`, `pm_snapshot_fechas` vía `pmRepository.ts`.
-- Escritura / import: `POST /api/upload-pm-excel`, RPC `replace_pm_portfolio`, logs en `pm_import_logs` — auditadas con `withAudit`.
+- Origen: tablas Supabase `pm_activos`, `pm_hitos`, `pm_snapshot_fechas` vía `pmRepository.ts`.
+- Import Excel: `POST /api/upload-pm-excel` + RPC `replace_pm_portfolio` (script SQL en `scripts/supabase/replace_pm_portfolio.sql`).
+- UI de subida en workspace **Data** (`PmDataUpload` integrado en flujo de upload).
 
 ---
 
 ## 4. Integración Supabase
 
-### Clientes
+### Clientes (`src/lib/db/`)
 
 | Archivo | Rol |
 |---------|-----|
-| `src/lib/db/client.ts` | `createBrowserClient` (`@supabase/ssr`) — anon key |
-| `src/lib/db/server.ts` | `createServerClient` con cookies — anon key |
-| `src/lib/db/admin.ts` | `createClient` con **service role** — solo servidor, mutaciones y audit |
+| `client.ts` | `createBrowserClient` (`@supabase/ssr`) — anon key en cliente |
+| `server.ts` | `createServerClient` con cookies — SSR anon |
+| `admin.ts` | `createClient` con **service role** — solo servidor, mutaciones y audit |
 
-Selección de cliente de lectura (portfolio y PM comparten patrón en `getPortfolioReadSupabase` / `getPmReadSupabase`):
+### Por módulo
 
-- En servidor: service role si `SUPABASE_SERVICE_ROLE_KEY` está definida; si no, cliente SSR con anon.
-- En browser: cliente anon.
+- `modules/portfolio/data/readClient.ts` — lectura: service role en servidor si está configurado, si no server anon; en browser usa `client.ts`.
+- `modules/pm/data/readClient.ts` — reutiliza `getPortfolioReadSupabase`; escritura `getPmWriteSupabase` → service role.
+- Patrón documentado: **no** llamar `supabase.from()` fuera de `data/`.
 
-### Auth: dos capas separadas
-
-| Capa | Implementación |
-|------|----------------|
-| **Sesión app ICAM** | Cookie `icam-auth=authenticated` tras `POST /api/auth/login` (credenciales hardcoded en dev). **No usa Supabase Auth.** |
-| **Identidad** | `getCurrentUser()` devuelve usuario mock (`admin@icam.es`) — TODO Entra ID / SSO en código. |
-| **Supabase** | Solo almacén de datos; RLS con políticas permisivas temporales y lectura pública en scripts legacy PM. |
-
-Variables de entorno esperadas:
+### Variables de entorno esperadas
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (servidor, uploads y audit)
+- `SUPABASE_SERVICE_ROLE_KEY` (uploads, RPC, audit)
 
-### Schemas / tablas relevantes
+### Schemas / SQL
 
-**Portfolio:** `proyectos`, `upload_logs` (+ scripts `replace_proyectos.sql`).
+| Ubicación | Contenido |
+|-----------|-----------|
+| `scripts/supabase/pm_schema.sql` | Tablas PM + RLS lectura pública inicial |
+| `scripts/supabase/replace_pm_portfolio.sql` | RPC reemplazo portfolio PM |
+| `scripts/supabase/replace_proyectos.sql` | RPC portfolio financiero |
+| `scripts/supabase/policies_proyectos_read_public.sql` | Políticas lectura `proyectos` |
+| `scripts/supabase/README-policies.md` | Guía operativa RLS |
+| `supabase/migrations/` | `enable_rls_temp_allow_all`, `audit_log` |
 
-**PM** (`scripts/supabase/pm_schema.sql`):
+Tablas PM principales: `pm_activos`, `pm_hitos`, `pm_snapshot_fechas`, `pm_activo_proyecto_map`, `pm_import_logs`. Portfolio: `proyectos`, `upload_logs`. Transversal: `audit_log`, `monday_sync_logs`.
 
-- `pm_activos`, `pm_hitos`, `pm_snapshot_fechas`, `pm_activo_proyecto_map`, `pm_import_logs`
-- RPC: `replace_pm_portfolio`
+### Auth
 
-**Monday:** `monday_sync_logs` (sync vía API Monday + persistencia).
-
-**Plataforma:** `audit_log` (migración `supabase/migrations/20260521110000_audit_log.sql`).
-
-**RLS:** migración `20260521100000_enable_rls_temp_allow_all.sql` — política `temp_allow_all` en tablas listadas en `ARCHITECTURE.md` (deuda: RBAC real).
-
-### Regla de acceso a datos
-
-Documentado en `ARCHITECTURE.md`: **no** llamar `supabase.from()` fuera de `modules/*/data/`. Primer argumento de repositorios: `UserContext`. Mutaciones envueltas en `withAudit`.
+- **La sesión de la app no es Supabase Auth.**
+- Login: `POST /api/auth/login` con credenciales fijas en código; cookie `icam-auth=authenticated`.
+- Gate: `src/proxy.ts` (middleware Next 16) redirige a `/login` si no hay cookie; APIs de datos sensibles devuelven 401.
+- Identidad: `getCurrentUser()` devuelve usuario mock (`admin@icam.es`) — TODO Entra ID en comentarios.
+- Supabase se usa como **base de datos** con RLS temporal permisivo (`temp_allow_all` en migraciones).
 
 ---
 
@@ -183,88 +166,72 @@ Documentado en `ARCHITECTURE.md`: **no** llamar `supabase.from()` fuera de `modu
 
 ### Tests
 
-| Aspecto | Estado |
-|---------|--------|
-| Framework (Jest / Vitest / Playwright) | **No configurado** en `package.json` |
-| Archivos `*.test.ts` / `*.spec.ts` | **0** en el repo |
-| Script `test` | **Ausente** |
-| CI de tests | No observado en este audit |
-
-Verificación manual documentada: `npx tsc --noEmit` y `npm run build` (`ARCHITECTURE.md`).
+- **No hay** framework de tests en `package.json` (sin Jest, Vitest, Playwright, Cypress).
+- **No hay** archivos `*.test.ts(x)` ni `*.spec.ts(x)` en el repo.
+- Verificación manual documentada: `npx tsc --noEmit` y `npm run build` (`ARCHITECTURE.md`).
 
 ### Linting
 
-| Aspecto | Estado |
-|---------|--------|
-| **ESLint 9** | `eslint.config.mjs` — `eslint-config-next` (core-web-vitals + typescript) |
-| **Script** | `npm run lint` → `eslint src --ext .ts,.tsx` |
-| **Prettier / Husky** | No presentes en dependencias raíz |
-| **Typecheck** | Implícito vía `tsc` en build Next; no hay script `typecheck` dedicado |
+- **ESLint 9** con flat config `eslint.config.mjs`: `eslint-config-next` (core-web-vitals + typescript).
+- Script: `npm run lint` → `eslint src --ext .ts,.tsx`.
+- **No hay** Prettier ni Husky configurados en el proyecto.
 
-`docs/quality-baseline.md` es un stub para tooling de PR (Greptile), no define reglas de calidad locales.
+### CI / calidad
+
+- `docs/quality-baseline.md` menciona baseline para tooling de PR (Greptile); sin pipeline detallado en este audit.
 
 ---
 
 ## 6. Convenciones del repositorio
 
-Fuente principal: **`ARCHITECTURE.md`** y plantilla **`src/modules/_template/README.md`**.
-
 ### Organización modular
 
-- Cada área de negocio: `data/` (I/O), `logic/` (sin I/O), `ui/` (+ `ui/pages/`), `module.ts`, `types.ts`.
-- Rutas en `app/` son **delgadas** — re-exportan páginas del módulo.
-- Nuevos módulos: copiar `_template`, registrar en `registry/modules.ts`, crear rutas bajo `app/dashboard/<key>/`.
+1. Cada área de negocio = carpeta en `src/modules/<key>/` con `data/`, `logic/`, `ui/`, `module.ts`.
+2. Rutas en `app/` son **delgadas**: `export { default } from "@/modules/.../ui/pages/..."`.
+3. Registro central en `src/registry/modules.ts`; nav Data aparte en `platform-nav.ts`.
 
 ### Naming
 
-| Ámbito | Convención |
-|--------|------------|
-| **Module key** | minúsculas, estable (`portfolio`, `pm`, `monday`) — no renombrar tras release |
-| **Claves de permiso / ruta registry** | `modulo.recurso.accion` con puntos (`pm.read`, `portfolio.rentabilidad`) |
-| **URLs** | kebab-case bajo `/dashboard/` |
-| **Repositorios** | `*Repository.ts`, funciones con `ctx: UserContext` primero |
-| **Auditoría** | `withAudit(ctx, "modulo.recurso.verbo", ...)` |
-| **Imports** | Alias `@/` hacia `src/` |
+| Elemento | Convención |
+|----------|------------|
+| Module `key` | minúsculas, estable (`portfolio`, `pm`, `monday`) — no renombrar tras release |
+| Route keys | `modulo.recurso` o path segment (`pm.overview`, `portfolio.rentabilidad`) |
+| Permission actions | `modulo.read`, `modulo.write`, `modulo.sync`, etc. |
+| URLs | kebab-case bajo `/dashboard/` |
+| Audit actions | `modulo.recurso.verbo` (`pm.import_log.create`, `portfolio.upload_log.create`) |
+| Repositorios | `*Repository.ts`, funciones con `ctx: UserContext` primero |
+| Mutaciones Supabase | envueltas en `withAudit` (`src/lib/audit/withAudit.ts`) |
 
 ### Patrones técnicos
 
-- **Server-first**: dashboard con RSC; `"use client"` solo donde hace falta interactividad (nav, charts con brush, uploads).
-- **Sin capa `services/`**: repositorios + logic sustituyen servicios clásicos.
-- **Seguridad perimetral**: `proxy.ts` + cookie; APIs de mutación protegidas; Supabase service role solo en servidor tras validar sesión.
-- **Módulo de referencia**: `portfolio`; PM sigue el mismo esquema registry + repository + páginas finas.
-- **Data workspace**: no es `ModuleDefinition`; vive en `platform-nav.ts` (Upload, Actividad).
+- **RSC por defecto** en páginas de dashboard; `"use client"` solo donde hay interactividad (nav, gráficos interactivos, hooks).
+- **Separación logic/data/ui** estricta; KPIs y transforms en `logic/`.
+- **Reutilización cross-módulo**: PM usa `KPICard` de portfolio; PM read client delega en portfolio read client.
+- **Plantilla nuevos módulos**: copiar `_template`, registrar en `modules.ts`, crear rutas `app/dashboard/<key>/`.
+- **Middleware**: Next 16 usa `src/proxy.ts` con `export function proxy` (no `middleware.ts` en raíz).
 
-### Documentación existente (fuera de actas)
+### Otros módulos (contexto nav)
 
-- `docs/00_README_uso_en_cursor.md`, contexto exec summary, diccionario campos.
-- `PROMPT_CURSOR_NEXTJS.md`, `AGENTS.md` (regla Next.js 16 — consultar docs en `node_modules/next/dist/docs/`).
+| Módulo | `defaultPath` | Subpestañas |
+|--------|---------------|-------------|
+| Portfolio | `/dashboard/portfolio` | Executive, Rentabilidad, Proyectos, Tendencias |
+| Monday | `/dashboard/monday` | Dashboard, Histórico (+ logs en ruta extra `/dashboard/monday/logs`) |
+| Data (plataforma) | `/dashboard/data/upload` | Subir datos, Actividad |
+
+Orden primario en nav: orden de `MODULES_LIST` (portfolio → pm → monday) + Data al final.
 
 ---
 
 ## 7. Resumen ejecutivo
 
-| Pregunta | Respuesta breve |
-|----------|-----------------|
-| ¿React o Next? | **Next.js 16** App Router + React 19 |
-| ¿Vite? | **No** |
-| ¿Estado global? | **No**; contexto de usuario + fetch en servidor |
-| ¿UI kit? | **Tailwind custom** + Recharts |
-| ¿PM dónde? | `/dashboard/pm/*`, módulo `src/modules/pm/` |
-| ¿Subpestañas PM? | **Sí**: Overview + Detalle proyecto (+ detalle por `[id]`) |
-| ¿Supabase? | **Sí**, datos + RLS temporal; auth de app **separada** (cookie ICAM) |
-| ¿Tests? | **No** |
-| ¿Lint? | **ESLint 9** (Next config), script `lint` en `src/` |
+El proyecto es un **portal interno Next.js 16 + React 19** con arquitectura **modular por dominio**, datos en **Supabase** y sesión **propia por cookie** (aún sin SSO). La pestaña **PM** está madura en rutas, subnav y visualización Gantt/KPI, con datos en tablas `pm_*` y carga vía Excel. No hay capa de tests automatizados; la calidad se apoya en TypeScript estricto, ESLint y build. Las convenciones están documentadas y aplicadas de forma consistente en `ARCHITECTURE.md` y el módulo de referencia **portfolio**.
 
 ---
 
-## 8. Deuda / riesgos detectados (informativo)
+## Referencias rápidas
 
-- Auth mock + credenciales en `api/auth/login` — sustituir por Entra ID.
-- RLS `temp_allow_all` y lecturas públicas en scripts PM — endurecer con RBAC.
-- PM y portfolio pueden leer con service role en servidor si la key está presente (omite RLS).
-- Sin tests automatizados — regresiones solo vía build manual.
-- `src/app/dashboard/mapa/page.tsx` existe pero **no** está en el registry de módulos (posible ruta huérfana / legacy).
-
----
-
-*Documento generado por inspección del repo. Para ampliar un módulo concreto, ver su `README.md` bajo `src/modules/<nombre>/` cuando exista.*
+- `package.json` — versiones y scripts
+- `ARCHITECTURE.md` — guía canónica
+- `src/modules/pm/module.ts` — metadatos PM y subpestañas
+- `src/components/layout/DashboardNav.tsx` — render de pestañas
+- `scripts/supabase/pm_schema.sql` — modelo PM en BD
