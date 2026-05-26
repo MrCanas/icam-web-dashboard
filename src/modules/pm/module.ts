@@ -19,6 +19,12 @@ export const pmModule: ModuleDefinition = {
       label: "Detalle proyecto",
       match: (p) => p === "/dashboard/pm/detalle" || p.startsWith("/dashboard/pm/proyecto/"),
     },
+    {
+      key: "pm.actas",
+      path: "/dashboard/pm/actas",
+      label: "Actas",
+      match: (p) => p === "/dashboard/pm/actas" || p.startsWith("/dashboard/pm/actas/"),
+    },
   ],
   actions: [
     { key: "pm.read", label: "Ver" },
