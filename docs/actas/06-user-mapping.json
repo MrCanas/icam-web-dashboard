@@ -1,0 +1,377 @@
+{
+  "generated_at": "2026-05-25T15:36:05.047Z",
+  "description": "Mapa monday_user_id → supabase_user_id (auth.users). Editar supabase_user_id para unmapped antes de migrar.",
+  "mappings": {
+    "63777492": "5275007f-1573-48ac-b420-19bad82f6cd6",
+    "63778536": "d9e72968-5e14-4a43-b49e-839614b80caf",
+    "63778537": "891b61f5-7c97-4183-b3d9-5879a160d1e9",
+    "63778538": "c1dd186c-afa3-4f10-b82b-45e281284057",
+    "63778539": "dd3b4116-f02e-4ca4-bc26-656abc7bf64e",
+    "63778541": "0e9f9a42-16c3-43f5-861e-78e8448fcfa1",
+    "63778543": "bb0336dc-eb63-42aa-955d-5aea684c3602",
+    "63778544": "b385a2a2-1bca-42eb-bbef-962897181fd3",
+    "63778545": "ab3641c7-9309-49f0-bf50-674ef29bf3a0",
+    "63778547": "881d130d-ac74-457e-87ab-3248d332c5ac",
+    "63778548": "99638d20-2c0e-49b4-b2b5-e4f695d6c493",
+    "63778550": "92a807f9-6f77-4a7d-954c-6132d8ea84ae",
+    "63815585": "9b278801-f806-47a2-ae0c-373a323416ca",
+    "64311708": "3ef14f13-107e-4e1f-ab67-f0b6e418af4b",
+    "64386699": "2449cff9-6ce4-432b-80f2-0ac47fb8fce4",
+    "64435059": "f2a8e9c3-3afb-4c72-a727-b8d449cb5a57",
+    "68771637": "937b4431-a93e-4652-ae7a-a1536d0846fd",
+    "70460433": "c5b58250-f26c-4fe4-8fe4-25a44900fa72",
+    "70812205": "56a7afb3-8943-4218-8810-bf1d1c8a249c",
+    "70940351": "9eeb84ac-c8f9-4473-b03d-34bdb873c3e7",
+    "71798471": "4455bf54-13b8-41b3-a63f-b8499de40abd",
+    "71810415": "b150f401-14bc-40b9-93d8-210a38b1fde2",
+    "72413055": "88c484dc-9943-4156-826c-4d66cfc4a45c",
+    "75945908": "45fab804-c214-4df4-9192-8d6ada76f100",
+    "79313705": "1240dcf7-ce10-4beb-9ee5-7f0cbe6fe176",
+    "92115921": "e76c16f1-cd22-4fac-a0b4-ea833e3bfa57",
+    "97279646": "51daa5bd-294a-4af6-b8b0-5750395d7dc9",
+    "100755752": "23adb385-c9bd-4429-b5a8-6acc414220ec",
+    "101372522": "0bf8601f-be23-4c39-9671-da72c7d95356",
+    "101836055": "ce6657e9-1b58-4076-a988-8fd52eaba684",
+    "101868229": "59d611cb-d58c-4c81-ba03-280c045b271d",
+    "102918498": "eb4ce350-767a-4fa6-8db1-dd7721f84b72",
+    "103526723": "096fc59e-aa7a-486b-9ec0-26220353e510"
+  },
+  "users": [
+    {
+      "monday_user_id": "103526723",
+      "monday_name": "8elisaferran@gmail.com",
+      "monday_email": "8elisaferran@gmail.com",
+      "supabase_user_id": "096fc59e-aa7a-486b-9ec0-26220353e510",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "101836055",
+      "monday_name": "Alejandro Flecha Ruiz",
+      "monday_email": "alejandroflecha@imparcapital.com",
+      "supabase_user_id": "ce6657e9-1b58-4076-a988-8fd52eaba684",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63777492",
+      "monday_name": "Alejandro Graffe",
+      "monday_email": "alejandro@imparcapital.com",
+      "supabase_user_id": "5275007f-1573-48ac-b420-19bad82f6cd6",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "101372522",
+      "monday_name": "alejandroflecha@impargrupo.com",
+      "monday_email": "alejandroflecha@impargrupo.com",
+      "supabase_user_id": "0bf8601f-be23-4c39-9671-da72c7d95356",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "64435059",
+      "monday_name": "Almudena Vello",
+      "monday_email": "almudenavello@impargrupo.com",
+      "supabase_user_id": "f2a8e9c3-3afb-4c72-a727-b8d449cb5a57",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "70812205",
+      "monday_name": "Archie",
+      "monday_email": "hdzarturo21@gmail.com",
+      "supabase_user_id": "56a7afb3-8943-4218-8810-bf1d1c8a249c",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "70940351",
+      "monday_name": "Barbara Villar Fontenla",
+      "monday_email": "barbaravillar@imparcapital.com",
+      "supabase_user_id": "9eeb84ac-c8f9-4473-b03d-34bdb873c3e7",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778536",
+      "monday_name": "Carmen Panadero",
+      "monday_email": "carmenpanadero@imparcapital.com",
+      "supabase_user_id": "d9e72968-5e14-4a43-b49e-839614b80caf",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "75945908",
+      "monday_name": "Cristina Riol",
+      "monday_email": "cristinariol@imparcapital.com",
+      "supabase_user_id": "45fab804-c214-4df4-9192-8d6ada76f100",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "102918498",
+      "monday_name": "Elisa Ferran",
+      "monday_email": "elisaferran@gmail.com",
+      "supabase_user_id": "eb4ce350-767a-4fa6-8db1-dd7721f84b72",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778537",
+      "monday_name": "Emiliano Guerrero",
+      "monday_email": "emilianoguerrero@imparcapital.com",
+      "supabase_user_id": "891b61f5-7c97-4183-b3d9-5879a160d1e9",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "70460433",
+      "monday_name": "Fabrizio Agrimi",
+      "monday_email": "fabrizio.agrimi@vbarealestate.com",
+      "supabase_user_id": "c5b58250-f26c-4fe4-8fe4-25a44900fa72",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778539",
+      "monday_name": "Iranzu Vicente",
+      "monday_email": "iranzuvicente@imparcapital.com",
+      "supabase_user_id": "dd3b4116-f02e-4ca4-bc26-656abc7bf64e",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778541",
+      "monday_name": "Isabella París",
+      "monday_email": "isabellaparis@impargrupo.com",
+      "supabase_user_id": "0e9f9a42-16c3-43f5-861e-78e8448fcfa1",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778543",
+      "monday_name": "Jaime A Gómez Sotillo",
+      "monday_email": "jaimegomezsotillo@imparcapital.com",
+      "supabase_user_id": "bb0336dc-eb63-42aa-955d-5aea684c3602",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "72413055",
+      "monday_name": "JAIME GARCIA-FERMIN",
+      "monday_email": "jaimegarciafermin@impargrupo.com",
+      "supabase_user_id": "88c484dc-9943-4156-826c-4d66cfc4a45c",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "68771637",
+      "monday_name": "Javier Canas",
+      "monday_email": "javiercanas@imparcapital.com",
+      "supabase_user_id": "937b4431-a93e-4652-ae7a-a1536d0846fd",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778550",
+      "monday_name": "Javier del Villar Garcia",
+      "monday_email": "javiervillar@imparcapital.com",
+      "supabase_user_id": "92a807f9-6f77-4a7d-954c-6132d8ea84ae",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "64311708",
+      "monday_name": "Jose Carlos Martínez-Cubells Yraola",
+      "monday_email": "josecarlos@impargrupo.com",
+      "supabase_user_id": "3ef14f13-107e-4e1f-ab67-f0b6e418af4b",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "97279646",
+      "monday_name": "Laura Dorda",
+      "monday_email": "lauradorda@imparcapital.com",
+      "supabase_user_id": "51daa5bd-294a-4af6-b8b0-5750395d7dc9",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "101868229",
+      "monday_name": "Laura Ortiz",
+      "monday_email": "lauraortiz@imparproperties.com",
+      "supabase_user_id": "59d611cb-d58c-4c81-ba03-280c045b271d",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "100755752",
+      "monday_name": "Leire Pastrana Torres",
+      "monday_email": "leirepastrana@imparcapital.com",
+      "supabase_user_id": "23adb385-c9bd-4429-b5a8-6acc414220ec",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778538",
+      "monday_name": "Maria Gabriela Quiñones Arzolay",
+      "monday_email": "gabrielaquinones@imparcapital.com",
+      "supabase_user_id": "c1dd186c-afa3-4f10-b82b-45e281284057",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778545",
+      "monday_name": "Maria José Moya",
+      "monday_email": "mariajose@imparcapital.com",
+      "supabase_user_id": "ab3641c7-9309-49f0-bf50-674ef29bf3a0",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "92115921",
+      "monday_name": "María Santos",
+      "monday_email": "mariasantos@imparcapital.com",
+      "supabase_user_id": "e76c16f1-cd22-4fac-a0b4-ea833e3bfa57",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "71810415",
+      "monday_name": "Mariana Ramirez U",
+      "monday_email": "marianaramirez@gmail.com",
+      "supabase_user_id": "b150f401-14bc-40b9-93d8-210a38b1fde2",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778544",
+      "monday_name": "Mayela Torrado",
+      "monday_email": "mayelatorrado@impargrupo.com",
+      "supabase_user_id": "b385a2a2-1bca-42eb-bbef-962897181fd3",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "64386699",
+      "monday_name": "Raquel Guadaño",
+      "monday_email": "raquelguadano@imparcapital.com",
+      "supabase_user_id": "2449cff9-6ce4-432b-80f2-0ac47fb8fce4",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "71798471",
+      "monday_name": "Rebecca Belli",
+      "monday_email": "belli.rebecca@gmail.com",
+      "supabase_user_id": "4455bf54-13b8-41b3-a63f-b8499de40abd",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778548",
+      "monday_name": "Roberto Perri",
+      "monday_email": "robertoperri@imparcapital.com",
+      "supabase_user_id": "99638d20-2c0e-49b4-b2b5-e4f695d6c493",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63815585",
+      "monday_name": "Sofía Gil",
+      "monday_email": "sofiagil@imparcapital.com",
+      "supabase_user_id": "9b278801-f806-47a2-ae0c-373a323416ca",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "79313705",
+      "monday_name": "Vanesa Diaz Rodriguez",
+      "monday_email": "vanesadiaz@imparcapital.com",
+      "supabase_user_id": "1240dcf7-ce10-4beb-9ee5-7f0cbe6fe176",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    },
+    {
+      "monday_user_id": "63778547",
+      "monday_name": "zoraida alcubilla",
+      "monday_email": "zoraida@impargrupo.com",
+      "supabase_user_id": "881d130d-ac74-457e-87ab-3248d332c5ac",
+      "mapped": true,
+      "unmapped": false,
+      "match_method": "email",
+      "notes": null
+    }
+  ],
+  "unmapped_monday_users": [],
+  "summary": {
+    "total_monday_users": 33,
+    "mapped": 33,
+    "unmapped": 0
+  }
+}
