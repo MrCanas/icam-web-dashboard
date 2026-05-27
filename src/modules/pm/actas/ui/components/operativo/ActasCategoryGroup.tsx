@@ -16,6 +16,8 @@ interface ActasCategoryGroupProps {
   defaultExpanded?: boolean;
   readOnly?: boolean;
   asOfDate?: string;
+  onElementArchived?: (message: string) => void;
+  onToast?: (message: string) => void;
 }
 
 function countElements(elements: ActasOperativoCategory["elements"]): number {
@@ -37,6 +39,8 @@ export function ActasCategoryGroup({
   defaultExpanded = true,
   readOnly = false,
   asOfDate,
+  onElementArchived,
+  onToast,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const style = getCategoryGroupStyle(category.masterGroupId, category.id);
@@ -86,6 +90,8 @@ export function ActasCategoryGroup({
                 currentAuthUserId={currentAuthUserId}
                 readOnly={readOnly}
                 asOfDate={asOfDate}
+                onElementArchived={onElementArchived}
+                onToast={onToast}
               />
             ))
           )}
