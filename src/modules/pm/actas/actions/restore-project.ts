@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 
 export type RestoreProjectInput = {
@@ -15,6 +17,10 @@ export type RestoreProjectResult =
 export async function restoreProject(
   input: RestoreProjectInput,
 ): Promise<RestoreProjectResult> {
+  const user = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(user, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
+
   const auth = await getActasAuthenticatedSupabase();
   if (!auth.client) {
     return { ok: false, error: auth.error };

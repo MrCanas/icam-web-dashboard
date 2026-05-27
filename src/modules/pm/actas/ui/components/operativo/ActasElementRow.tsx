@@ -1,22 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
+import { countElementDescendants } from "@/modules/pm/actas/logic/count-element-descendants";
 import {
   truncateEntryPreview,
-  formatTimelineRange,
   OPERATIVO_ROW_GRID,
 } from "@/modules/pm/actas/logic/element-display";
-import {
-  ELEMENT_STATUS_LABEL,
-  ELEMENT_STATUS_STYLE,
-} from "@/modules/pm/actas/logic/element-status";
+import { ActasStatusPicker } from "./ActasStatusPicker";
 import { formatRelativeEntryDate } from "@/modules/pm/actas/logic/actas-time";
-import type { ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
+import type { ActasLogEntryItem, ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
 
 import { ActasAddLogEntryPanel } from "./ActasAddLogEntryPanel";
+import { ActasAddSubelementPanel } from "./ActasAddSubelementPanel";
+import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementHistoryPanel } from "./ActasElementHistoryPanel";
-import { ActasOwnerAvatars } from "./ActasOwnerAvatars";
+import { ActasElementQuickActions } from "./ActasElementQuickActions";
+import { ActasOwnerPicker } from "./ActasOwnerPicker";
 
 interface ActasElementRowProps {
   element: ActasOperativoElement;
@@ -25,9 +26,11 @@ interface ActasElementRowProps {
   depth?: number;
   readOnly?: boolean;
   asOfDate?: string;
+  onElementArchived?: (message: string) => void;
+  onToast?: (message: string) => void;
 }
 
-const INDENT_PX = 24;
+const INDENT_PX = 20;
 
 export function ActasElementRow({
   element,
@@ -36,9 +39,14 @@ export function ActasElementRow({
   depth = 0,
   readOnly = false,
   asOfDate,
+  onElementArchived,
+  onToast,
 }: ActasElementRowProps) {
+  const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [historyReloadNonce, setHistoryReloadNonce] = useState(0);
   const [displayStatus, setDisplayStatus] = useState<ElementStatus>(
     element.status,
@@ -47,13 +55,13 @@ export function ActasElementRow({
     element.lastEntryContent,
   );
   const [lastDate, setLastDate] = useState<string | null>(element.lastEntryDate);
+  const [owners, setOwners] = useState(element.owners);
+
+  useEffect(() => {
+    setOwners(element.owners);
+  }, [element.owners]);
 
   const rowStatus = readOnly ? element.status : displayStatus;
-  const statusStyle = ELEMENT_STATUS_STYLE[rowStatus];
-  const timeline = formatTimelineRange(
-    element.timelineStart,
-    element.timelineEnd,
-  );
   const effectivePreview = readOnly ? element.lastEntryContent : lastPreview;
   const entryPreviewText = effectivePreview
     ? truncateEntryPreview(effectivePreview)
@@ -64,34 +72,74 @@ export function ActasElementRow({
   );
   const rowIndent = depth * INDENT_PX;
   const isSubElement = depth > 0;
+  const descendantCount = countElementDescendants(element);
+  const expanded = historyOpen || addOpen || subOpen;
+
+  const handleStatusChange = (
+    newStatus: ElementStatus,
+    entry: ActasLogEntryItem | null,
+  ) => {
+    setDisplayStatus(newStatus);
+    if (entry) {
+      setLastPreview(entry.content);
+      setLastDate(entry.entryDate);
+      setHistoryReloadNonce((n) => n + 1);
+    }
+  };
 
   return (
     <>
       <div className="border-b border-subtle/40">
         <div
-          className={`${OPERATIVO_ROW_GRID} px-4 py-2 transition-colors ${
+          className={`group/row ${OPERATIVO_ROW_GRID} px-3 py-1.5 min-h-9 transition-colors ${
             isSubElement
               ? "bg-page/30 hover:bg-page/50"
               : "bg-card hover:bg-page/60"
-          } ${historyOpen || addOpen ? "bg-page/40" : ""}`}
+          } ${expanded ? "bg-page/40" : ""}`}
         >
           <div
             className={`flex min-w-0 items-center gap-1 ${
-              isSubElement ? "border-l-2 border-icam-900/20 pl-2" : ""
+              isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
             }`}
             style={{ paddingLeft: rowIndent }}
           >
+            {!readOnly ? (
+              <ActasElementQuickActions
+                canAddSubelement={element.canHaveSubelements}
+                historyOpen={historyOpen}
+                onAddEntry={(e) => {
+                  e.stopPropagation();
+                  setAddOpen(true);
+                  setSubOpen(false);
+                }}
+                onAddSubelement={(e) => {
+                  e.stopPropagation();
+                  setSubOpen(true);
+                  setAddOpen(false);
+                }}
+                onToggleHistory={(e) => {
+                  e.stopPropagation();
+                  setHistoryOpen((v) => !v);
+                }}
+                onDelete={(e) => {
+                  e.stopPropagation();
+                  setArchiveOpen(true);
+                }}
+              />
+            ) : (
+              <span className="w-0 shrink-0" aria-hidden />
+            )}
             {isSubElement ? (
               <span
-                className="shrink-0 text-text-muted/60 text-xs select-none"
+                className="shrink-0 text-text-muted/60 text-[10px] select-none"
                 aria-hidden
               >
                 └
               </span>
             ) : null}
             <span
-              className={`truncate text-text-body ${
-                isSubElement ? "text-sm" : "text-sm font-medium"
+              className={`min-w-0 truncate text-text-body ${
+                isSubElement ? "text-xs" : "text-sm font-medium"
               }`}
               title={element.name}
             >
@@ -99,31 +147,31 @@ export function ActasElementRow({
             </span>
           </div>
 
-          <ActasOwnerAvatars owners={element.owners} />
+          <ActasOwnerPicker
+            elementId={element.id}
+            owners={owners}
+            compact
+            readOnly={readOnly}
+            onOwnersChange={setOwners}
+            onError={(msg) => onToast?.(msg)}
+          />
 
-          <span
-            className="justify-self-start rounded px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
-            style={{
-              backgroundColor: statusStyle.bg,
-              color: statusStyle.text,
-            }}
-          >
-            {ELEMENT_STATUS_LABEL[rowStatus]}
-          </span>
-
-          <span
-            className="text-xs text-text-body truncate"
-            title={timeline ?? undefined}
-          >
-            {timeline ?? <span className="text-text-muted">—</span>}
-          </span>
+          <ActasStatusPicker
+            elementId={element.id}
+            status={rowStatus}
+            readOnly={readOnly}
+            onStatusChange={handleStatusChange}
+            onError={(msg) => onToast?.(msg)}
+          />
 
           <span
             className="min-w-0 text-xs text-text-body truncate cursor-default"
             title={entryFull.length > 0 ? entryFull : undefined}
           >
             {readOnly && !effectivePreview ? (
-              <span className="text-text-muted italic">Sin actividad previa</span>
+              <span className="text-text-muted italic text-[11px]">
+                Sin actividad previa
+              </span>
             ) : entryPreviewText ? (
               entryPreviewText
             ) : (
@@ -131,35 +179,9 @@ export function ActasElementRow({
             )}
           </span>
 
-          <span className="text-xs text-text-muted whitespace-nowrap">
+          <span className="text-[11px] text-text-muted whitespace-nowrap tabular-nums">
             {(readOnly ? element.lastEntryDate : lastDate) ? relativeDate : "—"}
           </span>
-
-          <div className="justify-self-end flex flex-col items-end gap-0.5">
-            <button
-              type="button"
-              className="text-xs font-medium text-icam-900 hover:text-icam-gold whitespace-nowrap"
-              onClick={(e) => {
-                e.stopPropagation();
-                setHistoryOpen((v) => !v);
-              }}
-              aria-expanded={historyOpen}
-            >
-              {historyOpen ? "▴ Histórico" : "▾ Histórico"}
-            </button>
-            {!readOnly ? (
-              <button
-                type="button"
-                className="text-[11px] text-text-muted hover:text-icam-900 whitespace-nowrap"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setAddOpen(true);
-                }}
-              >
-                + Añadir entrada
-              </button>
-            ) : null}
-          </div>
         </div>
       </div>
 
@@ -176,6 +198,18 @@ export function ActasElementRow({
             setDisplayStatus(elementStatus);
             setHistoryReloadNonce((n) => n + 1);
             setHistoryOpen(true);
+          }}
+        />
+      ) : null}
+
+      {!readOnly && subOpen && element.canHaveSubelements ? (
+        <ActasAddSubelementPanel
+          parentElementId={element.id}
+          indentPx={rowIndent + 8}
+          onCancel={() => setSubOpen(false)}
+          onCreated={() => {
+            setSubOpen(false);
+            router.refresh();
           }}
         />
       ) : null}
@@ -201,6 +235,19 @@ export function ActasElementRow({
         />
       ) : null}
 
+      {archiveOpen ? (
+        <ActasArchiveElementModal
+          elementId={element.id}
+          elementName={element.name}
+          descendantCount={descendantCount}
+          onClose={() => setArchiveOpen(false)}
+          onArchived={({ elementName: archivedName }) => {
+            onElementArchived?.(`${archivedName} eliminado.`);
+            router.refresh();
+          }}
+        />
+      ) : null}
+
       {element.children.map((child) => (
         <ActasElementRow
           key={child.id}
@@ -208,22 +255,12 @@ export function ActasElementRow({
           projectCode={projectCode}
           currentAuthUserId={currentAuthUserId}
           depth={depth + 1}
+          readOnly={readOnly}
+          asOfDate={asOfDate}
+          onElementArchived={onElementArchived}
+          onToast={onToast}
         />
       ))}
-
-      {!readOnly && element.canHaveSubelements ? (
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 border-b border-subtle/40 bg-card/80 px-4 py-2 text-sm text-icam-900/75 hover:bg-icam-900/5 transition-colors"
-          style={{ paddingLeft: rowIndent + 16 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="text-lg leading-none font-light" aria-hidden>
-            +
-          </span>
-          Sub-elemento
-        </button>
-      ) : null}
     </>
   );
 }

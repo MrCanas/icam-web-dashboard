@@ -1,0 +1,378 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+
+import {
+  addElementOwner,
+  getElementOwnerPickerContext,
+  removeElementOwner,
+  searchOrgMembers,
+} from "@/modules/pm/actas/actions/element-owner";
+import { isUnresolvedOwner } from "@/modules/pm/actas/logic/owner-display";
+import {
+  avatarColorFromEmail,
+  avatarColorFromUserId,
+} from "@/modules/pm/actas/logic/actas-avatar";
+import type { ActasElementOwner } from "@/modules/pm/actas/types";
+
+import { ActasOwnerAvatars } from "./ActasOwnerAvatars";
+
+const POPOVER_WIDTH = 280;
+const SEARCH_DEBOUNCE_MS = 250;
+
+interface ActasOwnerPickerProps {
+  elementId: string;
+  owners: ActasElementOwner[];
+  compact?: boolean;
+  readOnly?: boolean;
+  onOwnersChange: (owners: ActasElementOwner[]) => void;
+  onError: (message: string) => void;
+}
+
+function OwnerMiniAvatar({
+  owner,
+  size = "sm",
+  unresolved = false,
+}: {
+  owner: Pick<ActasElementOwner, "userId" | "email" | "initials">;
+  size?: "sm" | "md";
+  unresolved?: boolean;
+}) {
+  const dim = size === "sm" ? "h-5 w-5 text-[8px]" : "h-6 w-6 text-[9px]";
+  const bg = unresolved
+    ? "#9ca3af"
+    : owner.email
+      ? avatarColorFromEmail(owner.email)
+      : avatarColorFromUserId(owner.userId);
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${dim}`}
+      style={{ backgroundColor: bg }}
+    >
+      {unresolved ? "?" : owner.initials}
+    </span>
+  );
+}
+
+export function ActasOwnerPicker({
+  elementId,
+  owners,
+  compact = false,
+  readOnly = false,
+  onOwnersChange,
+  onError,
+}: ActasOwnerPickerProps) {
+  const inputId = useId();
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState("la organización");
+  const [query, setQuery] = useState("");
+  const [members, setMembers] = useState<
+    { userId: string; email: string; label: string; initials: string }[]
+  >([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [pendingUserIds, setPendingUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const ownerIdSet = new Set(owners.map((o) => o.userId));
+
+  const updatePosition = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    let left = rect.left;
+    const top = rect.bottom + 6;
+    if (left + POPOVER_WIDTH > window.innerWidth - 8) {
+      left = window.innerWidth - POPOVER_WIDTH - 8;
+    }
+    setPosition({ top, left });
+  }, []);
+
+  const loadMembers = useCallback(
+    async (org: string, q: string) => {
+      setLoadingMembers(true);
+      const res = await searchOrgMembers({ orgId: org, query: q, limit: 20 });
+      setLoadingMembers(false);
+      if (!res.ok) {
+        onError(res.error);
+        return;
+      }
+      setMembers(res.members);
+    },
+    [onError],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setContextLoading(true);
+    void getElementOwnerPickerContext(elementId).then((res) => {
+      setContextLoading(false);
+      if (!res.ok) {
+        onError(res.error);
+        setOpen(false);
+        return;
+      }
+      setOrgId(res.orgId);
+      setOrgName(res.orgName);
+      void loadMembers(res.orgId, "");
+    });
+    updatePosition();
+  }, [open, elementId, loadMembers, onError, updatePosition]);
+
+  useEffect(() => {
+    if (!open || !orgId) return;
+    const timer = window.setTimeout(() => {
+      void loadMembers(orgId, query);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, orgId, query, loadMembers]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onScrollOrResize = () => updatePosition();
+    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    return () => {
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        popoverRef.current?.contains(target) ||
+        anchorRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [open]);
+
+  const toggleOwner = async (member: {
+    userId: string;
+    email: string;
+    label: string;
+    initials: string;
+  }) => {
+    if (pendingUserIds.has(member.userId)) return;
+
+    const isOwner = ownerIdSet.has(member.userId);
+    const previous = owners;
+    const nextOwner: ActasElementOwner = {
+      userId: member.userId,
+      email: member.email,
+      label: member.label,
+      initials: member.initials,
+    };
+
+    setPendingUserIds((s) => new Set(s).add(member.userId));
+    if (isOwner) {
+      onOwnersChange(owners.filter((o) => o.userId !== member.userId));
+    } else {
+      onOwnersChange([...owners, nextOwner]);
+    }
+
+    const result = isOwner
+      ? await removeElementOwner({ elementId, userId: member.userId })
+      : await addElementOwner({ elementId, userId: member.userId });
+
+    setPendingUserIds((s) => {
+      const n = new Set(s);
+      n.delete(member.userId);
+      return n;
+    });
+
+    if (!result.ok) {
+      onOwnersChange(previous);
+      onError(result.error);
+    }
+  };
+
+  const removeCurrentOwner = async (owner: ActasElementOwner) => {
+    if (pendingUserIds.has(owner.userId)) return;
+    const previous = owners;
+    setPendingUserIds((s) => new Set(s).add(owner.userId));
+    onOwnersChange(owners.filter((o) => o.userId !== owner.userId));
+
+    const result = await removeElementOwner({
+      elementId,
+      userId: owner.userId,
+    });
+
+    setPendingUserIds((s) => {
+      const n = new Set(s);
+      n.delete(owner.userId);
+      return n;
+    });
+
+    if (!result.ok) {
+      onOwnersChange(previous);
+      onError(result.error);
+    }
+  };
+
+  if (readOnly) {
+    return <ActasOwnerAvatars owners={owners} compact={compact} />;
+  }
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="inline-flex items-center rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-icam-900/30"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title="Asignar responsable(s)"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+          setQuery("");
+        }}
+      >
+        <ActasOwnerAvatars owners={owners} compact={compact} />
+      </button>
+
+      {open && position && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={popoverRef}
+              role="dialog"
+              aria-labelledby={`${inputId}-title`}
+              className="fixed z-[70] w-[280px] rounded-lg border border-subtle/60 bg-card shadow-xl"
+              style={{ top: position.top, left: position.left }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-subtle/40 px-3 py-2">
+                <h3
+                  id={`${inputId}-title`}
+                  className="text-xs font-semibold text-text-primary"
+                >
+                  Asignar responsable(s)
+                </h3>
+              </div>
+
+              {owners.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 border-b border-subtle/30 px-3 py-2">
+                  {owners.map((owner) => {
+                    const unresolved = isUnresolvedOwner(owner);
+                    const displayEmail = unresolved
+                      ? "Usuario no encontrado"
+                      : (owner.email ?? owner.label);
+                    return (
+                      <span
+                        key={owner.userId}
+                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-subtle/50 bg-page px-1.5 py-0.5 text-[10px] text-text-body"
+                      >
+                        <OwnerMiniAvatar
+                          owner={owner}
+                          unresolved={unresolved}
+                        />
+                        <span className="truncate max-w-[140px]">
+                          {displayEmail}
+                        </span>
+                        <button
+                          type="button"
+                          className="ml-0.5 text-text-muted hover:text-red-600"
+                          aria-label={`Quitar ${displayEmail}`}
+                          disabled={pendingUserIds.has(owner.userId)}
+                          onClick={() => void removeCurrentOwner(owner)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <div className="p-3 space-y-2">
+                <label htmlFor={inputId} className="sr-only">
+                  Buscar usuario
+                </label>
+                <input
+                  id={inputId}
+                  type="search"
+                  autoFocus
+                  value={query}
+                  placeholder="Buscar usuario por nombre o email…"
+                  className="w-full rounded-md border border-subtle/60 bg-page px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-icam-900/40 focus:outline-none focus:ring-1 focus:ring-icam-900/20"
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+
+                {contextLoading || loadingMembers ? (
+                  <p className="py-2 text-xs text-text-muted">Cargando…</p>
+                ) : members.length === 0 ? (
+                  <p className="py-2 text-xs text-text-muted leading-snug">
+                    Sin coincidencias. ¿Quizá el usuario no es miembro de{" "}
+                    {orgName}?
+                  </p>
+                ) : (
+                  <ul className="max-h-52 overflow-y-auto -mx-1">
+                    {members.map((member) => {
+                      const selected = ownerIdSet.has(member.userId);
+                      return (
+                        <li key={member.userId}>
+                          <button
+                            type="button"
+                            disabled={pendingUserIds.has(member.userId)}
+                            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-page ${
+                              selected ? "bg-icam-900/5" : ""
+                            }`}
+                            onClick={() => void toggleOwner(member)}
+                          >
+                            <OwnerMiniAvatar owner={member} />
+                            <span className="min-w-0 flex-1 truncate text-xs text-text-body">
+                              {member.email}
+                            </span>
+                            {selected ? (
+                              <span
+                                className="shrink-0 text-emerald-600 text-sm"
+                                aria-hidden
+                              >
+                                ✓
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}

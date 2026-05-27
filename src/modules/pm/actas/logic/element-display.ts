@@ -30,8 +30,11 @@ export function formatTimelineRange(
 }
 
 /** Ancho mínimo del tablero (scroll horizontal en pantallas estrechas). */
-export const OPERATIVO_BOARD_MIN_WIDTH_PX = 920;
+export const OPERATIVO_BOARD_MIN_WIDTH_PX = 780;
 
-/** Clases grid compartidas entre cabecera y filas del tablero operativo. */
+/**
+ * Grid compacto (P-UX-1): elemento (+ acciones hover), owner, status, última entrada, fecha.
+ * Sin columna Timeline (dato conservado en modelo para V2).
+ */
 export const OPERATIVO_ROW_GRID =
-  "grid grid-cols-[minmax(160px,1.25fr)_72px_96px_minmax(100px,0.75fr)_minmax(140px,1fr)_88px_80px] gap-x-3 items-center";
+  "grid grid-cols-[minmax(200px,1.5fr)_56px_88px_minmax(120px,1fr)_68px] gap-x-2 items-center";

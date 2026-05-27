@@ -2,6 +2,7 @@
 
 import { DashboardNav } from "@/components/layout/DashboardNav";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export function Header() {
@@ -41,14 +42,22 @@ export function Header() {
             </div>
           </div>
 
-          <form action="/api/auth/logout" method="post" className="hidden lg:block shrink-0">
-            <button
-              type="submit"
-              className="min-h-11 px-2 text-white/50 text-xs text-right leading-tight hover:text-white/80 transition cursor-pointer"
+          <div className="hidden lg:flex items-center gap-3 shrink-0">
+            <Link
+              href="/dashboard/perfil"
+              className="min-h-11 flex items-center text-white/50 text-xs hover:text-white/80 transition"
             >
-              Cerrar sesión
-            </button>
-          </form>
+              Mi perfil
+            </Link>
+            <form action="/api/auth/logout" method="post">
+              <button
+                type="submit"
+                className="min-h-11 px-2 text-white/50 text-xs text-right leading-tight hover:text-white/80 transition cursor-pointer"
+              >
+                Cerrar sesión
+              </button>
+            </form>
+          </div>
         </div>
 
         <div className="hidden lg:block px-3 sm:px-6 lg:px-8 pb-3 pt-1">
@@ -85,14 +94,23 @@ export function Header() {
             <div className="flex-1 overflow-y-auto px-2 py-2">
               <DashboardNav layout="vertical" onNavigate={() => setMenuOpen(false)} />
             </div>
-            <form action="/api/auth/logout" method="post" className="p-3 border-t border-white/10 shrink-0">
-              <button
-                type="submit"
-                className="w-full min-h-11 text-left text-sm text-white/70 hover:text-white py-2 px-2 rounded-md hover:bg-white/5 transition"
+            <div className="p-3 border-t border-white/10 shrink-0 space-y-1">
+              <Link
+                href="/dashboard/perfil"
+                onClick={() => setMenuOpen(false)}
+                className="block w-full min-h-11 text-left text-sm text-white/70 hover:text-white py-2 px-2 rounded-md hover:bg-white/5 transition"
               >
-                Cerrar sesión
-              </button>
-            </form>
+                Mi perfil
+              </Link>
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  className="w-full min-h-11 text-left text-sm text-white/70 hover:text-white py-2 px-2 rounded-md hover:bg-white/5 transition"
+                >
+                  Cerrar sesión
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       ) : null}

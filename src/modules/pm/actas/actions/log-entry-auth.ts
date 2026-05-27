@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { UserContext } from "@/lib/auth/currentUser";
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import {
+  requireWriteAccess,
+  WriteAccessDeniedError,
+} from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 
 export const LOG_ENTRY_SELECT =
@@ -19,6 +23,14 @@ export async function requireLogEntryAuthor(): Promise<
   | { ok: false; error: string }
 > {
   const icamUser = await requireCurrentUser();
+  try {
+    requireWriteAccess(icamUser, "pm");
+  } catch (err) {
+    if (err instanceof WriteAccessDeniedError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
   const authorId = await resolveAuthUserIdByEmail(icamUser.email);
   if (!authorId) {
     return {

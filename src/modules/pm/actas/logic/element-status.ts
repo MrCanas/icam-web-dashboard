@@ -3,7 +3,7 @@ import type { ElementStatus } from "@/modules/pm/actas/types";
 export const ELEMENT_STATUS_LABEL: Record<ElementStatus, string> = {
   not_started: "Sin empezar",
   working_on_it: "En curso",
-  stuck: "Atascado",
+  stuck: "Bloqueado",
   done: "Hecho",
 };
 

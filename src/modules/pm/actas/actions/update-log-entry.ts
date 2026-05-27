@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 import {
@@ -42,6 +43,10 @@ export async function updateLogEntry(
   }
 
   const icamUser = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(icamUser, "pm");
+  if (writeDenied) {
+    return { ok: false, error: writeDenied, forbidden: true };
+  }
   const authorId = await resolveAuthUserIdByEmail(icamUser.email);
   if (!authorId) {
     return {
