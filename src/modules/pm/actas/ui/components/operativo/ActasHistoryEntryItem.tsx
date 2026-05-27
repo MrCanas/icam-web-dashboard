@@ -18,6 +18,7 @@ import { ActasLogEntryStatusChip } from "./ActasLogEntryStatusChip";
 interface ActasHistoryEntryItemProps {
   entry: ActasLogEntryItem;
   currentAuthUserId: string | null;
+  readOnly?: boolean;
   onUpdated: (entry: ActasLogEntryItem) => void;
   onDeleted: (entry: ActasLogEntryItem) => void;
 }
@@ -25,6 +26,7 @@ interface ActasHistoryEntryItemProps {
 export function ActasHistoryEntryItem({
   entry: initialEntry,
   currentAuthUserId,
+  readOnly = false,
   onUpdated,
   onDeleted,
 }: ActasHistoryEntryItemProps) {
@@ -252,7 +254,7 @@ export function ActasHistoryEntryItem({
                 statusAfter={entry.statusAfter!}
               />
             ) : null}
-            {manageable && !isDeleted ? (
+            {manageable && !isDeleted && !readOnly ? (
               <span className="ml-auto flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                 <button
                   type="button"

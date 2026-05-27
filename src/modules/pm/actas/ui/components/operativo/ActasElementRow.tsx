@@ -23,6 +23,8 @@ interface ActasElementRowProps {
   projectCode: string;
   currentAuthUserId: string | null;
   depth?: number;
+  readOnly?: boolean;
+  asOfDate?: string;
 }
 
 const INDENT_PX = 24;
@@ -32,6 +34,8 @@ export function ActasElementRow({
   projectCode,
   currentAuthUserId,
   depth = 0,
+  readOnly = false,
+  asOfDate,
 }: ActasElementRowProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -44,14 +48,20 @@ export function ActasElementRow({
   );
   const [lastDate, setLastDate] = useState<string | null>(element.lastEntryDate);
 
-  const statusStyle = ELEMENT_STATUS_STYLE[displayStatus];
+  const rowStatus = readOnly ? element.status : displayStatus;
+  const statusStyle = ELEMENT_STATUS_STYLE[rowStatus];
   const timeline = formatTimelineRange(
     element.timelineStart,
     element.timelineEnd,
   );
-  const entryPreview = lastPreview ? truncateEntryPreview(lastPreview) : null;
-  const entryFull = lastPreview?.trim() ?? "";
-  const relativeDate = formatRelativeEntryDate(lastDate);
+  const effectivePreview = readOnly ? element.lastEntryContent : lastPreview;
+  const entryPreviewText = effectivePreview
+    ? truncateEntryPreview(effectivePreview)
+    : null;
+  const entryFull = effectivePreview?.trim() ?? "";
+  const relativeDate = formatRelativeEntryDate(
+    readOnly ? element.lastEntryDate : lastDate,
+  );
   const rowIndent = depth * INDENT_PX;
   const isSubElement = depth > 0;
 
@@ -98,7 +108,7 @@ export function ActasElementRow({
               color: statusStyle.text,
             }}
           >
-            {ELEMENT_STATUS_LABEL[displayStatus]}
+            {ELEMENT_STATUS_LABEL[rowStatus]}
           </span>
 
           <span
@@ -112,11 +122,17 @@ export function ActasElementRow({
             className="min-w-0 text-xs text-text-body truncate cursor-default"
             title={entryFull.length > 0 ? entryFull : undefined}
           >
-            {entryPreview ?? <span className="text-text-muted">—</span>}
+            {readOnly && !effectivePreview ? (
+              <span className="text-text-muted italic">Sin actividad previa</span>
+            ) : entryPreviewText ? (
+              entryPreviewText
+            ) : (
+              <span className="text-text-muted">—</span>
+            )}
           </span>
 
           <span className="text-xs text-text-muted whitespace-nowrap">
-            {lastDate ? relativeDate : "—"}
+            {(readOnly ? element.lastEntryDate : lastDate) ? relativeDate : "—"}
           </span>
 
           <div className="justify-self-end flex flex-col items-end gap-0.5">
@@ -131,21 +147,23 @@ export function ActasElementRow({
             >
               {historyOpen ? "▴ Histórico" : "▾ Histórico"}
             </button>
-            <button
-              type="button"
-              className="text-[11px] text-text-muted hover:text-icam-900 whitespace-nowrap"
-              onClick={(e) => {
-                e.stopPropagation();
-                setAddOpen(true);
-              }}
-            >
-              + Añadir entrada
-            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                className="text-[11px] text-text-muted hover:text-icam-900 whitespace-nowrap"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddOpen(true);
+                }}
+              >
+                + Añadir entrada
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {addOpen ? (
+      {!readOnly && addOpen ? (
         <ActasAddLogEntryPanel
           elementId={element.id}
           currentStatus={displayStatus}
@@ -170,10 +188,16 @@ export function ActasElementRow({
           currentAuthUserId={currentAuthUserId}
           indentPx={rowIndent + (isSubElement ? 8 : 0)}
           reloadNonce={historyReloadNonce}
-          onLastEntryChange={(latest) => {
-            setLastPreview(latest?.content ?? null);
-            setLastDate(latest?.entryDate ?? null);
-          }}
+          readOnly={readOnly}
+          asOfDate={asOfDate}
+          onLastEntryChange={
+            readOnly
+              ? undefined
+              : (latest) => {
+                  setLastPreview(latest?.content ?? null);
+                  setLastDate(latest?.entryDate ?? null);
+                }
+          }
         />
       ) : null}
 
@@ -187,7 +211,7 @@ export function ActasElementRow({
         />
       ))}
 
-      {element.canHaveSubelements ? (
+      {!readOnly && element.canHaveSubelements ? (
         <button
           type="button"
           className="flex w-full items-center gap-2 border-b border-subtle/40 bg-card/80 px-4 py-2 text-sm text-icam-900/75 hover:bg-icam-900/5 transition-colors"

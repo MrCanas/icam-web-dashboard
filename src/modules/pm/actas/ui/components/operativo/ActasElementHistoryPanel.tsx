@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { actasProjectElementHistoricoPath } from "@/modules/pm/actas/logic/actas-paths";
 import { OPERATIVO_BOARD_MIN_WIDTH_PX } from "@/modules/pm/actas/logic/element-display";
+import { formatAsOfDisplay } from "@/modules/pm/actas/logic/operativo-asof";
 import { pickLatestActiveEntry } from "@/modules/pm/actas/logic/log-entry-helpers";
 import type { ActasLogEntryItem } from "@/modules/pm/actas/types";
 
@@ -19,6 +20,8 @@ interface ActasElementHistoryPanelProps {
   indentPx: number;
   currentAuthUserId: string | null;
   reloadNonce?: number;
+  readOnly?: boolean;
+  asOfDate?: string;
   onLastEntryChange?: (latest: ActasLogEntryItem | null) => void;
 }
 
@@ -29,6 +32,8 @@ export function ActasElementHistoryPanel({
   indentPx,
   currentAuthUserId,
   reloadNonce = 0,
+  readOnly = false,
+  asOfDate,
   onLastEntryChange,
 }: ActasElementHistoryPanelProps) {
   const router = useRouter();
@@ -49,8 +54,11 @@ export function ActasElementHistoryPanel({
     setLoading(true);
     setLoadError(null);
     try {
+      const qs = asOfDate
+        ? `?asOf=${encodeURIComponent(asOfDate)}`
+        : "";
       const res = await fetch(
-        `/api/actas/elements/${encodeURIComponent(elementId)}/log-entries`,
+        `/api/actas/elements/${encodeURIComponent(elementId)}/log-entries${qs}`,
       );
       const body = (await res.json()) as {
         entries?: ActasLogEntryItem[];
@@ -69,7 +77,7 @@ export function ActasElementHistoryPanel({
     } finally {
       setLoading(false);
     }
-  }, [elementId, syncLastEntry]);
+  }, [elementId, asOfDate, syncLastEntry]);
 
   useEffect(() => {
     void loadEntries();
@@ -80,7 +88,9 @@ export function ActasElementHistoryPanel({
     : entries.filter((e) => e.deletedAt == null);
   const deletedCount = entries.filter((e) => e.deletedAt != null).length;
 
-  const applyEntryListChange = (updater: (prev: ActasLogEntryItem[]) => ActasLogEntryItem[]) => {
+  const applyEntryListChange = (
+    updater: (prev: ActasLogEntryItem[]) => ActasLogEntryItem[],
+  ) => {
     setEntries((prev) => {
       const next = updater(prev);
       syncLastEntry(next);
@@ -123,7 +133,7 @@ export function ActasElementHistoryPanel({
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
             Histórico — {elementName}
           </p>
-          {deletedCount > 0 ? (
+          {!readOnly && deletedCount > 0 ? (
             <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -155,9 +165,11 @@ export function ActasElementHistoryPanel({
 
         {!loading && !loadError && visible.length === 0 ? (
           <p className="text-sm text-text-muted italic">
-            {entries.length > 0 && !showDeleted
-              ? "Solo hay entradas borradas. Activa «Mostrar borradas»."
-              : "Sin entradas en el histórico."}
+            {readOnly
+              ? "Sin entradas hasta esta fecha."
+              : entries.length > 0 && !showDeleted
+                ? "Solo hay entradas borradas. Activa «Mostrar borradas»."
+                : "Sin entradas en el histórico."}
           </p>
         ) : null}
 
@@ -168,6 +180,7 @@ export function ActasElementHistoryPanel({
                 key={entry.id}
                 entry={entry}
                 currentAuthUserId={currentAuthUserId}
+                readOnly={readOnly}
                 onUpdated={handleEntryUpdated}
                 onDeleted={handleEntryDeleted}
               />
@@ -175,12 +188,20 @@ export function ActasElementHistoryPanel({
           </ul>
         ) : null}
 
-        <Link
-          href={actasProjectElementHistoricoPath(projectCode, elementId)}
-          className="inline-block text-xs font-medium text-icam-900 hover:text-icam-gold"
-        >
-          Ver histórico completo →
-        </Link>
+        {readOnly && asOfDate ? (
+          <p className="text-xs text-text-muted italic">
+            Solo se muestran entradas hasta el {formatAsOfDisplay(asOfDate)}.
+          </p>
+        ) : null}
+
+        {!readOnly ? (
+          <Link
+            href={actasProjectElementHistoricoPath(projectCode, elementId)}
+            className="inline-block text-xs font-medium text-icam-900 hover:text-icam-gold"
+          >
+            Ver histórico completo →
+          </Link>
+        ) : null}
       </div>
     </div>
   );
