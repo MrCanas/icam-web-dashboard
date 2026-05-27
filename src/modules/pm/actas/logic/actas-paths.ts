@@ -17,9 +17,24 @@ export function actasProjectPath(projectCode: string): string {
 export function actasProjectTabPath(
   projectCode: string,
   tab: ActasProjectTab,
+  options?: { asOf?: string },
 ): string {
   const base = actasProjectPath(projectCode);
-  return tab === "operativo" ? base : `${base}?tab=${tab}`;
+  if (tab !== "operativo") {
+    return `${base}?tab=${tab}`;
+  }
+  if (options?.asOf) {
+    const params = new URLSearchParams({ asOf: options.asOf });
+    return `${base}?${params.toString()}`;
+  }
+  return base;
+}
+
+export function actasProjectOperativoPath(
+  projectCode: string,
+  asOf?: string,
+): string {
+  return actasProjectTabPath(projectCode, "operativo", asOf ? { asOf } : undefined);
 }
 
 export function actasProjectHistoricoHubPath(projectCode: string): string {
@@ -30,12 +45,17 @@ export function actasProjectHistoricoHubPath(projectCode: string): string {
 export function actasProjectElementHistoricoPath(
   projectCode: string,
   elementId: string,
+  logEntryId?: string,
 ): string {
   const params = new URLSearchParams({
     tab: "historico",
     element: elementId,
   });
-  return `${actasProjectPath(projectCode)}?${params.toString()}`;
+  const base = `${actasProjectPath(projectCode)}?${params.toString()}`;
+  if (logEntryId) {
+    return `${base}#entry-${logEntryId}`;
+  }
+  return base;
 }
 
 export function actasElementPermalinkUrl(

@@ -2,6 +2,7 @@ import type { UserContext } from "@/lib/auth/currentUser";
 
 import { getActasReadSupabase } from "./readClient";
 import { formatCategoryDisplayName } from "../logic/actas-category-display";
+import { asOfDateToTimestamptz } from "../logic/operativo-asof";
 import { buildElementTree } from "../logic/build-element-tree";
 import { toElementStatus } from "../logic/element-status";
 import { mapLogEntryRow } from "./map-log-entry";
@@ -451,16 +452,24 @@ export interface FetchElementLogEntriesResult {
 export async function fetchElementLogEntries(
   ctx: UserContext,
   elementId: string,
+  options?: { asOfIsoDate?: string },
 ): Promise<FetchElementLogEntriesResult> {
   const supabase = await getActasReadSupabase(ctx);
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("log_entry")
     .select(
       "id, content, entry_date, deleted_at, status_before, status_after, author_id, source, edited_at",
     )
-    .eq("element_id", elementId)
-    .order("entry_date", { ascending: false });
+    .eq("element_id", elementId);
+
+  if (options?.asOfIsoDate) {
+    query = query.lte("entry_date", asOfDateToTimestamptz(options.asOfIsoDate));
+  }
+
+  const { data: rows, error } = await query.order("entry_date", {
+    ascending: false,
+  });
 
   if (error) {
     return { entries: [], error: error.message };

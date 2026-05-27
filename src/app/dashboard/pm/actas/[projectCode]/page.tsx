@@ -8,7 +8,7 @@ import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
 interface PageProps {
   params: Promise<{ projectCode: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; asOf?: string }>;
 }
 
 export default async function ActasProjectRoutePage({
@@ -19,7 +19,7 @@ export default async function ActasProjectRoutePage({
   if (!ctx) return null;
 
   const { projectCode } = await params;
-  const { tab } = await searchParams;
+  const { tab, asOf } = await searchParams;
   const decoded = decodeURIComponent(projectCode).trim();
 
   const activeTab: ActasProjectTab =
@@ -50,6 +50,7 @@ export default async function ActasProjectRoutePage({
       ctx={ctx}
       project={resolution.project}
       activeTab={activeTab}
+      asOfParam={asOf}
     />
   );
 }

@@ -150,6 +150,20 @@ export interface ActasHistoricoElementOption {
   archived: boolean;
 }
 
+export interface ActasLogSearchResult {
+  logEntryId: string;
+  elementId: string;
+  elementName: string;
+  categoryId: string;
+  categoryName: string;
+  content: string;
+  entryDate: string;
+  authorId: string | null;
+  authorLabel: string;
+  headline: string;
+  rank: number;
+}
+
 export interface ActasHistoricoElementDetail {
   element: {
     id: string;

@@ -49,6 +49,9 @@ export function ActasHistoricoElementView({
   const [loading, setLoading] = useState(true);
   const [showDeleted, setShowDeleted] = useState(false);
   const [shareToast, setShareToast] = useState(false);
+  const [highlightEntryId, setHighlightEntryId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -81,6 +84,35 @@ export function ActasHistoricoElementView({
     () => buildHistoricoTimelineItems(visibleEntries),
     [visibleEntries],
   );
+
+  useEffect(() => {
+    if (loading || !detail) return;
+    const match = window.location.hash.match(/^#entry-(.+)$/);
+    if (!match) return;
+    const entryId = match[1]!;
+
+    let highlightTimer: number | undefined;
+
+    const scrollToEntry = () => {
+      const el = document.getElementById(`entry-${entryId}`);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightEntryId(entryId);
+      highlightTimer = window.setTimeout(() => setHighlightEntryId(null), 1000);
+      return true;
+    };
+
+    const retryTimer = window.setTimeout(() => {
+      if (!scrollToEntry()) {
+        window.setTimeout(scrollToEntry, 200);
+      }
+    }, 50);
+
+    return () => {
+      window.clearTimeout(retryTimer);
+      if (highlightTimer != null) window.clearTimeout(highlightTimer);
+    };
+  }, [loading, detail, timelineItems.length]);
 
   const activeCount = detail
     ? detail.entries.filter((e) => e.deletedAt == null).length
@@ -263,6 +295,7 @@ export function ActasHistoricoElementView({
                   key={item.entry.id}
                   entry={item.entry}
                   deleted={item.entry.deletedAt != null}
+                  highlight={highlightEntryId === item.entry.id}
                 />
               ),
             )}

@@ -7,7 +7,7 @@ interface RouteContext {
   params: Promise<{ elementId: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const ctx = await getCurrentUser();
   if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -19,7 +19,15 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "elementId requerido" }, { status: 400 });
   }
 
-  const { entries, error } = await fetchElementLogEntries(ctx, id);
+  const asOfRaw = new URL(request.url).searchParams.get("asOf")?.trim();
+  const { parseAsOfDateParam } = await import(
+    "@/modules/pm/actas/logic/operativo-asof"
+  );
+  const asOfIsoDate = parseAsOfDateParam(asOfRaw ?? undefined) ?? undefined;
+
+  const { entries, error } = await fetchElementLogEntries(ctx, id, {
+    asOfIsoDate,
+  });
   if (error) {
     return NextResponse.json({ error }, { status: 500 });
   }

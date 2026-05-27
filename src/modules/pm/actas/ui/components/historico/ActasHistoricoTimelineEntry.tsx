@@ -6,11 +6,13 @@ import { ActasLogEntryStatusChip } from "../operativo/ActasLogEntryStatusChip";
 interface ActasHistoricoTimelineEntryProps {
   entry: ActasLogEntryItem;
   deleted?: boolean;
+  highlight?: boolean;
 }
 
 export function ActasHistoricoTimelineEntry({
   entry,
   deleted = false,
+  highlight = false,
 }: ActasHistoricoTimelineEntryProps) {
   const hasStatusChange =
     entry.statusBefore != null && entry.statusAfter != null;
@@ -18,7 +20,12 @@ export function ActasHistoricoTimelineEntry({
     entry.author?.label ?? (entry.authorId ? "Usuario" : "Sin autor");
 
   return (
-    <div className="flex gap-4 md:gap-6">
+    <div
+      id={`entry-${entry.id}`}
+      className={`flex gap-4 md:gap-6 scroll-mt-24 rounded-md transition-colors duration-300 ${
+        highlight ? "bg-amber-100/80 ring-2 ring-amber-300/60" : ""
+      }`}
+    >
       <div className="w-28 shrink-0 text-right md:w-32">
         <time
           dateTime={entry.entryDate}

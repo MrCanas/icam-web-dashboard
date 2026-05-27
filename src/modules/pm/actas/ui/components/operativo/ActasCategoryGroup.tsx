@@ -14,6 +14,8 @@ interface ActasCategoryGroupProps {
   projectCode: string;
   currentAuthUserId: string | null;
   defaultExpanded?: boolean;
+  readOnly?: boolean;
+  asOfDate?: string;
 }
 
 function countElements(elements: ActasOperativoCategory["elements"]): number {
@@ -33,6 +35,8 @@ export function ActasCategoryGroup({
   projectCode,
   currentAuthUserId,
   defaultExpanded = true,
+  readOnly = false,
+  asOfDate,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const style = getCategoryGroupStyle(category.masterGroupId, category.id);
@@ -80,20 +84,24 @@ export function ActasCategoryGroup({
                 element={el}
                 projectCode={projectCode}
                 currentAuthUserId={currentAuthUserId}
+                readOnly={readOnly}
+                asOfDate={asOfDate}
               />
             ))
           )}
 
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 border-t border-subtle/40 px-4 py-2.5 text-sm text-icam-900/80 hover:bg-icam-900/5 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-lg leading-none font-light" aria-hidden>
-              +
-            </span>
-            Añadir elemento
-          </button>
+          {!readOnly ? (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 border-t border-subtle/40 px-4 py-2.5 text-sm text-icam-900/80 hover:bg-icam-900/5 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-lg leading-none font-light" aria-hidden>
+                +
+              </span>
+              Añadir elemento
+            </button>
+          ) : null}
           </div>
         </div>
       ) : null}

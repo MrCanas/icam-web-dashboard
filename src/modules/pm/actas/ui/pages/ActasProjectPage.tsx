@@ -6,8 +6,10 @@ import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
 import { ActasActaTab } from "../components/acta/ActasActaTab";
 import { ActasHistoricoTab } from "../components/historico/ActasHistoricoTab";
+import { ActasOperativoAsOfPicker } from "../components/operativo/ActasOperativoAsOfPicker";
 import { ActasOperativoTab } from "../components/operativo/ActasOperativoTab";
 import { ActasProjectHeader } from "../components/ActasProjectHeader";
+import { ActasProjectSearch } from "../components/ActasProjectSearch";
 import { ActasProjectTabs } from "../components/ActasProjectTabs";
 import { ActasTabContent } from "../components/ActasTabContent";
 
@@ -16,12 +18,15 @@ interface ActasProjectPageProps {
   project: ActasProjectDetail;
   /** Active tab resolved from ?tab= query param. Defaults to "operativo". */
   activeTab: ActasProjectTab;
+  /** ISO date YYYY-MM-DD for snapshot histórico (tab operativo). */
+  asOfParam?: string;
 }
 
 export function ActasProjectPage({
   ctx,
   project,
   activeTab,
+  asOfParam,
 }: ActasProjectPageProps) {
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
@@ -29,7 +34,17 @@ export function ActasProjectPage({
 
   return (
     <div className="flex flex-col gap-0">
-      <ActasProjectHeader project={project} />
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <ActasProjectHeader project={project} />
+        </div>
+        {validTab === "operativo" ? (
+          <Suspense fallback={null}>
+            <ActasOperativoAsOfPicker projectCode={project.code} />
+          </Suspense>
+        ) : null}
+      </div>
+      <ActasProjectSearch projectId={project.id} projectCode={project.code} />
 
       <div className="mt-4 flex flex-col">
         <Suspense fallback={null}>
@@ -40,6 +55,7 @@ export function ActasProjectPage({
             ctx={ctx}
             projectId={project.id}
             projectCode={project.code}
+            asOfParam={asOfParam}
           />
         ) : validTab === "acta" ? (
           <Suspense
