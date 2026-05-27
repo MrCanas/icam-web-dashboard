@@ -1,23 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { PLATFORM_NAV } from "@/registry/platform-nav";
-import { MODULES, MODULES_LIST } from "@/registry/modules";
+import { MODULES, MODULES_LIST, MODULE_TO_ZONE } from "@/registry/modules";
 import type { ModuleRoute } from "@/registry/types";
-
-const primaryTabs = [
-  ...MODULES_LIST.map((mod) => ({
-    href: mod.defaultPath,
-    label: mod.label,
-    prefix: mod.pathPrefix,
-  })),
-  {
-    href: PLATFORM_NAV.defaultPath,
-    label: PLATFORM_NAV.label,
-    prefix: PLATFORM_NAV.pathPrefix,
-  },
-];
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
+import { hasZoneAccess } from "@/lib/auth/permissions";
+import type { ZoneKey } from "@/registry/modules";
 
 function secondaryForPath(pathname: string): ModuleRoute[] {
   const module = MODULES_LIST.find((mod) => pathname.startsWith(mod.pathPrefix));
@@ -38,8 +29,35 @@ interface DashboardNavProps {
 
 export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNavProps) {
   const pathname = usePathname();
+  const { user } = useCurrentUser();
   const secondary = secondaryForPath(pathname);
   const isVertical = layout === "vertical";
+
+  const primaryTabs = useMemo(() => {
+    if (!user) return [];
+
+    const tabs: { href: string; label: string; prefix: string }[] = [];
+
+    for (const mod of MODULES_LIST) {
+      const zoneKey = MODULE_TO_ZONE[mod.key] as ZoneKey | undefined;
+      if (!zoneKey || !hasZoneAccess(user, zoneKey)) continue;
+      tabs.push({
+        href: mod.defaultPath,
+        label: mod.label,
+        prefix: mod.pathPrefix,
+      });
+    }
+
+    if (hasZoneAccess(user, "data")) {
+      tabs.push({
+        href: PLATFORM_NAV.defaultPath,
+        label: PLATFORM_NAV.label,
+        prefix: PLATFORM_NAV.pathPrefix,
+      });
+    }
+
+    return tabs;
+  }, [user]);
 
   const primaryRow = (
     <nav

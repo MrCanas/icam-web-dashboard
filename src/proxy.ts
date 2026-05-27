@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSessionAuthenticated } from "@/lib/auth/currentUser";
 
-export function proxy(request: NextRequest) {
-  const isAuthenticated = isSessionAuthenticated(request);
+export async function proxy(request: NextRequest) {
+  const isAuthenticated = await isSessionAuthenticated(request);
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");

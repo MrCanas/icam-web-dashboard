@@ -27,12 +27,16 @@
     "actas:apply-manual-mappings": "tsx scripts/actas/apply-manual-mappings.ts",
     "actas:auth-bulk-create": "tsx scripts/actas/auth-bulk-create.ts",
     "actas:test-auth-bridge": "tsx scripts/actas/test-auth-bridge.ts",
-    "actas:test-migration-resolve": "tsx --test scripts/actas/lib/__tests__/migration-resolve.test.ts"
+    "actas:test-migration-resolve": "tsx --test scripts/actas/lib/__tests__/migration-resolve.test.ts",
+    "auth:seed-hardcoded": "tsx scripts/auth/seed-hardcoded-users.ts",
+    "auth:grant": "tsx scripts/auth/grant-zone-role.ts",
+    "auth:test-login": "tsx scripts/auth/test-login.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
+    "bcrypt": "^6.0.0",
     "jose": "^6.2.3",
     "next": "16.2.4",
     "pg": "^8.21.0",
@@ -43,6 +47,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",

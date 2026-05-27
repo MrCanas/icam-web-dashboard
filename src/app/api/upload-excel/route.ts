@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { writeAccessResponse } from "@/lib/auth/api-guard";
 import {
   isLikelyExcelBuffer,
   parseMaestroWorkbook,
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = writeAccessResponse(user, "financiero");
+  if (denied) return denied;
 
   const confirm = request.nextUrl.searchParams.get("confirm") === "true";
 

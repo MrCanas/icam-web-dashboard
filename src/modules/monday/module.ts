@@ -2,7 +2,7 @@ import type { ModuleDefinition } from "@/registry/types";
 
 export const mondayModule: ModuleDefinition = {
   key: "monday",
-  label: "Monday",
+  label: "Adquisiciones",
   icon: "layout-grid",
   pathPrefix: "/dashboard/monday",
   defaultPath: "/dashboard/monday",

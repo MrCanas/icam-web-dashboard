@@ -2,7 +2,7 @@ import type { ModuleDefinition } from "@/registry/types";
 
 export const portfolioModule: ModuleDefinition = {
   key: "portfolio",
-  label: "Portfolio",
+  label: "Financiero",
   icon: "building",
   pathPrefix: "/dashboard/portfolio",
   defaultPath: "/dashboard/portfolio",

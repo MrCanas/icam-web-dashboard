@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 import {
   fetchElementOwnerPickerContext,
@@ -83,7 +84,9 @@ async function assertElementAccess(
 export async function addElementOwner(
   input: MutateElementOwnerInput,
 ): Promise<MutateElementOwnerResult> {
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(user, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
   const elementId = input.elementId.trim();
   const userId = input.userId.trim();
   if (!elementId || !userId) {
@@ -112,7 +115,9 @@ export async function addElementOwner(
 export async function removeElementOwner(
   input: MutateElementOwnerInput,
 ): Promise<MutateElementOwnerResult> {
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(user, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
   const elementId = input.elementId.trim();
   const userId = input.userId.trim();
   if (!elementId || !userId) {

@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import { revalidatePath } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { getActasReadSupabase } from "@/modules/pm/actas/data/readClient";
 import { getPgPool } from "@/modules/pm/actas/data/pg";
@@ -217,6 +218,8 @@ export async function duplicateProject(
   input: DuplicateProjectInput,
 ): Promise<DuplicateProjectResult> {
   const ctx = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(ctx, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
 
   const newCode = normalizeProjectCodeInput(input.newCode);
   const newName = input.newName.trim();

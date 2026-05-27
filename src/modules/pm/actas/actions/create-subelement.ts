@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 
 export type CreateSubelementInput = {
@@ -27,7 +28,9 @@ export async function createSubelement(
     return { ok: false, error: "parentElementId requerido" };
   }
 
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(user, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
 
   const { client, error: clientError } = await getActasAuthenticatedSupabase();
   if (!client) {
