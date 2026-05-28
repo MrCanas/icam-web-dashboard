@@ -33,8 +33,7 @@ export function formatTimelineRange(
 export const OPERATIVO_BOARD_MIN_WIDTH_PX = 780;
 
 /**
- * Grid compacto (P-UX-1): elemento (+ acciones hover), owner, status, última entrada, fecha.
- * Sin columna Timeline (dato conservado en modelo para V2).
+ * Grid compacto: elemento (+ acciones hover), owner, status, plazo, última entrada, actualizado.
  */
 export const OPERATIVO_ROW_GRID =
-  "grid grid-cols-[minmax(200px,1.5fr)_56px_88px_minmax(120px,1fr)_68px] gap-x-2 items-center";
+  "grid grid-cols-[minmax(200px,1.4fr)_56px_88px_minmax(120px,0.9fr)_minmax(120px,1fr)_72px] gap-x-2 items-center";

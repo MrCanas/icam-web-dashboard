@@ -18,6 +18,7 @@ import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementHistoryPanel } from "./ActasElementHistoryPanel";
 import { ActasElementQuickActions } from "./ActasElementQuickActions";
 import { ActasOwnerPicker } from "./ActasOwnerPicker";
+import { ActasTimelinePicker } from "./ActasTimelinePicker";
 
 interface ActasElementRowProps {
   element: ActasOperativoElement;
@@ -56,10 +57,20 @@ export function ActasElementRow({
   );
   const [lastDate, setLastDate] = useState<string | null>(element.lastEntryDate);
   const [owners, setOwners] = useState(element.owners);
+  const [timelineStart, setTimelineStart] = useState<string | null>(
+    element.timelineStart,
+  );
+  const [timelineEnd, setTimelineEnd] = useState<string | null>(
+    element.timelineEnd,
+  );
 
   useEffect(() => {
     setOwners(element.owners);
   }, [element.owners]);
+  useEffect(() => {
+    setTimelineStart(element.timelineStart);
+    setTimelineEnd(element.timelineEnd);
+  }, [element.timelineStart, element.timelineEnd]);
 
   const rowStatus = readOnly ? element.status : displayStatus;
   const effectivePreview = readOnly ? element.lastEntryContent : lastPreview;
@@ -161,6 +172,19 @@ export function ActasElementRow({
             status={rowStatus}
             readOnly={readOnly}
             onStatusChange={handleStatusChange}
+            onError={(msg) => onToast?.(msg)}
+          />
+
+          <ActasTimelinePicker
+            elementId={element.id}
+            timelineStart={timelineStart}
+            timelineEnd={timelineEnd}
+            status={rowStatus}
+            readOnly={readOnly}
+            onTimelineChange={(start, end) => {
+              setTimelineStart(start);
+              setTimelineEnd(end);
+            }}
             onError={(msg) => onToast?.(msg)}
           />
 
