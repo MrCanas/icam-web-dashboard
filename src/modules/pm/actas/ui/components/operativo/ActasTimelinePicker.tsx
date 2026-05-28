@@ -10,13 +10,30 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker, type DateRange } from "react-day-picker";
+import { es } from "react-day-picker/locale";
+import "react-day-picker/style.css";
 
 import { updateElementTimeline } from "@/modules/pm/actas/actions/update-element-timeline";
-import { formatTimelineCell, timelineUrgencyClass } from "@/modules/pm/actas/logic/timeline-display";
+import {
+  formatTimelineCell,
+  timelineUrgencyClass,
+} from "@/modules/pm/actas/logic/timeline-display";
 import type { ElementStatus } from "@/modules/pm/actas/types";
 
-const POPOVER_WIDTH = 296;
+import "./actas-timeline-daypicker.css";
+
+const POPOVER_WIDTH = 312;
 const TIMELINE_ERROR = "No se pudo actualizar el plazo.";
+
+const MONTH_FMT = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+});
+const FULL_FMT = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
 
 interface ActasTimelinePickerProps {
   elementId: string;
@@ -24,7 +41,10 @@ interface ActasTimelinePickerProps {
   timelineEnd: string | null;
   status: ElementStatus;
   readOnly?: boolean;
-  onTimelineChange: (timelineStart: string | null, timelineEnd: string | null) => void;
+  onTimelineChange: (
+    timelineStart: string | null,
+    timelineEnd: string | null,
+  ) => void;
   onError: (message: string) => void;
 }
 
@@ -37,6 +57,22 @@ function toDate(iso: string | null): Date | undefined {
 
 function toIso(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function noonUtc(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function daysInclusive(from: Date, to: Date): number {
+  const diff = Math.abs(noonUtc(to) - noonUtc(from));
+  return Math.floor(diff / 86400000) + 1;
+}
+
+function isBetweenDates(date: Date, a: Date, b: Date): boolean {
+  const t = noonUtc(date);
+  const min = Math.min(noonUtc(a), noonUtc(b));
+  const max = Math.max(noonUtc(a), noonUtc(b));
+  return t >= min && t <= max;
 }
 
 export function ActasTimelinePicker({
@@ -52,11 +88,15 @@ export function ActasTimelinePicker({
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const [draftRange, setDraftRange] = useState<DateRange | undefined>();
   const [singleDate, setSingleDate] = useState<Date | undefined>();
+  const [hoverDate, setHoverDate] = useState<Date | undefined>();
 
+  const hasExistingPlazo = Boolean(timelineStart || timelineEnd);
   const timelineLabel = formatTimelineCell(timelineStart, timelineEnd);
   const urgencyClass = timelineUrgencyClass(timelineEnd, status);
 
@@ -78,6 +118,7 @@ export function ActasTimelinePicker({
     const end = toDate(timelineEnd);
     setDraftRange(start && end ? { from: start, to: end } : undefined);
     setSingleDate(end ?? start);
+    setHoverDate(undefined);
     updatePosition();
   }, [open, timelineStart, timelineEnd, updatePosition]);
 
@@ -88,7 +129,12 @@ export function ActasTimelinePicker({
     };
     const onPointerDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (popRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      if (
+        popRef.current?.contains(target) ||
+        anchorRef.current?.contains(target)
+      ) {
+        return;
+      }
       setOpen(false);
     };
     window.addEventListener("keydown", onKey);
@@ -125,6 +171,45 @@ export function ActasTimelinePicker({
     return { start: null as string | null, end: null as string | null };
   }, [draftRange, singleDate]);
 
+  const selectionKind = useMemo(() => {
+    const from = draftRange?.from;
+    const to = draftRange?.to;
+    if (from && to && toIso(from) !== toIso(to)) return "duration" as const;
+    if (singleDate || from) return "deadline" as const;
+    return "none" as const;
+  }, [draftRange, singleDate]);
+
+  const selectionHint = useMemo(() => {
+    const from = draftRange?.from;
+    const to = draftRange?.to;
+    if (from && to && toIso(from) !== toIso(to)) {
+      const start = from < to ? from : to;
+      const end = from < to ? to : from;
+      const count = daysInclusive(start, end);
+      return `Duración: ${MONTH_FMT.format(start)} – ${FULL_FMT.format(end)} (${count} días)`;
+    }
+    const deadline = singleDate ?? from;
+    if (deadline) {
+      return `Deadline: ${FULL_FMT.format(deadline)}`;
+    }
+    return "Selecciona una fecha (deadline) o dos (duración)";
+  }, [draftRange, singleDate]);
+
+  const rangePreviewModifiers = useMemo(() => {
+    const from = draftRange?.from;
+    const to = draftRange?.to;
+    if (!from || to || !hoverDate || toIso(from) === toIso(hoverDate)) {
+      return {};
+    }
+    return {
+      range_preview: (date: Date) =>
+        isBetweenDates(date, from, hoverDate) &&
+        toIso(date) !== toIso(from) &&
+        toIso(date) !== toIso(hoverDate),
+      range_preview_end: (date: Date) => toIso(date) === toIso(hoverDate),
+    };
+  }, [draftRange, hoverDate]);
+
   const applyTimeline = async (start: string | null, end: string | null) => {
     const prev = { start: timelineStart, end: timelineEnd };
     setOpen(false);
@@ -144,6 +229,18 @@ export function ActasTimelinePicker({
     onTimelineChange(result.timelineStart, result.timelineEnd);
   };
 
+  const handlePrimaryApply = () => {
+    if (selectionKind === "duration") {
+      void applyTimeline(derived.start, derived.end);
+      return;
+    }
+    if (selectionKind === "deadline") {
+      const end =
+        derived.end ?? (singleDate ? toIso(singleDate) : null);
+      void applyTimeline(null, end);
+    }
+  };
+
   if (readOnly) {
     return (
       <span className={`text-xs truncate ${urgencyClass}`}>
@@ -151,6 +248,12 @@ export function ActasTimelinePicker({
       </span>
     );
   }
+
+  const primaryLabel =
+    selectionKind === "duration"
+      ? "Aplicar duración"
+      : "Aplicar como deadline";
+  const primaryDisabled = selectionKind === "none" || pending;
 
   return (
     <>
@@ -173,7 +276,9 @@ export function ActasTimelinePicker({
           <span className="text-text-muted group-hover/row:hidden">—</span>
         )}
         {!timelineLabel ? (
-          <span className="hidden text-icam-900 group-hover/row:inline">+ Plazo</span>
+          <span className="hidden text-icam-900 group-hover/row:inline">
+            + Plazo
+          </span>
         ) : null}
       </button>
 
@@ -184,58 +289,74 @@ export function ActasTimelinePicker({
               id={listId}
               role="dialog"
               aria-label="Editar plazo"
-              className="fixed z-[70] w-[296px] rounded-md border border-subtle/60 bg-card p-2 shadow-lg"
+              className="fixed z-[70] w-[312px] rounded-lg border border-subtle/60 bg-card p-3 shadow-lg"
               style={{ top: position.top, left: position.left }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <DayPicker
-                mode="range"
-                numberOfMonths={1}
-                selected={draftRange}
-                onSelect={(range) => {
-                  setDraftRange(range);
-                  if (range?.from && !range.to) {
-                    setSingleDate(range.from);
-                  } else if (range?.from && range.to && toIso(range.from) === toIso(range.to)) {
-                    setSingleDate(range.from);
-                  } else {
-                    setSingleDate(undefined);
-                  }
-                }}
-                className="text-xs"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5 border-t border-subtle/40 pt-2">
+              <p className="mb-2 text-[11px] leading-snug text-text-muted">
+                {selectionHint}
+              </p>
+              <div className="actas-timeline-picker">
+                <DayPicker
+                  mode="range"
+                  locale={es}
+                  navLayout="around"
+                  numberOfMonths={1}
+                  selected={draftRange}
+                  modifiers={rangePreviewModifiers}
+                  modifiersClassNames={{
+                    range_preview: "rdp-range_preview",
+                    range_preview_end: "rdp-range_preview_end",
+                  }}
+                  onDayMouseEnter={(date) => {
+                    if (draftRange?.from && !draftRange.to) {
+                      setHoverDate(date);
+                    }
+                  }}
+                  onDayMouseLeave={() => setHoverDate(undefined)}
+                  onSelect={(range) => {
+                    setDraftRange(range);
+                    setHoverDate(undefined);
+                    if (range?.from && !range.to) {
+                      setSingleDate(range.from);
+                    } else if (
+                      range?.from &&
+                      range.to &&
+                      toIso(range.from) === toIso(range.to)
+                    ) {
+                      setSingleDate(range.from);
+                    } else {
+                      setSingleDate(undefined);
+                    }
+                  }}
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-subtle/40 pt-3">
                 <button
                   type="button"
-                  className="rounded border border-subtle px-2 py-1 text-[11px] text-text-body hover:bg-page"
-                  onClick={() => void applyTimeline(derived.start, derived.end)}
+                  disabled={primaryDisabled}
+                  className="rounded-md bg-icam-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-icam-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handlePrimaryApply}
                 >
-                  Aplicar
+                  {primaryLabel}
                 </button>
+                {hasExistingPlazo ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="rounded-md border border-subtle px-2.5 py-1 text-[11px] text-text-body hover:bg-page disabled:opacity-50"
+                    onClick={() => void applyTimeline(null, null)}
+                  >
+                    Quitar plazo
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="rounded border border-subtle px-2 py-1 text-[11px] text-text-body hover:bg-page"
-                  onClick={() => void applyTimeline(null, null)}
-                >
-                  Quitar plazo
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-subtle px-2 py-1 text-[11px] text-text-body hover:bg-page"
+                  className="rounded-md border border-subtle px-2.5 py-1 text-[11px] text-text-body hover:bg-page"
                   onClick={() => setOpen(false)}
                 >
                   Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-icam-900/30 bg-icam-900/5 px-2 py-1 text-[11px] text-icam-900 hover:bg-icam-900/10"
-                  onClick={() => {
-                    const end = derived.end ?? (singleDate ? toIso(singleDate) : null);
-                    void applyTimeline(null, end);
-                  }}
-                >
-                  Aplicar como deadline
                 </button>
               </div>
             </div>,
