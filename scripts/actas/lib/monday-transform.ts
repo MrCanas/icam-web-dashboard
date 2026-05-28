@@ -44,6 +44,11 @@ export const MONDAY_TRANSFORMED_DIR = resolve(
   "tmp/monday-transformed",
 );
 
+export const MONDAY_TRANSFORMED_FIX_DIR = resolve(
+  process.cwd(),
+  "tmp/monday-transformed-fix",
+);
+
 export type ElementStatus =
   | "not_started"
   | "working_on_it"
@@ -133,7 +138,7 @@ export interface MondayTransformedPayload {
 
 interface SnapshotObservation {
   snapshot_date_iso: string;
-  /** Timestamp del board (`updated_at`) para ordenar y `entry_date` con resolución temporal. */
+  /** Timestamp del board (`updated_at`) para ordenar observaciones; `entry_date` usa `snapshot_date_iso`. */
   observation_at: string;
   texto: string;
   status: ElementStatus;
@@ -542,7 +547,7 @@ function buildLogEntriesFromObservations(
           content: text,
           status_before: null,
           status_after: null,
-          entry_date: obs.observation_at,
+          entry_date: obs.snapshot_date_iso,
           source: "snapshot",
         });
       }
@@ -560,7 +565,7 @@ function buildLogEntriesFromObservations(
         content: text,
         status_before: statusChanged ? prevStatus : null,
         status_after: statusChanged ? status : null,
-        entry_date: obs.observation_at,
+        entry_date: obs.snapshot_date_iso,
         source: "snapshot",
       });
       prevText = text;
@@ -613,6 +618,70 @@ function buildLogEntriesFromUpdates(
   }
 
   return entries;
+}
+
+/** Fecha ISO del extract (`extracted_at`), solo día. */
+function extractRunDateIso(extract: MondayExtractPayload): string {
+  return extract.extracted_at.slice(0, 10);
+}
+
+/**
+ * Comprueba fechas de log_entries snapshot: rango del extract y distinto de
+ * `extracted_at`. Emite warnings (no lanza).
+ */
+export function validateSnapshotEntryDates(
+  extract: MondayExtractPayload,
+  logEntries: readonly TransformedLogEntry[],
+  canonicalBoards: readonly MondayExtractBoard[],
+): void {
+  const min = extract.summary.snapshot_date_min;
+  const max = extract.summary.snapshot_date_max;
+  const extractedDay = extractRunDateIso(extract);
+  const boardsByUpdatedDay = new Map<string, string[]>();
+  for (const board of canonicalBoards) {
+    const updatedDay = board.updated_at?.slice(0, 10);
+    if (!updatedDay) continue;
+    const list = boardsByUpdatedDay.get(updatedDay) ?? [];
+    list.push(board.name);
+    boardsByUpdatedDay.set(updatedDay, list);
+  }
+
+  const warnedDays = new Set<string>();
+
+  for (const entry of logEntries) {
+    if (entry.source !== "snapshot") continue;
+    const d = entry.entry_date;
+    if (!d || warnedDays.has(d)) continue;
+
+    let bad = false;
+    if (min && d < min) bad = true;
+    if (max && d > max) bad = true;
+    if (d === extractedDay) bad = true;
+
+    if (!bad) continue;
+    warnedDays.add(d);
+
+    const boards = boardsByUpdatedDay.get(d) ?? [];
+    const boardHint = boards.length
+      ? ` · tableros (updated_at ese día): ${boards.join("; ")}`
+      : "";
+
+    if (min && d < min) {
+      console.warn(
+        `[entry_date] ${extract.project_code}: "${d}" < snapshot_date_min (${min})${boardHint}`,
+      );
+    }
+    if (max && d > max) {
+      console.warn(
+        `[entry_date] ${extract.project_code}: "${d}" > snapshot_date_max (${max})${boardHint}`,
+      );
+    }
+    if (d === extractedDay) {
+      console.warn(
+        `[entry_date] ${extract.project_code}: "${d}" coincide con extracted_at${boardHint}`,
+      );
+    }
+  }
 }
 
 export async function loadMasterModuleIds(
@@ -899,6 +968,8 @@ export function transformMondayExtract(
     options.masterModuleIdsByName ?? new Map(),
   );
 
+  validateSnapshotEntryDates(extract, log_entries, canonical);
+
   const transform_stats: TransformStats = {
     snapshots_processed: canonical.length,
     ...discardStats,
@@ -952,10 +1023,11 @@ export function loadMondayExtractFile(path: string): MondayExtractPayload {
 export function writeMondayTransformed(
   payload: MondayTransformedPayload,
   projectCode: string,
+  outDir: string = MONDAY_TRANSFORMED_DIR,
 ): string {
-  mkdirSync(MONDAY_TRANSFORMED_DIR, { recursive: true });
+  mkdirSync(outDir, { recursive: true });
   const filePath = resolve(
-    MONDAY_TRANSFORMED_DIR,
+    outDir,
     `${projectCode.trim().toUpperCase()}.json`,
   );
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
