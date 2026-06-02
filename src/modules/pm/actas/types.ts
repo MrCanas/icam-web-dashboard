@@ -30,10 +30,16 @@ export interface ActasArchivedProjectRef {
   archivedAt: string;
 }
 
-export type ActasProjectTab = "operativo" | "acta" | "historico" | "ajustes";
+export type ActasProjectTab =
+  | "operativo"
+  | "completados"
+  | "acta"
+  | "historico"
+  | "ajustes";
 
 export const ACTAS_PROJECT_TABS: { key: ActasProjectTab; label: string }[] = [
   { key: "operativo", label: "Operativo" },
+  { key: "completados", label: "Completados" },
   { key: "acta", label: "Acta" },
   { key: "historico", label: "Histórico" },
   { key: "ajustes", label: "Ajustes" },

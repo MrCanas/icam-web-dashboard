@@ -3,6 +3,7 @@
 import { requireCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import { assertUniqueElementNameInCategory } from "@/modules/pm/actas/logic/element-name-validation";
 
 export type CreateElementInput = {
   categoryId: string;
@@ -75,32 +76,13 @@ export async function createElement(
     }
   }
 
-  const siblingQuery = client
-    .from("element")
-    .select("id, name")
-    .eq("category_id", categoryId)
-    .is("archived_at", null);
-
-  if (parentElementId) {
-    siblingQuery.eq("parent_element_id", parentElementId);
-  } else {
-    siblingQuery.is("parent_element_id", null);
-  }
-
-  const { data: siblings, error: sibErr } = await siblingQuery;
-  if (sibErr) {
-    return { ok: false, error: sibErr.message };
-  }
-
-  const nameLower = name.toLowerCase();
-  const duplicate = (siblings ?? []).some(
-    (row) => (row.name as string).trim().toLowerCase() === nameLower,
-  );
-  if (duplicate) {
-    return {
-      ok: false,
-      error: "Ya existe un elemento con ese nombre en esta categoría",
-    };
+  const unique = await assertUniqueElementNameInCategory(client, {
+    categoryId,
+    parentElementId,
+    name,
+  });
+  if (!unique.ok) {
+    return { ok: false, error: unique.error };
   }
 
   let orderQuery = client

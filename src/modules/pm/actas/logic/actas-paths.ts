@@ -21,7 +21,8 @@ export function actasProjectTabPath(
 ): string {
   const base = actasProjectPath(projectCode);
   if (tab !== "operativo") {
-    return `${base}?tab=${tab}`;
+    const params = new URLSearchParams({ tab });
+    return `${base}?${params.toString()}`;
   }
   if (options?.asOf) {
     const params = new URLSearchParams({ asOf: options.asOf });

@@ -6,7 +6,9 @@ import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
 import { ActasActaTab } from "../components/acta/ActasActaTab";
 import { ActasHistoricoTabServer } from "../components/historico/ActasHistoricoTabServer";
+import { ActasCompletadosTab } from "../components/completados/ActasCompletadosTab";
 import { ActasOperativoAsOfPicker } from "../components/operativo/ActasOperativoAsOfPicker";
+import { ActasOperativoShowCompletedToggle } from "../components/operativo/ActasOperativoShowCompletedToggle";
 import { ActasOperativoTab } from "../components/operativo/ActasOperativoTab";
 import { ActasProjectHeader } from "../components/ActasProjectHeader";
 import { ActasProjectSearch } from "../components/ActasProjectSearch";
@@ -39,9 +41,14 @@ export function ActasProjectPage({
           <ActasProjectHeader project={project} />
         </div>
         {validTab === "operativo" ? (
-          <Suspense fallback={null}>
-            <ActasOperativoAsOfPicker projectCode={project.code} />
-          </Suspense>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Suspense fallback={null}>
+              <ActasOperativoShowCompletedToggle />
+            </Suspense>
+            <Suspense fallback={null}>
+              <ActasOperativoAsOfPicker projectCode={project.code} />
+            </Suspense>
+          </div>
         ) : null}
       </div>
       <ActasProjectSearch projectId={project.id} projectCode={project.code} />
@@ -51,11 +58,25 @@ export function ActasProjectPage({
           <ActasProjectTabs projectCode={project.code} />
         </Suspense>
         {validTab === "operativo" ? (
-          <ActasOperativoTab
+          <Suspense
+            fallback={
+              <section className="rounded-b-lg border border-t-0 border-subtle/50 bg-card p-6 text-sm text-text-muted">
+                Cargando operativo…
+              </section>
+            }
+          >
+            <ActasOperativoTab
+              ctx={ctx}
+              projectId={project.id}
+              projectCode={project.code}
+              asOfParam={asOfParam}
+            />
+          </Suspense>
+        ) : validTab === "completados" ? (
+          <ActasCompletadosTab
             ctx={ctx}
             projectId={project.id}
             projectCode={project.code}
-            asOfParam={asOfParam}
           />
         ) : validTab === "acta" ? (
           <Suspense

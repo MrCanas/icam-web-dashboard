@@ -1,15 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { ActasAddCategoryModal } from "./ActasAddCategoryModal";
 
 import { collectRootElementOptions } from "@/modules/pm/actas/logic/collect-root-elements";
-import type { ActasOperativoCategory } from "@/modules/pm/actas/types";
+import { filterOperativoCategories } from "@/modules/pm/actas/logic/operativo-done-filter";
+import { mergeVisibleOperativoTrees } from "@/modules/pm/actas/logic/merge-visible-operativo-tree";
+import type {
+  ActasOperativoCategory,
+  ElementStatus,
+} from "@/modules/pm/actas/types";
 
 import { ActasCategoryGroup } from "./ActasCategoryGroup";
+import { ActasBulkSelectionBar } from "./ActasBulkSelectionBar";
 import { ActasLogEntryUndoProvider } from "./ActasLogEntryUndoContext";
+import { ActasOperativoSelectionProvider } from "./ActasOperativoSelectionContext";
+import { ActasOperativoDndProvider } from "./ActasOperativoDndContext";
+import { useShowCompletedOperativo } from "./ActasOperativoShowCompletedToggle";
 
 type ActasOperativoBoardProps = {
   categories: ActasOperativoCategory[];
+  projectId: string;
   projectCode: string;
   currentAuthUserId: string | null;
   isPmAdmin?: boolean;
@@ -22,6 +34,7 @@ type ActasOperativoBoardProps = {
 export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   const {
     categories,
+    projectId,
     projectCode,
     currentAuthUserId,
     mode,
@@ -30,8 +43,43 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   } = props;
   const asOfDate = mode === "historical" ? props.asOfDate : undefined;
   const readOnly = mode === "historical";
-  const parentOptions = collectRootElementOptions(categories);
+  const { showCompleted } = useShowCompletedOperativo();
+  const [statusOverrides, setStatusOverrides] = useState<
+    Record<string, ElementStatus>
+  >({});
   const [toast, setToast] = useState<string | null>(null);
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [displayCategories, setDisplayCategories] = useState(categories);
+  const enableDragDrop = !readOnly && hasWriteAccess;
+  const enableSelection = !readOnly && hasWriteAccess;
+
+  useEffect(() => {
+    setDisplayCategories(categories);
+  }, [categories]);
+
+  const filteredCategories = useMemo(
+    () =>
+      filterOperativoCategories(
+        displayCategories,
+        showCompleted,
+        statusOverrides,
+      ),
+    [displayCategories, showCompleted, statusOverrides],
+  );
+
+  const parentOptions = useMemo(
+    () => collectRootElementOptions(filteredCategories),
+    [filteredCategories],
+  );
+
+  const handleStatusOverride = (elementId: string, status: ElementStatus) => {
+    setStatusOverrides((prev) => ({ ...prev, [elementId]: status }));
+  };
+
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 4000);
+  };
 
   if (categories.length === 0) {
     return (
@@ -43,40 +91,76 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     );
   }
 
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 4000);
-  };
+  const categoryList = (
+    <>
+      {filteredCategories.length === 0 ? (
+        <p className="rounded-md border border-dashed border-subtle/60 bg-card px-4 py-8 text-center text-sm text-text-muted">
+          {showCompleted
+            ? "No hay elementos activos en este proyecto."
+            : "Todos los elementos visibles están completados. Activa «Mostrar completados» o abre la pestaña Completados."}
+        </p>
+      ) : (
+        filteredCategories.map((category) => (
+          <ActasCategoryGroup
+            key={category.id}
+            category={category}
+            categories={displayCategories}
+            parentOptions={parentOptions}
+            projectCode={projectCode}
+            currentAuthUserId={currentAuthUserId}
+            isPmAdmin={isPmAdmin}
+            hasWriteAccess={hasWriteAccess && !readOnly}
+            readOnly={readOnly}
+            asOfDate={asOfDate}
+            showCompletedStyle={showCompleted}
+            onElementStatusLiveChange={handleStatusOverride}
+            onElementArchived={readOnly ? undefined : showToast}
+            onToast={readOnly ? undefined : showToast}
+          />
+        ))
+      )}
+    </>
+  );
 
   const board = (
     <div className="relative flex flex-col gap-3 rounded-b-lg border border-t-0 border-subtle/50 bg-page/40 p-4">
-      {categories.map((category) => (
-        <ActasCategoryGroup
-          key={category.id}
-          category={category}
-          categories={categories}
-          parentOptions={parentOptions}
+      {enableDragDrop ? (
+        <ActasOperativoDndProvider
+          projectId={projectId}
           projectCode={projectCode}
-          currentAuthUserId={currentAuthUserId}
-          isPmAdmin={isPmAdmin}
-          hasWriteAccess={hasWriteAccess && !readOnly}
-          readOnly={readOnly}
-          asOfDate={asOfDate}
-          onElementArchived={readOnly ? undefined : showToast}
-          onToast={readOnly ? undefined : showToast}
-        />
-      ))}
+          baseCategories={filteredCategories}
+          onCategoriesChange={(nextVisible) =>
+            setDisplayCategories((prev) =>
+              mergeVisibleOperativoTrees(prev, nextVisible),
+            )
+          }
+          onError={showToast}
+        >
+          {categoryList}
+        </ActasOperativoDndProvider>
+      ) : (
+        categoryList
+      )}
 
-      {!readOnly ? (
+      {!readOnly && hasWriteAccess ? (
         <button
           type="button"
           className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-subtle bg-card px-4 py-3 text-sm font-medium text-icam-900 hover:bg-icam-900/5 transition-colors"
+          onClick={() => setAddCategoryOpen(true)}
         >
           <span className="text-lg leading-none font-light" aria-hidden>
             +
           </span>
-          Añadir categoría
+          Nuevo grupo
         </button>
+      ) : null}
+
+      {!readOnly && hasWriteAccess ? (
+        <ActasAddCategoryModal
+          open={addCategoryOpen}
+          projectId={projectId}
+          onClose={() => setAddCategoryOpen(false)}
+        />
       ) : null}
 
       {toast ? (
@@ -90,5 +174,17 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     </div>
   );
 
-  return <ActasLogEntryUndoProvider>{board}</ActasLogEntryUndoProvider>;
+  const wrapped = enableSelection ? (
+    <ActasOperativoSelectionProvider
+      enabled
+      onStatusLiveChange={handleStatusOverride}
+    >
+      {board}
+      <ActasBulkSelectionBar onError={showToast} />
+    </ActasOperativoSelectionProvider>
+  ) : (
+    board
+  );
+
+  return <ActasLogEntryUndoProvider>{wrapped}</ActasLogEntryUndoProvider>;
 }

@@ -189,8 +189,11 @@ async function executeCreateInTransaction(
 
   const { rows: projectRows } = await client.query<{ id: string }>(
     `INSERT INTO public.project
-       (code, name, phase, asset_type, organization_id, created_by, pm_activo_id, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+       (code, name, phase, asset_type, organization_id, created_by, pm_activo_id, status, sort_order)
+     VALUES (
+       $1, $2, $3, $4, $5, $6, $7, 'active',
+       (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM public.project WHERE archived_at IS NULL)
+     )
      RETURNING id`,
     [
       code,

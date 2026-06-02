@@ -1,11 +1,12 @@
 import type { ActasProjectListItem } from "@/modules/pm/actas/types";
 
-import { ActasProjectSidebar } from "./ActasProjectSidebar";
+import { ActasCollapsibleLayout } from "./ActasCollapsibleLayout";
 
 interface ActasShellProps {
   projects: ActasProjectListItem[];
   archivedCount: number;
   loadError: string | null;
+  hasWriteAccess?: boolean;
   children: React.ReactNode;
 }
 
@@ -13,6 +14,7 @@ export function ActasShell({
   projects,
   archivedCount,
   loadError,
+  hasWriteAccess = true,
   children,
 }: ActasShellProps) {
   return (
@@ -30,13 +32,13 @@ export function ActasShell({
         </section>
       ) : null}
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 min-w-0">
-        <ActasProjectSidebar
-          projects={projects}
-          archivedCount={archivedCount}
-        />
-        <div className="flex-1 min-w-0">{children}</div>
-      </div>
+      <ActasCollapsibleLayout
+        projects={projects}
+        archivedCount={archivedCount}
+        hasWriteAccess={hasWriteAccess}
+      >
+        {children}
+      </ActasCollapsibleLayout>
     </div>
   );
 }

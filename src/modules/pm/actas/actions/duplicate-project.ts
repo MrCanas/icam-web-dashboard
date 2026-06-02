@@ -81,8 +81,11 @@ async function executeDuplicateInTransaction(
 
   const { rows: projectRows } = await client.query<{ id: string }>(
     `INSERT INTO public.project
-       (code, name, phase, asset_type, organization_id, created_by, status, pm_activo_id)
-     VALUES ($1, $2, $3, $4, $5, $6, 'active', NULL)
+       (code, name, phase, asset_type, organization_id, created_by, status, pm_activo_id, sort_order)
+     VALUES (
+       $1, $2, $3, $4, $5, $6, 'active', NULL,
+       (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM public.project WHERE archived_at IS NULL)
+     )
      RETURNING id`,
     [
       newCode,

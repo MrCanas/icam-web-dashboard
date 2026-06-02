@@ -1,0 +1,99 @@
+"use server";
+
+import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
+import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import {
+  assertUniqueCategoryNameInProject,
+  normalizeCategoryName,
+} from "@/modules/pm/actas/logic/category-name-validation";
+
+export type CreateCategoryInput = {
+  projectId: string;
+  name: string;
+};
+
+export type CreateCategoryResult =
+  | { ok: true; categoryId: string }
+  | { ok: false; error: string };
+
+export async function createCategory(
+  input: CreateCategoryInput,
+): Promise<CreateCategoryResult> {
+  const name = normalizeCategoryName(input.name);
+  if (!name) {
+    return { ok: false, error: "El nombre es obligatorio" };
+  }
+
+  const projectId = input.projectId.trim();
+  if (!projectId) {
+    return { ok: false, error: "projectId requerido" };
+  }
+
+  const user = await requireCurrentUser();
+  const writeDenied = checkWriteAccess(user, "pm");
+  if (writeDenied) return { ok: false, error: writeDenied };
+
+  const { client, error: clientError } = await getActasAuthenticatedSupabase();
+  if (!client) {
+    return { ok: false, error: clientError };
+  }
+
+  const { data: project, error: projectError } = await client
+    .from("project")
+    .select("id")
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (projectError) {
+    return { ok: false, error: projectError.message };
+  }
+  if (!project) {
+    return {
+      ok: false,
+      error: "Proyecto no encontrado o sin acceso",
+    };
+  }
+
+  const unique = await assertUniqueCategoryNameInProject(client, {
+    projectId,
+    name,
+  });
+  if (!unique.ok) {
+    return { ok: false, error: unique.error };
+  }
+
+  const { data: orderRows, error: orderErr } = await client
+    .from("category")
+    .select("order_index")
+    .eq("project_id", projectId)
+    .is("archived_at", null);
+
+  if (orderErr) {
+    return { ok: false, error: orderErr.message };
+  }
+
+  const maxOrder = (orderRows ?? []).reduce(
+    (max, row) => Math.max(max, row.order_index as number),
+    -1,
+  );
+
+  const { data: inserted, error: insertErr } = await client
+    .from("category")
+    .insert({
+      project_id: projectId,
+      master_group_id: null,
+      name,
+      order_index: maxOrder + 1,
+      sublot_label: null,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr) {
+    return { ok: false, error: insertErr.message };
+  }
+
+  return { ok: true, categoryId: inserted.id as string };
+}

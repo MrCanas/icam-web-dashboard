@@ -18,10 +18,12 @@ import {
   type DuplicateProjectSuccess,
 } from "./ActasDuplicateProjectModal";
 import { ActasProjectSidebarItem } from "./ActasProjectSidebarItem";
+import { ActasSortableProjectList } from "./ActasSortableProjectList";
 
 interface ActasProjectSidebarProps {
   projects: ActasProjectListItem[];
   archivedCount: number;
+  hasWriteAccess?: boolean;
 }
 
 function normalizeSearch(value: string): string {
@@ -71,6 +73,7 @@ function ArchivedProjectsLink({
 export function ActasProjectSidebar({
   projects,
   archivedCount,
+  hasWriteAccess = true,
 }: ActasProjectSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -84,10 +87,14 @@ export function ActasProjectSidebar({
 
   const archivedLinkActive = pathname === actasArchivedProjectsPath();
 
+  const searchActive = normalizeSearch(search).length > 0;
+
   const filtered = useMemo(() => {
     const q = normalizeSearch(search);
     return projects.filter((p) => projectMatchesQuery(p, q));
   }, [projects, search]);
+
+  const canReorder = hasWriteAccess && !searchActive;
 
   const showToast = (content: ReactNode) => {
     setToast(content);
@@ -223,6 +230,13 @@ export function ActasProjectSidebar({
               <p className="px-2 py-4 text-center text-sm text-text-muted">
                 Ningún proyecto coincide con la búsqueda.
               </p>
+            ) : canReorder ? (
+              <ActasSortableProjectList
+                projects={filtered}
+                onDuplicate={setDuplicateSource}
+                onArchive={setArchiveSource}
+                onReorderError={(message) => showToast(message)}
+              />
             ) : (
               filtered.map((project) => {
                 const href = actasProjectPath(project.code);

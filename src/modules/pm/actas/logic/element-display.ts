@@ -37,3 +37,7 @@ export const OPERATIVO_BOARD_MIN_WIDTH_PX = 780;
  */
 export const OPERATIVO_ROW_GRID =
   "grid grid-cols-[minmax(200px,1.4fr)_56px_88px_minmax(120px,0.9fr)_minmax(120px,1fr)_72px] gap-x-2 items-center";
+
+/** Tablero operativo con columna de selección múltiple. */
+export const OPERATIVO_ROW_GRID_WITH_SELECTION =
+  "grid grid-cols-[28px_minmax(200px,1.4fr)_56px_88px_minmax(120px,0.9fr)_minmax(120px,1fr)_72px] gap-x-2 items-center";

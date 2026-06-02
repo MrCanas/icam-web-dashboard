@@ -50,6 +50,7 @@ export async function fetchActasProjects(
     .from("project")
     .select("id, code, name, phase")
     .is("archived_at", null)
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) {
