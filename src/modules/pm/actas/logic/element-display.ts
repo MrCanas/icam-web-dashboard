@@ -32,6 +32,9 @@ export function formatTimelineRange(
 /** Ancho mínimo del tablero (scroll horizontal en pantallas estrechas). */
 export const OPERATIVO_BOARD_MIN_WIDTH_PX = 780;
 
+export const OPERATIVO_BOARD_MIN_WIDTH_WITH_SELECTION_PX =
+  OPERATIVO_BOARD_MIN_WIDTH_PX + 28;
+
 /**
  * Grid compacto: elemento (+ acciones hover), owner, status, plazo, última entrada, actualizado.
  */

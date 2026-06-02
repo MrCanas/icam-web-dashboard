@@ -66,6 +66,7 @@ interface ActasOperativoDndProviderProps {
   projectCode: string;
   baseCategories: ActasOperativoCategory[];
   onCategoriesChange: (categories: ActasOperativoCategory[]) => void;
+  onMutatingChange?: (mutating: boolean) => void;
   onError: (message: string) => void;
   children: ReactNode;
 }
@@ -75,6 +76,7 @@ export function ActasOperativoDndProvider({
   projectCode,
   baseCategories,
   onCategoriesChange,
+  onMutatingChange,
   onError,
   children,
 }: ActasOperativoDndProviderProps) {
@@ -176,29 +178,34 @@ export function ActasOperativoDndProvider({
     applyContainers(nextContainers);
 
     startTransition(async () => {
-      const result = await moveElement({
-        projectId,
-        projectCode,
-        elementId: activeId,
-        targetCategoryId,
-        targetParentElementId,
-        orderedSiblingIds,
-      });
+      onMutatingChange?.(true);
+      try {
+        const result = await moveElement({
+          projectId,
+          projectCode,
+          elementId: activeId,
+          targetCategoryId,
+          targetParentElementId,
+          orderedSiblingIds,
+        });
 
-      if (!result.ok) {
-        setContainers(previousContainers);
-        onCategoriesChange(
-          rebuildCategoriesFromContainers(
-            baseCategories,
-            previousContainers,
-            elementsById,
-          ),
-        );
-        onError(result.error);
-        return;
+        if (!result.ok) {
+          setContainers(previousContainers);
+          onCategoriesChange(
+            rebuildCategoriesFromContainers(
+              baseCategories,
+              previousContainers,
+              elementsById,
+            ),
+          );
+          onError(result.error);
+          return;
+        }
+
+        router.refresh();
+      } finally {
+        onMutatingChange?.(false);
       }
-
-      router.refresh();
     });
   };
 

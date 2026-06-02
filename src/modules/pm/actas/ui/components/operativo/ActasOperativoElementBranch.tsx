@@ -129,6 +129,18 @@ export function OperativoCategoryRootList({
   const containerKey = rootContainerKey(categoryId);
   const rootMap = new Map(elements.map((e) => [e.id, e]));
 
+  const mergeContainerIds = (containerIds: string[]) => {
+    const seen = new Set(containerIds);
+    const merged = [...containerIds];
+    for (const el of elements) {
+      if (!seen.has(el.id)) {
+        seen.add(el.id);
+        merged.push(el.id);
+      }
+    }
+    return merged;
+  };
+
   const renderRoots = (ids: string[]) =>
     ids
       .map((id) => rootMap.get(id))
@@ -160,7 +172,7 @@ export function OperativoCategoryRootList({
           containerKey={containerKey}
           className={ids.length === 0 ? "min-h-[2px]" : undefined}
         >
-          {renderRoots(ids)}
+          {renderRoots(mergeContainerIds(ids))}
         </ActasOperativoElementContainer>
       )}
     </OperativoElementSortableList>

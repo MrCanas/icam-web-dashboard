@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { OPERATIVO_BOARD_MIN_WIDTH_PX } from "@/modules/pm/actas/logic/element-display";
+import {
+  OPERATIVO_BOARD_MIN_WIDTH_PX,
+  OPERATIVO_BOARD_MIN_WIDTH_WITH_SELECTION_PX,
+} from "@/modules/pm/actas/logic/element-display";
 import { getCategoryGroupStyle } from "@/modules/pm/actas/logic/category-group-style";
 import type {
   ActasOperativoCategory,
@@ -72,6 +75,10 @@ export function ActasCategoryGroup({
   );
   const style = getCategoryGroupStyle(category.masterGroupId, category.id);
   const itemCount = countElements(category.elements);
+  const boardMinWidth =
+    hasWriteAccess && !readOnly
+      ? OPERATIVO_BOARD_MIN_WIDTH_WITH_SELECTION_PX
+      : OPERATIVO_BOARD_MIN_WIDTH_PX;
 
   useEffect(() => {
     setCategoryName(category.name);
@@ -119,7 +126,7 @@ export function ActasCategoryGroup({
 
       {expanded ? (
         <div className="bg-card overflow-x-auto">
-          <div style={{ minWidth: OPERATIVO_BOARD_MIN_WIDTH_PX }}>
+          <div style={{ minWidth: boardMinWidth }}>
           <ActasOperativoColumnHeader
             showSelectionColumn={hasWriteAccess && !readOnly}
           />

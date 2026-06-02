@@ -64,10 +64,11 @@ export function ActasElementRow({
 }: ActasElementRowProps) {
   const router = useRouter();
   const selection = useOperativoSelection();
-  const rowGrid =
-    selection?.enabled && hasWriteAccess && !readOnly
-      ? OPERATIVO_ROW_GRID_WITH_SELECTION
-      : OPERATIVO_ROW_GRID;
+  const showSelectionColumn =
+    Boolean(selection?.enabled) && hasWriteAccess && !readOnly;
+  const rowGrid = showSelectionColumn
+    ? OPERATIVO_ROW_GRID_WITH_SELECTION
+    : OPERATIVO_ROW_GRID;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
@@ -192,13 +193,17 @@ export function ActasElementRow({
           } ${showAsCompleted ? "opacity-60" : ""} ${expanded ? "bg-page/40" : ""} ${historyOpen ? "bg-page/50" : ""}`}
           aria-expanded={historyOpen}
         >
+          {showSelectionColumn ? (
+            <div className="flex items-center justify-center self-center">
+              <ActasElementSelectCheckbox elementId={element.id} />
+            </div>
+          ) : null}
           <div
             className={`flex min-w-0 items-center gap-1 ${
               isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
             }`}
             style={{ paddingLeft: rowIndent }}
           >
-            <ActasElementSelectCheckbox elementId={element.id} />
             {dragHandle}
             {!readOnly ? (
               <ActasElementQuickActions

@@ -50,12 +50,14 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [displayCategories, setDisplayCategories] = useState(categories);
+  const [isDndMutating, setIsDndMutating] = useState(false);
   const enableDragDrop = !readOnly && hasWriteAccess;
   const enableSelection = !readOnly && hasWriteAccess;
 
   useEffect(() => {
+    if (isDndMutating) return;
     setDisplayCategories(categories);
-  }, [categories]);
+  }, [categories, isDndMutating]);
 
   const filteredCategories = useMemo(
     () =>
@@ -128,12 +130,13 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
         <ActasOperativoDndProvider
           projectId={projectId}
           projectCode={projectCode}
-          baseCategories={filteredCategories}
+          baseCategories={displayCategories}
           onCategoriesChange={(nextVisible) =>
             setDisplayCategories((prev) =>
               mergeVisibleOperativoTrees(prev, nextVisible),
             )
           }
+          onMutatingChange={setIsDndMutating}
           onError={showToast}
         >
           {categoryList}

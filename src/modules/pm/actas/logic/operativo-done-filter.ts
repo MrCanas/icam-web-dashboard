@@ -65,7 +65,6 @@ export function filterOperativoCategories(
       showCompleted,
       statusOverrides,
     );
-    if (elements.length === 0) continue;
     filtered.push({ ...category, elements });
   }
 
