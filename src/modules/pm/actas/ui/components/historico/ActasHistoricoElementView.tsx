@@ -26,21 +26,25 @@ import {
 import type { ActasHistoricoElementDetail } from "@/modules/pm/actas/types";
 
 import { ActasOwnerAvatars } from "../operativo/ActasOwnerAvatars";
-import {
-  ActasHistoricoGapSeparator,
-  ActasHistoricoTimelineEntry,
-} from "./ActasHistoricoTimelineEntry";
+import { ActasHistoryEntryItem } from "../operativo/ActasHistoryEntryItem";
+import { ActasHistoricoGapSeparator } from "./ActasHistoricoTimelineEntry";
 
 interface ActasHistoricoElementViewProps {
   projectId: string;
   projectCode: string;
   elementId: string;
+  currentAuthUserId: string | null;
+  isPmAdmin: boolean;
+  hasWriteAccess: boolean;
 }
 
 export function ActasHistoricoElementView({
   projectId,
   projectCode,
   elementId,
+  currentAuthUserId,
+  isPmAdmin,
+  hasWriteAccess,
 }: ActasHistoricoElementViewProps) {
   const router = useRouter();
   const [detail, setDetail] = useState<ActasHistoricoElementDetail | null>(null);
@@ -117,6 +121,31 @@ export function ActasHistoricoElementView({
   const activeCount = detail
     ? detail.entries.filter((e) => e.deletedAt == null).length
     : 0;
+
+  const handleEntryUpdated = (updated: ActasHistoricoElementDetail["entries"][number]) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        entries: prev.entries.map((e) =>
+          e.id === updated.id ? updated : e,
+        ),
+      };
+    });
+  };
+
+  const handleEntryDeleted = (deleted: ActasHistoricoElementDetail["entries"][number]) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        entries: prev.entries.map((e) =>
+          e.id === deleted.id ? deleted : e,
+        ),
+      };
+    });
+    router.refresh();
+  };
 
   const handleShare = async () => {
     const url = actasElementPermalinkUrl(
@@ -283,23 +312,35 @@ export function ActasHistoricoElementView({
             el tab Operativo.
           </p>
         ) : (
-          <div className="max-w-3xl">
+          <ul className="max-w-3xl space-y-3">
             {timelineItems.map((item, idx) =>
               item.kind === "gap" ? (
-                <ActasHistoricoGapSeparator
-                  key={`gap-${idx}`}
-                  days={item.days}
-                />
+                <li key={`gap-${idx}`} className="list-none">
+                  <ActasHistoricoGapSeparator days={item.days} />
+                </li>
               ) : (
-                <ActasHistoricoTimelineEntry
+                <li
                   key={item.entry.id}
-                  entry={item.entry}
-                  deleted={item.entry.deletedAt != null}
-                  highlight={highlightEntryId === item.entry.id}
-                />
+                  id={`entry-${item.entry.id}`}
+                  className={`list-none scroll-mt-24 rounded-md transition-colors duration-300 ${
+                    highlightEntryId === item.entry.id
+                      ? "ring-2 ring-amber-300/60"
+                      : ""
+                  }`}
+                >
+                  <ActasHistoryEntryItem
+                    entry={item.entry}
+                    variant="card"
+                    currentAuthUserId={currentAuthUserId}
+                    isPmAdmin={isPmAdmin}
+                    hasWriteAccess={hasWriteAccess}
+                    onUpdated={handleEntryUpdated}
+                    onDeleted={handleEntryDeleted}
+                  />
+                </li>
               ),
             )}
-          </div>
+          </ul>
         )}
       </div>
 

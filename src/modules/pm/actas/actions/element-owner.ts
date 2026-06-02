@@ -3,51 +3,31 @@
 import { requireCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
-import {
-  fetchElementOwnerPickerContext,
-  searchOrgMembers as searchOrgMembersRepo,
-} from "@/modules/pm/actas/data/orgMembersRepository";
+import { searchPmZoneUsers as searchPmZoneUsersRepo } from "@/modules/pm/actas/data/pmZoneUsersRepository";
 
-export type GetOwnerPickerContextResult =
-  | { ok: true; orgId: string; orgName: string }
-  | { ok: false; error: string };
-
-export async function getElementOwnerPickerContext(
-  elementId: string,
-): Promise<GetOwnerPickerContextResult> {
-  await requireCurrentUser();
-  const result = await fetchElementOwnerPickerContext(elementId);
-  if (!result.ok) return result;
-  return { ok: true, ...result.context };
-}
-
-export type SearchOrgMembersInput = {
-  orgId: string;
+export type SearchPmZoneUsersInput = {
   query?: string;
   limit?: number;
 };
 
-export type SearchOrgMembersResult =
+export type SearchPmZoneUsersResult =
   | {
       ok: true;
-      members: {
+      users: {
         userId: string;
         email: string;
         label: string;
         initials: string;
+        displayName: string;
       }[];
     }
   | { ok: false; error: string };
 
-export async function searchOrgMembers(
-  input: SearchOrgMembersInput,
-): Promise<SearchOrgMembersResult> {
+export async function searchPmZoneUsers(
+  input: SearchPmZoneUsersInput = {},
+): Promise<SearchPmZoneUsersResult> {
   await requireCurrentUser();
-  return searchOrgMembersRepo(
-    input.orgId,
-    input.query ?? "",
-    input.limit ?? 20,
-  );
+  return searchPmZoneUsersRepo(input.query ?? "", input.limit ?? 25);
 }
 
 export type MutateElementOwnerInput = {

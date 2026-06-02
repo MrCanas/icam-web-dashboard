@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { collectRootElementOptions } from "@/modules/pm/actas/logic/collect-root-elements";
 import type { ActasOperativoCategory } from "@/modules/pm/actas/types";
 
 import { ActasCategoryGroup } from "./ActasCategoryGroup";
@@ -11,15 +12,25 @@ type ActasOperativoBoardProps = {
   categories: ActasOperativoCategory[];
   projectCode: string;
   currentAuthUserId: string | null;
+  isPmAdmin?: boolean;
+  hasWriteAccess?: boolean;
 } & (
   | { mode: "live" }
   | { mode: "historical"; asOfDate: string }
 );
 
 export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
-  const { categories, projectCode, currentAuthUserId, mode } = props;
+  const {
+    categories,
+    projectCode,
+    currentAuthUserId,
+    mode,
+    isPmAdmin = false,
+    hasWriteAccess = true,
+  } = props;
   const asOfDate = mode === "historical" ? props.asOfDate : undefined;
   const readOnly = mode === "historical";
+  const parentOptions = collectRootElementOptions(categories);
   const [toast, setToast] = useState<string | null>(null);
 
   if (categories.length === 0) {
@@ -43,8 +54,12 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
         <ActasCategoryGroup
           key={category.id}
           category={category}
+          categories={categories}
+          parentOptions={parentOptions}
           projectCode={projectCode}
           currentAuthUserId={currentAuthUserId}
+          isPmAdmin={isPmAdmin}
+          hasWriteAccess={hasWriteAccess && !readOnly}
           readOnly={readOnly}
           asOfDate={asOfDate}
           onElementArchived={readOnly ? undefined : showToast}

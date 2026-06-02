@@ -33,7 +33,7 @@ export async function softDeleteLogEntry(
   if (!authorResult.ok) {
     return { ok: false, error: authorResult.error };
   }
-  const { authorId } = authorResult.author;
+  const { authorId, isPmAdmin } = authorResult.author;
 
   const { client, error: clientError } = await getActasAuthenticatedSupabase();
   if (!client) {
@@ -44,6 +44,7 @@ export async function softDeleteLogEntry(
     client,
     logEntryId,
     authorId,
+    { isPmAdmin },
   );
   if (!access.ok) {
     return {

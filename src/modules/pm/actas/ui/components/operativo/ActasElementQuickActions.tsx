@@ -20,15 +20,6 @@ function IconSubelement() {
   );
 }
 
-function IconHistory() {
-  return (
-    <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
 function IconTrash() {
   return (
     <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -41,23 +32,19 @@ interface QuickActionButtonProps {
   label: string;
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
-  active?: boolean;
 }
 
 function QuickActionButton({
   label,
   onClick,
   children,
-  active = false,
 }: QuickActionButtonProps) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
-      className={`group/btn flex h-7 w-7 items-center justify-center rounded hover:bg-icam-900/10 ${
-        active ? "bg-icam-900/10" : ""
-      }`}
+      className="group/btn flex h-7 w-7 items-center justify-center rounded hover:bg-icam-900/10"
       onClick={onClick}
     >
       {children}
@@ -67,19 +54,15 @@ function QuickActionButton({
 
 export interface ActasElementQuickActionsProps {
   canAddSubelement: boolean;
-  historyOpen: boolean;
   onAddEntry: (e: React.MouseEvent) => void;
   onAddSubelement: (e: React.MouseEvent) => void;
-  onToggleHistory: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }
 
 export function ActasElementQuickActions({
   canAddSubelement,
-  historyOpen,
   onAddEntry,
   onAddSubelement,
-  onToggleHistory,
   onDelete,
 }: ActasElementQuickActionsProps) {
   return (
@@ -95,13 +78,6 @@ export function ActasElementQuickActions({
           <IconSubelement />
         </QuickActionButton>
       ) : null}
-      <QuickActionButton
-        label="Ver histórico inline"
-        onClick={onToggleHistory}
-        active={historyOpen}
-      >
-        <IconHistory />
-      </QuickActionButton>
       <QuickActionButton label="Eliminar elemento" onClick={onDelete}>
         <IconTrash />
       </QuickActionButton>

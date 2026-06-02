@@ -6,13 +6,20 @@ import { OPERATIVO_BOARD_MIN_WIDTH_PX } from "@/modules/pm/actas/logic/element-d
 import { getCategoryGroupStyle } from "@/modules/pm/actas/logic/category-group-style";
 import type { ActasOperativoCategory } from "@/modules/pm/actas/types";
 
+import type { ActasRootElementOption } from "@/modules/pm/actas/logic/collect-root-elements";
+
+import { ActasAddElementModal } from "./ActasAddElementModal";
 import { ActasElementRow } from "./ActasElementRow";
 import { ActasOperativoColumnHeader } from "./ActasOperativoColumnHeader";
 
 interface ActasCategoryGroupProps {
   category: ActasOperativoCategory;
+  categories: ActasOperativoCategory[];
+  parentOptions: ActasRootElementOption[];
   projectCode: string;
   currentAuthUserId: string | null;
+  isPmAdmin?: boolean;
+  hasWriteAccess?: boolean;
   defaultExpanded?: boolean;
   readOnly?: boolean;
   asOfDate?: string;
@@ -34,8 +41,12 @@ function countElements(elements: ActasOperativoCategory["elements"]): number {
 
 export function ActasCategoryGroup({
   category,
+  categories,
+  parentOptions,
   projectCode,
   currentAuthUserId,
+  isPmAdmin = false,
+  hasWriteAccess = true,
   defaultExpanded = true,
   readOnly = false,
   asOfDate,
@@ -43,6 +54,7 @@ export function ActasCategoryGroup({
   onToast,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [addElementOpen, setAddElementOpen] = useState(false);
   const style = getCategoryGroupStyle(category.masterGroupId, category.id);
   const itemCount = countElements(category.elements);
 
@@ -88,6 +100,8 @@ export function ActasCategoryGroup({
                 element={el}
                 projectCode={projectCode}
                 currentAuthUserId={currentAuthUserId}
+                isPmAdmin={isPmAdmin}
+                hasWriteAccess={hasWriteAccess}
                 readOnly={readOnly}
                 asOfDate={asOfDate}
                 onElementArchived={onElementArchived}
@@ -96,11 +110,11 @@ export function ActasCategoryGroup({
             ))
           )}
 
-          {!readOnly ? (
+          {!readOnly && hasWriteAccess ? (
             <button
               type="button"
               className="flex w-full items-center gap-2 border-t border-subtle/40 px-4 py-2.5 text-sm text-icam-900/80 hover:bg-icam-900/5 transition-colors"
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => setAddElementOpen(true)}
             >
               <span className="text-lg leading-none font-light" aria-hidden>
                 +
@@ -110,6 +124,16 @@ export function ActasCategoryGroup({
           ) : null}
           </div>
         </div>
+      ) : null}
+
+      {!readOnly && hasWriteAccess ? (
+        <ActasAddElementModal
+          open={addElementOpen}
+          defaultCategoryId={category.id}
+          categories={categories}
+          parentOptions={parentOptions}
+          onClose={() => setAddElementOpen(false)}
+        />
       ) : null}
     </section>
   );

@@ -1,9 +1,11 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
-import { checkWriteAccess } from "@/lib/auth/permissions";
-import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import {
+  loadLogEntryForAuthorAction,
+  LOG_ENTRY_SELECT,
+  requireLogEntryAuthor,
+} from "@/modules/pm/actas/actions/log-entry-auth";
 import {
   mapLogEntryRow,
   type LogEntryRow,
@@ -20,9 +22,6 @@ export type UpdateLogEntryInput = {
 export type UpdateLogEntryResult =
   | { ok: true; entry: ActasLogEntryItem }
   | { ok: false; error: string; forbidden?: boolean };
-
-const LOG_ENTRY_SELECT =
-  "id, content, entry_date, deleted_at, status_before, status_after, author_id, source, edited_at";
 
 export async function updateLogEntry(
   input: UpdateLogEntryInput,
@@ -42,56 +41,32 @@ export async function updateLogEntry(
     return { ok: false, error: "Fecha de entrada no válida" };
   }
 
-  const icamUser = await requireCurrentUser();
-  const writeDenied = checkWriteAccess(icamUser, "pm");
-  if (writeDenied) {
-    return { ok: false, error: writeDenied, forbidden: true };
+  const authorResult = await requireLogEntryAuthor();
+  if (!authorResult.ok) {
+    return { ok: false, error: authorResult.error, forbidden: true };
   }
-  const authorId = await resolveAuthUserIdByEmail(icamUser.email);
-  if (!authorId) {
-    return {
-      ok: false,
-      error: `Usuario ${icamUser.email} no provisionado en Supabase Auth.`,
-    };
-  }
+  const { authorId, isPmAdmin } = authorResult.author;
 
   const { client, error: clientError } = await getActasAuthenticatedSupabase();
   if (!client) {
     return { ok: false, error: clientError };
   }
 
-  const { data: existing, error: fetchError } = await client
-    .from("log_entry")
-    .select("id, author_id, deleted_at, source")
-    .eq("id", logEntryId)
-    .maybeSingle();
-
-  if (fetchError) {
-    return { ok: false, error: fetchError.message };
+  const access = await loadLogEntryForAuthorAction(
+    client,
+    logEntryId,
+    authorId,
+    { isPmAdmin },
+  );
+  if (!access.ok) {
+    return {
+      ok: false,
+      error: access.error,
+      forbidden: access.forbidden,
+    };
   }
-  if (!existing) {
-    return { ok: false, error: "Entrada no encontrada" };
-  }
-  if (existing.deleted_at) {
+  if (access.existing.deleted_at) {
     return { ok: false, error: "No se puede editar una entrada borrada" };
-  }
-
-  const rowAuthorId = existing.author_id as string | null;
-  if (!rowAuthorId || rowAuthorId !== authorId) {
-    return {
-      ok: false,
-      forbidden: true,
-      error: "Solo el autor de una entrada puede editarla",
-    };
-  }
-
-  const src = (existing.source as string | null)?.toLowerCase() ?? "";
-  if (src === "snapshot" || src === "monday_update") {
-    return {
-      ok: false,
-      forbidden: true,
-      error: "Las entradas migradas de Monday no se pueden editar desde la UI",
-    };
   }
 
   const { data: row, error: updateError } = await client
@@ -109,7 +84,8 @@ export async function updateLogEntry(
     return { ok: false, error: updateError.message };
   }
 
-  const userDisplayMap = await resolveUserDisplayMap([authorId]);
+  const displayAuthorId = (row.author_id as string | null) ?? authorId;
+  const userDisplayMap = await resolveUserDisplayMap([displayAuthorId]);
   const entry = mapLogEntryRow(row as LogEntryRow, userDisplayMap);
 
   return { ok: true, entry };
