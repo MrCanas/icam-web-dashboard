@@ -8,8 +8,9 @@ export function ActasOperativoColumnHeader() {
       <span>Elemento</span>
       <span>Owner</span>
       <span>Status</span>
+      <span>Plazo</span>
       <span>Última entrada</span>
-      <span>Fecha</span>
+      <span>Actualizado</span>
     </div>
   );
 }

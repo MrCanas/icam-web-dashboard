@@ -11,20 +11,19 @@ import { createPortal } from "react-dom";
 
 import {
   addElementOwner,
-  getElementOwnerPickerContext,
   removeElementOwner,
-  searchOrgMembers,
+  searchPmZoneUsers,
 } from "@/modules/pm/actas/actions/element-owner";
-import { isUnresolvedOwner } from "@/modules/pm/actas/logic/owner-display";
 import {
   avatarColorFromEmail,
   avatarColorFromUserId,
 } from "@/modules/pm/actas/logic/actas-avatar";
+import { isUnresolvedOwner } from "@/modules/pm/actas/logic/owner-display";
 import type { ActasElementOwner } from "@/modules/pm/actas/types";
 
 import { ActasOwnerAvatars } from "./ActasOwnerAvatars";
 
-const POPOVER_WIDTH = 280;
+const POPOVER_WIDTH = 300;
 const SEARCH_DEBOUNCE_MS = 250;
 
 interface ActasOwnerPickerProps {
@@ -32,6 +31,7 @@ interface ActasOwnerPickerProps {
   owners: ActasElementOwner[];
   compact?: boolean;
   readOnly?: boolean;
+  hasWriteAccess?: boolean;
   onOwnersChange: (owners: ActasElementOwner[]) => void;
   onError: (message: string) => void;
 }
@@ -67,9 +67,11 @@ export function ActasOwnerPicker({
   owners,
   compact = false,
   readOnly = false,
+  hasWriteAccess = true,
   onOwnersChange,
   onError,
 }: ActasOwnerPickerProps) {
+  const canAssign = hasWriteAccess && !readOnly;
   const inputId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -77,14 +79,17 @@ export function ActasOwnerPicker({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(
     null,
   );
-  const [orgId, setOrgId] = useState<string | null>(null);
-  const [orgName, setOrgName] = useState("la organización");
   const [query, setQuery] = useState("");
-  const [members, setMembers] = useState<
-    { userId: string; email: string; label: string; initials: string }[]
+  const [users, setUsers] = useState<
+    {
+      userId: string;
+      email: string;
+      label: string;
+      initials: string;
+      displayName: string;
+    }[]
   >([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [contextLoading, setContextLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [pendingUserIds, setPendingUserIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -103,44 +108,33 @@ export function ActasOwnerPicker({
     setPosition({ top, left });
   }, []);
 
-  const loadMembers = useCallback(
-    async (org: string, q: string) => {
-      setLoadingMembers(true);
-      const res = await searchOrgMembers({ orgId: org, query: q, limit: 20 });
-      setLoadingMembers(false);
+  const loadUsers = useCallback(
+    async (q: string) => {
+      setLoadingUsers(true);
+      const res = await searchPmZoneUsers({ query: q, limit: 25 });
+      setLoadingUsers(false);
       if (!res.ok) {
         onError(res.error);
         return;
       }
-      setMembers(res.members);
+      setUsers(res.users);
     },
     [onError],
   );
 
   useEffect(() => {
     if (!open) return;
-    setContextLoading(true);
-    void getElementOwnerPickerContext(elementId).then((res) => {
-      setContextLoading(false);
-      if (!res.ok) {
-        onError(res.error);
-        setOpen(false);
-        return;
-      }
-      setOrgId(res.orgId);
-      setOrgName(res.orgName);
-      void loadMembers(res.orgId, "");
-    });
+    void loadUsers("");
     updatePosition();
-  }, [open, elementId, loadMembers, onError, updatePosition]);
+  }, [open, loadUsers, updatePosition]);
 
   useEffect(() => {
-    if (!open || !orgId) return;
+    if (!open) return;
     const timer = window.setTimeout(() => {
-      void loadMembers(orgId, query);
+      void loadUsers(query);
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [open, orgId, query, loadMembers]);
+  }, [open, query, loadUsers]);
 
   useEffect(() => {
     if (!open) return;
@@ -182,7 +176,7 @@ export function ActasOwnerPicker({
     label: string;
     initials: string;
   }) => {
-    if (pendingUserIds.has(member.userId)) return;
+    if (!canAssign || pendingUserIds.has(member.userId)) return;
 
     const isOwner = ownerIdSet.has(member.userId);
     const previous = owners;
@@ -217,7 +211,7 @@ export function ActasOwnerPicker({
   };
 
   const removeCurrentOwner = async (owner: ActasElementOwner) => {
-    if (pendingUserIds.has(owner.userId)) return;
+    if (!canAssign || pendingUserIds.has(owner.userId)) return;
     const previous = owners;
     setPendingUserIds((s) => new Set(s).add(owner.userId));
     onOwnersChange(owners.filter((o) => o.userId !== owner.userId));
@@ -240,7 +234,13 @@ export function ActasOwnerPicker({
   };
 
   if (readOnly) {
-    return <ActasOwnerAvatars owners={owners} compact={compact} />;
+    return (
+      <ActasOwnerAvatars
+        owners={owners}
+        compact={compact}
+        showAssignPlaceholder={false}
+      />
+    );
   }
 
   return (
@@ -267,7 +267,7 @@ export function ActasOwnerPicker({
               ref={popoverRef}
               role="dialog"
               aria-labelledby={`${inputId}-title`}
-              className="fixed z-[70] w-[280px] rounded-lg border border-subtle/60 bg-card shadow-xl"
+              className="fixed z-[70] w-[300px] rounded-lg border border-subtle/60 bg-card shadow-xl"
               style={{ top: position.top, left: position.left }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
@@ -277,8 +277,13 @@ export function ActasOwnerPicker({
                   id={`${inputId}-title`}
                   className="text-xs font-semibold text-text-primary"
                 >
-                  Asignar responsable(s)
+                  Responsable
                 </h3>
+                {!canAssign ? (
+                  <p className="mt-1 text-[10px] text-text-muted leading-snug">
+                    Solo lectura: puedes consultar la lista pero no asignar.
+                  </p>
+                ) : null}
               </div>
 
               {owners.length > 0 ? (
@@ -300,15 +305,17 @@ export function ActasOwnerPicker({
                         <span className="truncate max-w-[140px]">
                           {displayEmail}
                         </span>
-                        <button
-                          type="button"
-                          className="ml-0.5 text-text-muted hover:text-red-600"
-                          aria-label={`Quitar ${displayEmail}`}
-                          disabled={pendingUserIds.has(owner.userId)}
-                          onClick={() => void removeCurrentOwner(owner)}
-                        >
-                          ×
-                        </button>
+                        {canAssign ? (
+                          <button
+                            type="button"
+                            className="ml-0.5 text-text-muted hover:text-red-600"
+                            aria-label={`Quitar ${displayEmail}`}
+                            disabled={pendingUserIds.has(owner.userId)}
+                            onClick={() => void removeCurrentOwner(owner)}
+                          >
+                            ×
+                          </button>
+                        ) : null}
                       </span>
                     );
                   })}
@@ -317,42 +324,48 @@ export function ActasOwnerPicker({
 
               <div className="p-3 space-y-2">
                 <label htmlFor={inputId} className="sr-only">
-                  Buscar usuario
+                  Buscar usuario PM
                 </label>
                 <input
                   id={inputId}
                   type="search"
                   autoFocus
                   value={query}
-                  placeholder="Buscar usuario por nombre o email…"
+                  placeholder="Buscar por nombre o email…"
                   className="w-full rounded-md border border-subtle/60 bg-page px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-icam-900/40 focus:outline-none focus:ring-1 focus:ring-icam-900/20"
                   onChange={(e) => setQuery(e.target.value)}
                 />
 
-                {contextLoading || loadingMembers ? (
+                {loadingUsers ? (
                   <p className="py-2 text-xs text-text-muted">Cargando…</p>
-                ) : members.length === 0 ? (
+                ) : users.length === 0 ? (
                   <p className="py-2 text-xs text-text-muted leading-snug">
-                    Sin coincidencias. ¿Quizá el usuario no es miembro de{" "}
-                    {orgName}?
+                    Sin coincidencias entre usuarios con acceso a PM.
                   </p>
                 ) : (
                   <ul className="max-h-52 overflow-y-auto -mx-1">
-                    {members.map((member) => {
+                    {users.map((member) => {
                       const selected = ownerIdSet.has(member.userId);
                       return (
                         <li key={member.userId}>
                           <button
                             type="button"
-                            disabled={pendingUserIds.has(member.userId)}
-                            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-page ${
+                            disabled={
+                              !canAssign || pendingUserIds.has(member.userId)
+                            }
+                            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-page disabled:cursor-not-allowed disabled:opacity-50 ${
                               selected ? "bg-icam-900/5" : ""
                             }`}
                             onClick={() => void toggleOwner(member)}
                           >
                             <OwnerMiniAvatar owner={member} />
-                            <span className="min-w-0 flex-1 truncate text-xs text-text-body">
-                              {member.email}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-medium text-text-body">
+                                {member.displayName}
+                              </span>
+                              <span className="block truncate text-[10px] text-text-muted">
+                                {member.email}
+                              </span>
                             </span>
                             {selected ? (
                               <span

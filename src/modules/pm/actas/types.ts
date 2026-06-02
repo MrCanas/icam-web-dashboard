@@ -75,6 +75,9 @@ export interface ActasOperativoElement {
   timelineEnd: string | null;
   lastEntryContent: string | null;
   lastEntryDate: string | null;
+  lastEntryId: string | null;
+  lastEntryAuthorId: string | null;
+  lastEntrySource: string | null;
   children: ActasOperativoElement[];
 }
 

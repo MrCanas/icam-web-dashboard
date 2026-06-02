@@ -169,6 +169,9 @@ export async function fetchProjectSnapshotAtDate(
         timelineEnd: (el.timeline_end as string | null) ?? null,
         lastEntryContent: snap?.last_log_content ?? null,
         lastEntryDate: snap?.last_log_entry_date ?? null,
+        lastEntryId: null,
+        lastEntryAuthorId: null,
+        lastEntrySource: null,
       } satisfies Omit<ActasOperativoElement, "children">;
     });
 

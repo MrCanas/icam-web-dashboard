@@ -2,6 +2,9 @@ import { createServiceRoleClient } from "@/lib/db/admin";
 
 import type { ActasElementOwner } from "@/modules/pm/actas/types";
 
+const UUID_LIKE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function initialsFromEmail(email: string): string {
   const local = email.split("@")[0]?.trim() ?? "";
   if (!local) return "?";
@@ -12,17 +15,54 @@ export function initialsFromEmail(email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
+export function initialsFromDisplayName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+  }
+  if (parts.length === 1) {
+    return parts[0]!.slice(0, 2).toUpperCase();
+  }
+  return "?";
+}
+
+export function displayNameFromAuthMetadata(
+  email: string,
+  metadata: Record<string, unknown> | undefined,
+): string {
+  if (metadata) {
+    if (typeof metadata.name === "string" && metadata.name.trim()) {
+      return metadata.name.trim();
+    }
+    if (typeof metadata.full_name === "string" && metadata.full_name.trim()) {
+      return metadata.full_name.trim();
+    }
+  }
+  const local = email.split("@")[0]?.trim();
+  return local || email;
+}
+
 export function ownerFromAuthUser(
   id: string,
   email: string | undefined,
+  metadata?: Record<string, unknown>,
 ): ActasElementOwner {
   const mail = email?.trim() ?? "";
-  const label = mail ? mail.split("@")[0]! : id.slice(0, 8);
+  const displayName = mail
+    ? displayNameFromAuthMetadata(mail, metadata)
+    : "";
+  const label = displayName || (mail ? mail.split("@")[0]! : "");
+  const initials = mail
+    ? initialsFromEmail(mail)
+    : displayName
+      ? initialsFromDisplayName(displayName)
+      : "?";
+
   return {
     userId: id,
     email: mail || null,
-    label,
-    initials: mail ? initialsFromEmail(mail) : id.slice(0, 2).toUpperCase(),
+    label: label && !UUID_LIKE.test(label) ? label : "",
+    initials: initials === "?" || UUID_LIKE.test(initials) ? "?" : initials,
   };
 }
 
@@ -45,7 +85,14 @@ export async function resolveUserDisplayMap(
 
     for (const user of data.users) {
       if (needed.has(user.id)) {
-        result.set(user.id, ownerFromAuthUser(user.id, user.email));
+        result.set(
+          user.id,
+          ownerFromAuthUser(
+            user.id,
+            user.email,
+            user.user_metadata as Record<string, unknown> | undefined,
+          ),
+        );
       }
     }
 

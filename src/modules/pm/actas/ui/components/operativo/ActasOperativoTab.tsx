@@ -1,4 +1,5 @@
 import type { UserContext } from "@/lib/auth/currentUser";
+import { getUserRole } from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { fetchActasProjectOperativo } from "@/modules/pm/actas/data/actasRepository";
 import {
@@ -28,6 +29,8 @@ export async function ActasOperativoTab({
   projectCode,
   asOfParam,
 }: ActasOperativoTabProps) {
+  const isPmAdmin = getUserRole(ctx, "pm") === "admin";
+  const hasWriteAccess = getUserRole(ctx, "pm") !== "lector";
   const asOfIso = parseAsOfDateParam(asOfParam);
   const isHistorical =
     asOfIso != null && !isAsOfFuture(asOfIso);
@@ -73,6 +76,8 @@ export async function ActasOperativoTab({
           categories={snapshotResult.categories}
           projectCode={projectCode}
           currentAuthUserId={currentAuthUserId}
+          isPmAdmin={isPmAdmin}
+          hasWriteAccess={false}
         />
       </div>
     );
@@ -98,6 +103,8 @@ export async function ActasOperativoTab({
       categories={categories}
       projectCode={projectCode}
       currentAuthUserId={currentAuthUserId}
+      isPmAdmin={isPmAdmin}
+      hasWriteAccess={hasWriteAccess}
     />
   );
 }

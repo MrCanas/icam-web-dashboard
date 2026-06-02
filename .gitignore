@@ -49,3 +49,4 @@ next-env.d.ts
 # Actas — extracciones Monday locales (P3.1)
 /tmp/monday-extracts/
 /tmp/monday-transformed/
+tmp/

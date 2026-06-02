@@ -338,7 +338,7 @@ export async function fetchActasProjectOperativo(
     elementIds.length > 0
       ? supabase
           .from("log_entry")
-          .select("element_id, content, entry_date")
+          .select("id, element_id, content, entry_date, author_id, source")
           .in("element_id", elementIds)
           .is("deleted_at", null)
           .order("entry_date", { ascending: false })
@@ -363,14 +363,23 @@ export async function fetchActasProjectOperativo(
 
   const lastLogByElement = new Map<
     string,
-    { content: string; entryDate: string }
+    {
+      id: string;
+      content: string;
+      entryDate: string;
+      authorId: string | null;
+      source: string | null;
+    }
   >();
   for (const row of logResult.data ?? []) {
     const eid = row.element_id as string;
     if (!lastLogByElement.has(eid)) {
       lastLogByElement.set(eid, {
+        id: row.id as string,
         content: row.content as string,
         entryDate: row.entry_date as string,
+        authorId: (row.author_id as string | null) ?? null,
+        source: (row.source as string | null) ?? null,
       });
     }
   }
@@ -423,6 +432,9 @@ export async function fetchActasProjectOperativo(
         timelineEnd: (el.timeline_end as string | null) ?? null,
         lastEntryContent: lastLog?.content ?? null,
         lastEntryDate: lastLog?.entryDate ?? null,
+        lastEntryId: lastLog?.id ?? null,
+        lastEntryAuthorId: lastLog?.authorId ?? null,
+        lastEntrySource: lastLog?.source ?? null,
       };
     });
 

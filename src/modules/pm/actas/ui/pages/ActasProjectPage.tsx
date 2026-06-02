@@ -5,7 +5,7 @@ import type { ActasProjectDetail, ActasProjectTab } from "@/modules/pm/actas/typ
 import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
 import { ActasActaTab } from "../components/acta/ActasActaTab";
-import { ActasHistoricoTab } from "../components/historico/ActasHistoricoTab";
+import { ActasHistoricoTabServer } from "../components/historico/ActasHistoricoTabServer";
 import { ActasOperativoAsOfPicker } from "../components/operativo/ActasOperativoAsOfPicker";
 import { ActasOperativoTab } from "../components/operativo/ActasOperativoTab";
 import { ActasProjectHeader } from "../components/ActasProjectHeader";
@@ -68,18 +68,11 @@ export function ActasProjectPage({
             <ActasActaTab projectId={project.id} projectCode={project.code} />
           </Suspense>
         ) : validTab === "historico" ? (
-          <Suspense
-            fallback={
-              <section className="bg-card rounded-b-lg border border-t-0 border-subtle/50 p-6 text-sm text-text-muted">
-                Cargando histórico…
-              </section>
-            }
-          >
-            <ActasHistoricoTab
-              projectId={project.id}
-              projectCode={project.code}
-            />
-          </Suspense>
+          <ActasHistoricoTabServer
+            ctx={ctx}
+            projectId={project.id}
+            projectCode={project.code}
+          />
         ) : (
           <ActasTabContent tab={validTab} projectCode={project.code} />
         )}

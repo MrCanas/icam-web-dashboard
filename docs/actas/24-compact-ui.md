@@ -9,17 +9,16 @@ Refactor de densidad del tablero operativo, alineado con Monday: una fila por el
 | ~60–80 px / fila | ~36–40 px / fila colapsada |
 | ~10 elementos visibles | ~15–20 sin scroll en viewport típico |
 
-Cambios de layout: `py-1.5`, `min-h-9`, avatares 24px, grid de 5 columnas (sin Timeline ni columna de acciones a la derecha).
+Cambios de layout: `py-1.5`, `min-h-9`, avatares 24px, grid compacto de 6 columnas + acciones hover.
 
 ## Columnas visibles
 
 1. **Elemento** — barra de acciones (hover) + indentación + nombre  
 2. **Owner**  
 3. **Status**  
-4. **Última entrada**  
-5. **Fecha** (relativa)
-
-`timeline_start` / `timeline_end` siguen en modelo y queries; **no se renderizan** (reservado para V2).
+4. **Plazo**  
+5. **Última entrada**  
+6. **Actualizado** (fecha relativa de última entrada)
 
 Grid: `OPERATIVO_ROW_GRID` en `logic/element-display.ts`.
 
@@ -36,11 +35,10 @@ Contenedor de fila: `group/row`. Barra: `opacity-0 group-hover/row:opacity-100`.
 
 Iconos: SVG inline 16px (`ActasElementQuickActions.tsx`). Sin Lucide en el proyecto.
 
-### Eliminado del DOM
+### Ajustes del DOM
 
 - Botones texto «Histórico» / «+ Añadir entrada» a la derecha  
 - Fila «+ Sub-elemento» bajo cada padre  
-- Columna Timeline (cabecera y celdas)
 
 ## Server Actions
 
@@ -114,6 +112,44 @@ Server Action: `changeElementStatus({ elementId, newStatus })`. Si `newStatus ==
 
 Componentes: `ActasStatusPicker.tsx`, `actions/change-element-status.ts`, `logic/status-change-log.ts`.
 
+## Columna Plazo (P-UX-4)
+
+Click en la celda de plazo abre un calendario popover (`react-day-picker`) anclado a la celda.
+
+| Estado visual | Regla |
+|---------------|-------|
+| `—` | `timeline_start` y `timeline_end` nulos |
+| `+ Plazo` en hover | mismo estado vacío, solo en filas editables |
+| Fecha única | deadline simple (`timeline_end`, `timeline_start = null`) |
+| Rango | duración (`timeline_start` + `timeline_end`) |
+
+Color del texto (solo si `timeline_end` existe y el estado no es `done`):
+
+- rojo: vencido (`timeline_end < hoy`)  
+- ámbar: vence en ≤7 días  
+- normal: resto
+
+### Semántica deadline vs duración
+
+- Selección de un único día (o mismo día dos veces) → deadline (`timeline_end`)  
+- Selección de dos días distintos → duración (`timeline_start` / `timeline_end`, ordenadas)
+
+Botones del popover: **Aplicar**, **Aplicar como deadline**, **Quitar plazo**, **Cancelar**.
+
+### Persistencia y logging
+
+Server Action: `updateElementTimeline({ elementId, timelineStart, timelineEnd })`.
+
+- Valida acceso RLS y formato `YYYY-MM-DD`
+- Si llega rango invertido, lo corrige (swap) antes de guardar
+- **No crea `log_entry`** por cambios de plazo: son ajustes frecuentes y generarían ruido en el histórico
+- UI optimista con rollback + toast en error
+
+### Modo histórico
+
+En `readOnly` / snapshot, la celda de plazo es solo lectura y muestra el valor actual del elemento.
+En V1 no se reconstruye histórico de plazos (igual que owners).
+
 ## Comparación con Monday
 
 Monday agrupa acciones en iconos al hover de la fila y evita filas secundarias de botones. Este cambio replica ese patrón para reducir ruido visual y aumentar filas visibles por pantalla.
@@ -122,6 +158,6 @@ Monday agrupa acciones en iconos al hover de la fila y evita filas secundarias d
 
 - `ActasElementRow.tsx`, `ActasElementQuickActions.tsx`  
 - `ActasAddSubelementPanel.tsx`, `ActasArchiveElementModal.tsx`  
-- `ActasStatusPicker.tsx`, `ActasOwnerPicker.tsx`, `ActasOwnerAvatars.tsx`
-- `actions/change-element-status.ts`, `actions/element-owner.ts`, `actions/create-subelement.ts`, `actions/archive-element.ts`  
+- `ActasStatusPicker.tsx`, `ActasTimelinePicker.tsx`, `ActasOwnerPicker.tsx`, `ActasOwnerAvatars.tsx`
+- `actions/change-element-status.ts`, `actions/update-element-timeline.ts`, `actions/element-owner.ts`, `actions/create-subelement.ts`, `actions/archive-element.ts`  
 - `ActasOperativoColumnHeader.tsx`, `element-display.ts`

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserContext } from "@/lib/auth/currentUser";
 import { requireCurrentUser } from "@/lib/auth/currentUser";
 import {
+  getUserRole,
   requireWriteAccess,
   WriteAccessDeniedError,
 } from "@/lib/auth/permissions";
@@ -16,6 +17,7 @@ const NON_EDITABLE_SOURCES = new Set(["snapshot", "monday_update"]);
 export type LogEntryAuthorContext = {
   authorId: string;
   icamUser: UserContext;
+  isPmAdmin: boolean;
 };
 
 export async function requireLogEntryAuthor(): Promise<
@@ -38,7 +40,8 @@ export async function requireLogEntryAuthor(): Promise<
       error: `Usuario ${icamUser.email} no provisionado en Supabase Auth.`,
     };
   }
-  return { ok: true, author: { authorId, icamUser } };
+  const isPmAdmin = getUserRole(icamUser, "pm") === "admin";
+  return { ok: true, author: { authorId, icamUser, isPmAdmin } };
 }
 
 type ExistingRow = {
@@ -51,12 +54,14 @@ type ExistingRow = {
 export async function loadLogEntryForAuthorAction(
   client: SupabaseClient,
   logEntryId: string,
-  authorId: string,
-  options?: { blockMondaySource?: boolean },
+  actorId: string,
+  options?: { blockMondaySource?: boolean; isPmAdmin?: boolean },
 ): Promise<
   | { ok: true; existing: ExistingRow }
   | { ok: false; error: string; forbidden?: boolean; notFound?: boolean }
 > {
+  const isPmAdmin = options?.isPmAdmin ?? false;
+
   const { data: existing, error: fetchError } = await client
     .from("log_entry")
     .select("id, author_id, deleted_at, source")
@@ -71,7 +76,7 @@ export async function loadLogEntryForAuthorAction(
   }
 
   const rowAuthorId = existing.author_id as string | null;
-  if (!rowAuthorId || rowAuthorId !== authorId) {
+  if (!isPmAdmin && (!rowAuthorId || rowAuthorId !== actorId)) {
     return {
       ok: false,
       forbidden: true,
