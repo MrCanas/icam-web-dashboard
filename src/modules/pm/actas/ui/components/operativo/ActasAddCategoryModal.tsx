@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { createCategory } from "@/modules/pm/actas/actions/create-category";
+import type { OperativoOptimisticAction } from "@/modules/pm/actas/logic/operativo-optimistic";
 
 interface ActasAddCategoryModalProps {
   open: boolean;
   projectId: string;
   onClose: () => void;
+  onOptimisticAction?: (action: OperativoOptimisticAction) => void;
 }
 
 const inputClass =
@@ -18,6 +20,7 @@ export function ActasAddCategoryModal({
   open,
   projectId,
   onClose,
+  onOptimisticAction,
 }: ActasAddCategoryModalProps) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -41,6 +44,12 @@ export function ActasAddCategoryModal({
         setError(result.error);
         return;
       }
+      onOptimisticAction?.({
+        type: "addCategory",
+        categoryId: result.categoryId,
+        name: name.trim(),
+        displayName: name.trim(),
+      });
       onClose();
       router.refresh();
     });

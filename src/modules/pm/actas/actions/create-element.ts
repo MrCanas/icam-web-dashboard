@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { requireCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
@@ -143,6 +145,23 @@ export async function createElement(
       if (copyErr) {
         return { ok: false, error: copyErr.message };
       }
+    }
+  }
+
+  const { data: projectRow, error: projectErr } = await client
+    .from("category")
+    .select("project_id")
+    .eq("id", categoryId)
+    .maybeSingle();
+
+  if (!projectErr && projectRow?.project_id) {
+    const { data: project, error: codeErr } = await client
+      .from("project")
+      .select("code")
+      .eq("id", projectRow.project_id as string)
+      .maybeSingle();
+    if (!codeErr && project?.code) {
+      revalidatePath(`/dashboard/pm/actas/${project.code as string}`);
     }
   }
 

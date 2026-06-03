@@ -13,6 +13,7 @@ import type {
 } from "@/modules/pm/actas/types";
 
 import type { ActasRootElementOption } from "@/modules/pm/actas/logic/collect-root-elements";
+import type { OperativoOptimisticAction } from "@/modules/pm/actas/logic/operativo-optimistic";
 
 import { ActasAddElementModal } from "./ActasAddElementModal";
 import { ActasCategoryNameCell } from "./ActasCategoryNameCell";
@@ -37,6 +38,7 @@ interface ActasCategoryGroupProps {
   ) => void;
   onElementArchived?: (message: string) => void;
   onToast?: (message: string) => void;
+  onOptimisticAction?: (action: OperativoOptimisticAction) => void;
 }
 
 function countElements(elements: ActasOperativoCategory["elements"]): number {
@@ -66,6 +68,7 @@ export function ActasCategoryGroup({
   onElementStatusLiveChange,
   onElementArchived,
   onToast,
+  onOptimisticAction,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [addElementOpen, setAddElementOpen] = useState(false);
@@ -174,6 +177,7 @@ export function ActasCategoryGroup({
           categories={categories}
           parentOptions={parentOptions}
           onClose={() => setAddElementOpen(false)}
+          onOptimisticAction={onOptimisticAction}
         />
       ) : null}
     </section>

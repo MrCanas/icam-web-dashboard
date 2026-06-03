@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { requireCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
@@ -93,6 +95,16 @@ export async function createCategory(
 
   if (insertErr) {
     return { ok: false, error: insertErr.message };
+  }
+
+  const { data: projectRow, error: projectCodeErr } = await client
+    .from("project")
+    .select("code")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (!projectCodeErr && projectRow?.code) {
+    revalidatePath(`/dashboard/pm/actas/${projectRow.code as string}`);
   }
 
   return { ok: true, categoryId: inserted.id as string };

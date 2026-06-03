@@ -20,7 +20,6 @@ import {
 import { useRouter } from "next/navigation";
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -40,7 +39,6 @@ import {
   moveBetweenContainers,
   nestDropId,
   parseContainerKey,
-  rebuildCategoriesFromContainers,
   resolveCategoryIdForContainer,
   rootContainerKey,
   type FlatOperativoElement,
@@ -64,9 +62,7 @@ export function useOperativoDnd(): OperativoDndContextValue | null {
 interface ActasOperativoDndProviderProps {
   projectId: string;
   projectCode: string;
-  baseCategories: ActasOperativoCategory[];
-  onCategoriesChange: (categories: ActasOperativoCategory[]) => void;
-  onMutatingChange?: (mutating: boolean) => void;
+  categories: ActasOperativoCategory[];
   onError: (message: string) => void;
   children: ReactNode;
 }
@@ -74,9 +70,7 @@ interface ActasOperativoDndProviderProps {
 export function ActasOperativoDndProvider({
   projectId,
   projectCode,
-  baseCategories,
-  onCategoriesChange,
-  onMutatingChange,
+  categories,
   onError,
   children,
 }: ActasOperativoDndProviderProps) {
@@ -84,37 +78,23 @@ export function ActasOperativoDndProvider({
   const [pending, startTransition] = useTransition();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [containers, setContainers] = useState(() =>
-    buildContainersFromCategories(baseCategories),
+    buildContainersFromCategories(categories),
   );
 
   const elementsById = useMemo(
-    () => flattenOperativoElements(baseCategories),
-    [baseCategories],
+    () => flattenOperativoElements(categories),
+    [categories],
   );
 
   useEffect(() => {
-    setContainers(buildContainersFromCategories(baseCategories));
-  }, [baseCategories]);
+    setContainers(buildContainersFromCategories(categories));
+  }, [categories]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
-  );
-
-  const applyContainers = useCallback(
-    (nextContainers: Record<OperativoDndContainerKey, string[]>) => {
-      setContainers(nextContainers);
-      onCategoriesChange(
-        rebuildCategoriesFromContainers(
-          baseCategories,
-          nextContainers,
-          elementsById,
-        ),
-      );
-    },
-    [baseCategories, elementsById, onCategoriesChange],
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -175,10 +155,9 @@ export function ActasOperativoDndProvider({
     const orderedSiblingIds = nextContainers[destKey] ?? [];
 
     const previousContainers = containers;
-    applyContainers(nextContainers);
+    setContainers(nextContainers);
 
     startTransition(async () => {
-      onMutatingChange?.(true);
       try {
         const result = await moveElement({
           projectId,
@@ -191,20 +170,14 @@ export function ActasOperativoDndProvider({
 
         if (!result.ok) {
           setContainers(previousContainers);
-          onCategoriesChange(
-            rebuildCategoriesFromContainers(
-              baseCategories,
-              previousContainers,
-              elementsById,
-            ),
-          );
           onError(result.error);
           return;
         }
 
         router.refresh();
-      } finally {
-        onMutatingChange?.(false);
+      } catch {
+        setContainers(previousContainers);
+        onError("No se pudo reordenar el elemento");
       }
     });
   };

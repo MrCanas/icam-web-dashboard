@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { createElement } from "@/modules/pm/actas/actions/create-element";
 import type { ActasRootElementOption } from "@/modules/pm/actas/logic/collect-root-elements";
+import type { OperativoOptimisticAction } from "@/modules/pm/actas/logic/operativo-optimistic";
 import type { ActasOperativoCategory } from "@/modules/pm/actas/types";
 
 interface ActasAddElementModalProps {
@@ -13,6 +14,7 @@ interface ActasAddElementModalProps {
   categories: ActasOperativoCategory[];
   parentOptions: ActasRootElementOption[];
   onClose: () => void;
+  onOptimisticAction?: (action: OperativoOptimisticAction) => void;
 }
 
 const inputClass =
@@ -24,6 +26,7 @@ export function ActasAddElementModal({
   categories,
   parentOptions,
   onClose,
+  onOptimisticAction,
 }: ActasAddElementModalProps) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -77,6 +80,13 @@ export function ActasAddElementModal({
         setError(result.error);
         return;
       }
+      onOptimisticAction?.({
+        type: "addElement",
+        categoryId,
+        parentElementId: asSubelement ? parentElementId : null,
+        elementId: result.elementId,
+        name: name.trim(),
+      });
       onClose();
       router.refresh();
     });

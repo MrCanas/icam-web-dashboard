@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useOptimistic, useState } from "react";
 
 import { ActasAddCategoryModal } from "./ActasAddCategoryModal";
 
 import { collectRootElementOptions } from "@/modules/pm/actas/logic/collect-root-elements";
 import { filterOperativoCategories } from "@/modules/pm/actas/logic/operativo-done-filter";
-import { mergeVisibleOperativoTrees } from "@/modules/pm/actas/logic/merge-visible-operativo-tree";
+import {
+  applyOperativoOptimisticAction,
+  type OperativoOptimisticAction,
+} from "@/modules/pm/actas/logic/operativo-optimistic";
 import type {
   ActasOperativoCategory,
   ElementStatus,
@@ -49,24 +52,21 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   >({});
   const [toast, setToast] = useState<string | null>(null);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
-  const [displayCategories, setDisplayCategories] = useState(categories);
-  const [isDndMutating, setIsDndMutating] = useState(false);
+  const [optimisticCategories, applyOptimisticCategories] = useOptimistic(
+    categories,
+    applyOperativoOptimisticAction,
+  );
   const enableDragDrop = !readOnly && hasWriteAccess;
   const enableSelection = !readOnly && hasWriteAccess;
-
-  useEffect(() => {
-    if (isDndMutating) return;
-    setDisplayCategories(categories);
-  }, [categories, isDndMutating]);
 
   const filteredCategories = useMemo(
     () =>
       filterOperativoCategories(
-        displayCategories,
+        optimisticCategories,
         showCompleted,
         statusOverrides,
       ),
-    [displayCategories, showCompleted, statusOverrides],
+    [optimisticCategories, showCompleted, statusOverrides],
   );
 
   const parentOptions = useMemo(
@@ -76,6 +76,10 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
 
   const handleStatusOverride = (elementId: string, status: ElementStatus) => {
     setStatusOverrides((prev) => ({ ...prev, [elementId]: status }));
+  };
+
+  const handleOptimisticAction = (action: OperativoOptimisticAction) => {
+    applyOptimisticCategories(action);
   };
 
   const showToast = (message: string) => {
@@ -106,7 +110,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
           <ActasCategoryGroup
             key={category.id}
             category={category}
-            categories={displayCategories}
+            categories={optimisticCategories}
             parentOptions={parentOptions}
             projectCode={projectCode}
             currentAuthUserId={currentAuthUserId}
@@ -118,6 +122,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
             onElementStatusLiveChange={handleStatusOverride}
             onElementArchived={readOnly ? undefined : showToast}
             onToast={readOnly ? undefined : showToast}
+            onOptimisticAction={readOnly ? undefined : handleOptimisticAction}
           />
         ))
       )}
@@ -130,13 +135,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
         <ActasOperativoDndProvider
           projectId={projectId}
           projectCode={projectCode}
-          baseCategories={displayCategories}
-          onCategoriesChange={(nextVisible) =>
-            setDisplayCategories((prev) =>
-              mergeVisibleOperativoTrees(prev, nextVisible),
-            )
-          }
-          onMutatingChange={setIsDndMutating}
+          categories={optimisticCategories}
           onError={showToast}
         >
           {categoryList}
@@ -163,6 +162,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
           open={addCategoryOpen}
           projectId={projectId}
           onClose={() => setAddCategoryOpen(false)}
+          onOptimisticAction={handleOptimisticAction}
         />
       ) : null}
 
