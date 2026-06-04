@@ -55,6 +55,24 @@ async function verifiedUserIdFromServerCookies(): Promise<string | null> {
   return verifiedUserIdFromToken(cookieStore.get(AUTH_COOKIE)?.value);
 }
 
+/** Route handlers: lee la cookie de sesión del Request (más fiable que cookies() en algunos despliegues). */
+export async function getCurrentUserFromRequest(
+  request: NextRequest,
+): Promise<UserContext | null> {
+  const userId = await verifiedUserIdFromToken(
+    request.cookies.get(AUTH_COOKIE)?.value,
+  );
+  if (!userId) {
+    return null;
+  }
+
+  try {
+    return await loadUserContext(userId);
+  } catch {
+    return null;
+  }
+}
+
 async function loadUserContext(userId: string): Promise<UserContext | null> {
   const admin = createServiceRoleClient();
 

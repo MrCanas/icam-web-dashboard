@@ -12,7 +12,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/upload-logs") ||
     pathname.startsWith("/api/replace-proyectos-status") ||
     pathname.startsWith("/api/replace-pm-portfolio-status") ||
-    pathname.startsWith("/api/monday");
+    pathname.startsWith("/api/monday") ||
+    pathname.startsWith("/api/actas");
 
   if (isApiRoute) {
     if (isProtectedDataApi && !isAuthenticated) {
