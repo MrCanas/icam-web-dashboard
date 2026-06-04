@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentUser } from "@/lib/auth/currentUser";
+import { getCurrentUserFromRequest } from "@/lib/auth/currentUser";
 import { fetchElementLogEntries } from "@/modules/pm/actas/data/actasRepository";
 
 interface RouteContext {
   params: Promise<{ elementId: string }>;
 }
 
-export async function GET(request: Request, context: RouteContext) {
-  const ctx = await getCurrentUser();
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  const ctx = await getCurrentUserFromRequest(request);
   if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
