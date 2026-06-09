@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { listElementLogEntries } from "@/modules/pm/actas/actions/list-element-log-entries";
 import { OPERATIVO_BOARD_MIN_WIDTH_PX } from "@/modules/pm/actas/logic/element-display";
 import { formatAsOfDisplay } from "@/modules/pm/actas/logic/operativo-asof";
 import { pickLatestActiveEntry } from "@/modules/pm/actas/logic/log-entry-helpers";
@@ -51,18 +52,11 @@ export function ActasElementInlineHistory({
     setLoading(true);
     setLoadError(null);
     try {
-      const qs = asOfDate ? `?asOf=${encodeURIComponent(asOfDate)}` : "";
-      const res = await fetch(
-        `/api/actas/elements/${encodeURIComponent(elementId)}/log-entries${qs}`,
-      );
-      const body = (await res.json()) as {
-        entries?: ActasLogEntryItem[];
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(body.error ?? `HTTP ${res.status}`);
+      const result = await listElementLogEntries(elementId, asOfDate);
+      if (!result.ok) {
+        throw new Error(result.error);
       }
-      const loaded = (body.entries ?? []).filter((e) => e.deletedAt == null);
+      const loaded = result.entries.filter((e) => e.deletedAt == null);
       setEntries(loaded);
       syncLastEntry(loaded);
     } catch (err) {

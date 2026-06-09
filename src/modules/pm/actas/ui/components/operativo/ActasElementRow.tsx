@@ -34,6 +34,9 @@ interface ActasElementRowProps {
   depth?: number;
   /** Asa de arrastre (DnD operativo); si está presente, los hijos se renderizan fuera. */
   dragHandle?: React.ReactNode | null;
+  /** Control externo del colapso de sub-elementos (modo DnD). */
+  childrenExpanded?: boolean;
+  onChildrenExpandedChange?: (expanded: boolean) => void;
   readOnly?: boolean;
   asOfDate?: string;
   showAsCompleted?: boolean;
@@ -55,6 +58,8 @@ export function ActasElementRow({
   hasWriteAccess = true,
   depth = 0,
   dragHandle = null,
+  childrenExpanded: childrenExpandedProp,
+  onChildrenExpandedChange,
   readOnly = false,
   asOfDate,
   showAsCompleted = false,
@@ -139,7 +144,10 @@ export function ActasElementRow({
   const isSubElement = depth > 0;
   const directChildCount = element.children.length;
   const hasDirectChildren = !isSubElement && directChildCount > 0;
-  const [childrenExpanded, setChildrenExpanded] = useState(true);
+  const [childrenExpandedLocal, setChildrenExpandedLocal] = useState(true);
+  const childrenExpanded = childrenExpandedProp ?? childrenExpandedLocal;
+  const setChildrenExpanded =
+    onChildrenExpandedChange ?? setChildrenExpandedLocal;
   const descendantCount = countElementDescendants(element);
   const expanded = historyOpen || addOpen || subOpen;
   const renderChildrenInline = dragHandle == null;
@@ -243,7 +251,7 @@ export function ActasElementRow({
                 }
                 onClick={(e) => {
                   e.stopPropagation();
-                  setChildrenExpanded((v) => !v);
+                  setChildrenExpanded(!childrenExpanded);
                 }}
               >
                 {childrenExpanded ? "▾" : "▸"}

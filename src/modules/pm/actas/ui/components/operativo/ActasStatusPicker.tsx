@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { bulkChangeElementStatus } from "@/modules/pm/actas/actions/bulk-change-element-status";
 import { changeElementStatus } from "@/modules/pm/actas/actions/change-element-status";
 import {
   ELEMENT_STATUS_LABEL,
@@ -16,6 +17,8 @@ import {
 } from "@/modules/pm/actas/logic/element-status";
 import { ELEMENT_STATUS_PICKER_ORDER } from "@/modules/pm/actas/logic/status-change-log";
 import type { ActasLogEntryItem, ElementStatus } from "@/modules/pm/actas/types";
+
+import { useOperativoSelection } from "./ActasOperativoSelectionContext";
 
 const DROPDOWN_WIDTH = 180;
 const STATUS_CHANGE_ERROR =
@@ -39,6 +42,7 @@ export function ActasStatusPicker({
   onStatusChange,
   onError,
 }: ActasStatusPickerProps) {
+  const selection = useOperativoSelection();
   const listId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -111,28 +115,51 @@ export function ActasStatusPicker({
 
     setOpen(false);
     const previous = status;
-    onStatusChange(newStatus, null);
+    const targetIds =
+      selection?.selectionActive && selection.isSelected(elementId)
+        ? [...selection.selectedIds]
+        : [elementId];
+
+    if (targetIds.length > 1) {
+      selection?.applyStatusLive(targetIds, newStatus);
+    } else {
+      onStatusChange(newStatus, null);
+    }
 
     const task = changeQueueRef.current
       .then(async () => {
         setPending(true);
-        const result = await changeElementStatus({
-          elementId,
-          newStatus,
-        });
+        const result =
+          targetIds.length > 1
+            ? await bulkChangeElementStatus({
+                elementIds: targetIds,
+                newStatus,
+              })
+            : await changeElementStatus({
+                elementId,
+                newStatus,
+              });
         setPending(false);
         if (!result.ok) {
-          onStatusChange(previous, null);
+          if (targetIds.length > 1) {
+            selection?.applyStatusLive(targetIds, previous);
+          } else {
+            onStatusChange(previous, null);
+          }
           onError(STATUS_CHANGE_ERROR);
           return;
         }
-        if (result.entry) {
+        if (targetIds.length === 1 && "entry" in result && result.entry) {
           onStatusChange(result.elementStatus, result.entry);
         }
       })
       .catch(() => {
         setPending(false);
-        onStatusChange(previous, null);
+        if (targetIds.length > 1) {
+          selection?.applyStatusLive(targetIds, previous);
+        } else {
+          onStatusChange(previous, null);
+        }
         onError(STATUS_CHANGE_ERROR);
       });
 

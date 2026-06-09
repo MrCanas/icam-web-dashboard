@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { bulkAddElementOwner } from "@/modules/pm/actas/actions/bulk-add-element-owner";
 import {
   addElementOwner,
   removeElementOwner,
@@ -22,6 +23,7 @@ import { isUnresolvedOwner } from "@/modules/pm/actas/logic/owner-display";
 import type { ActasElementOwner } from "@/modules/pm/actas/types";
 
 import { ActasOwnerAvatars } from "./ActasOwnerAvatars";
+import { useOperativoSelection } from "./ActasOperativoSelectionContext";
 
 const POPOVER_WIDTH = 300;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -71,6 +73,7 @@ export function ActasOwnerPicker({
   onOwnersChange,
   onError,
 }: ActasOwnerPickerProps) {
+  const selection = useOperativoSelection();
   const canAssign = hasWriteAccess && !readOnly;
   const inputId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -194,9 +197,22 @@ export function ActasOwnerPicker({
       onOwnersChange([...owners, nextOwner]);
     }
 
+    const bulkIds =
+      !isOwner &&
+      selection?.selectionActive &&
+      selection.isSelected(elementId) &&
+      selection.selectedIds.size > 1
+        ? [...selection.selectedIds]
+        : [elementId];
+
     const result = isOwner
       ? await removeElementOwner({ elementId, userId: member.userId })
-      : await addElementOwner({ elementId, userId: member.userId });
+      : bulkIds.length > 1
+        ? await bulkAddElementOwner({
+            elementIds: bulkIds,
+            userId: member.userId,
+          })
+        : await addElementOwner({ elementId, userId: member.userId });
 
     setPendingUserIds((s) => {
       const n = new Set(s);

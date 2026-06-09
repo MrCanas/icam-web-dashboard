@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { childContainerKey, rootContainerKey } from "@/modules/pm/actas/logic/operativo-dnd";
 import type { ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
 
@@ -48,6 +50,9 @@ export function ActasOperativoElementBranch({
   const dnd = useOperativoDnd();
   const childContainer = childContainerKey(element.id);
   const childMap = new Map(element.children.map((c) => [c.id, c]));
+  const hasDirectChildren =
+    element.canHaveSubelements && element.children.length > 0;
+  const [childrenExpanded, setChildrenExpanded] = useState(true);
 
   return (
     <ActasOperativoSortableElement
@@ -67,12 +72,16 @@ export function ActasOperativoElementBranch({
             asOfDate={asOfDate}
             showAsCompleted={showAsCompleted}
             dragHandle={dragHandle}
+            childrenExpanded={hasDirectChildren ? childrenExpanded : undefined}
+            onChildrenExpandedChange={
+              hasDirectChildren ? setChildrenExpanded : undefined
+            }
             onElementStatusLiveChange={onElementStatusLiveChange}
             onElementArchived={onElementArchived}
             onToast={onToast}
           />
 
-          {element.canHaveSubelements ? (
+          {hasDirectChildren && childrenExpanded ? (
             <OperativoElementSortableList
               containerKey={childContainer}
               categoryId={categoryId}

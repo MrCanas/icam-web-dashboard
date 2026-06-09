@@ -39,6 +39,7 @@ function filterElementTree(
     );
 
     if (!shouldShowInOperativoBoard(status, showCompleted)) {
+      result.push(...children);
       continue;
     }
 
@@ -65,6 +66,9 @@ export function filterOperativoCategories(
       showCompleted,
       statusOverrides,
     );
+    if (!showCompleted && elements.length === 0) {
+      continue;
+    }
     filtered.push({ ...category, elements });
   }
 
