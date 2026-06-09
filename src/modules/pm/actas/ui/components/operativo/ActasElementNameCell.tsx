@@ -82,6 +82,7 @@ export function ActasElementNameCell({
       <div
         className="min-w-0 flex-1"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <input
           ref={inputRef}
@@ -124,6 +125,7 @@ export function ActasElementNameCell({
       } ${canEdit ? "cursor-text hover:underline decoration-dotted underline-offset-2" : ""}`}
       title={name}
       onClick={canEdit ? startEdit : undefined}
+      onMouseDown={canEdit ? (e) => e.stopPropagation() : undefined}
       role={canEdit ? "button" : undefined}
       tabIndex={canEdit ? 0 : undefined}
       onKeyDown={

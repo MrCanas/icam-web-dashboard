@@ -11,17 +11,21 @@ import type {
   ActasOperativoCategory,
   ElementStatus,
 } from "@/modules/pm/actas/types";
+import type { ActasDoneElementRef } from "@/modules/pm/actas/logic/operativo-done-filter";
 
 import type { ActasRootElementOption } from "@/modules/pm/actas/logic/collect-root-elements";
 import type { OperativoOptimisticAction } from "@/modules/pm/actas/logic/operativo-optimistic";
 
 import { ActasAddElementModal } from "./ActasAddElementModal";
 import { ActasCategoryNameCell } from "./ActasCategoryNameCell";
+import { ActasElementRow } from "./ActasElementRow";
 import { OperativoCategoryRootList } from "./ActasOperativoElementBranch";
 import { ActasOperativoColumnHeader } from "./ActasOperativoColumnHeader";
 
 interface ActasCategoryGroupProps {
   category: ActasOperativoCategory;
+  allCategories: ActasOperativoCategory[];
+  completedElements?: ActasDoneElementRef[];
   categories: ActasOperativoCategory[];
   parentOptions: ActasRootElementOption[];
   projectCode: string;
@@ -31,7 +35,6 @@ interface ActasCategoryGroupProps {
   defaultExpanded?: boolean;
   readOnly?: boolean;
   asOfDate?: string;
-  showCompletedStyle?: boolean;
   onElementStatusLiveChange?: (
     elementId: string,
     status: ElementStatus,
@@ -55,6 +58,8 @@ function countElements(elements: ActasOperativoCategory["elements"]): number {
 
 export function ActasCategoryGroup({
   category,
+  allCategories,
+  completedElements = [],
   categories,
   parentOptions,
   projectCode,
@@ -64,13 +69,13 @@ export function ActasCategoryGroup({
   defaultExpanded = true,
   readOnly = false,
   asOfDate,
-  showCompletedStyle = false,
   onElementStatusLiveChange,
   onElementArchived,
   onToast,
   onOptimisticAction,
 }: ActasCategoryGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [completedExpanded, setCompletedExpanded] = useState(false);
   const [addElementOpen, setAddElementOpen] = useState(false);
   const [categoryName, setCategoryName] = useState(category.name);
   const [categoryDisplayName, setCategoryDisplayName] = useState(
@@ -141,18 +146,53 @@ export function ActasCategoryGroup({
             <OperativoCategoryRootList
               categoryId={category.id}
               elements={category.elements}
+              allCategories={allCategories}
               projectCode={projectCode}
               currentAuthUserId={currentAuthUserId}
               isPmAdmin={isPmAdmin}
               hasWriteAccess={hasWriteAccess}
               readOnly={readOnly}
               asOfDate={asOfDate}
-              showAsCompleted={showCompletedStyle}
               onElementStatusLiveChange={onElementStatusLiveChange}
               onElementArchived={onElementArchived}
               onToast={onToast}
             />
           )}
+
+          {completedElements.length > 0 ? (
+            <div className="border-t border-subtle/40 bg-page/30">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-emerald-800 hover:bg-emerald-600/5"
+                aria-expanded={completedExpanded}
+                onClick={() => setCompletedExpanded((v) => !v)}
+              >
+                <span className="text-[10px]">{completedExpanded ? "▾" : "▸"}</span>
+                Completados ({completedElements.length})
+              </button>
+              {completedExpanded ? (
+                <div className="border-t border-subtle/30">
+                  {completedElements.map(({ element, depth }) => (
+                    <ActasElementRow
+                      key={element.id}
+                      element={element}
+                      projectCode={projectCode}
+                      currentAuthUserId={currentAuthUserId}
+                      isPmAdmin={isPmAdmin}
+                      hasWriteAccess={hasWriteAccess}
+                      depth={depth}
+                      readOnly={readOnly}
+                      asOfDate={asOfDate}
+                      showAsCompleted
+                      onElementStatusLiveChange={onElementStatusLiveChange}
+                      onElementArchived={onElementArchived}
+                      onToast={onToast}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {!readOnly && hasWriteAccess ? (
             <button

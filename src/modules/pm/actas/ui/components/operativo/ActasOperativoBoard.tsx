@@ -5,7 +5,9 @@ import { useMemo, useOptimistic, useState } from "react";
 import { ActasAddCategoryModal } from "./ActasAddCategoryModal";
 
 import { collectRootElementOptions } from "@/modules/pm/actas/logic/collect-root-elements";
-import { filterOperativoCategories } from "@/modules/pm/actas/logic/operativo-done-filter";
+import {
+  splitOperativoCategories,
+} from "@/modules/pm/actas/logic/operativo-done-filter";
 import {
   applyOperativoOptimisticAction,
   type OperativoOptimisticAction,
@@ -20,7 +22,6 @@ import { ActasBulkSelectionBar } from "./ActasBulkSelectionBar";
 import { ActasLogEntryUndoProvider } from "./ActasLogEntryUndoContext";
 import { ActasOperativoSelectionProvider } from "./ActasOperativoSelectionContext";
 import { ActasOperativoDndProvider } from "./ActasOperativoDndContext";
-import { useShowCompletedOperativo } from "./ActasOperativoShowCompletedToggle";
 
 type ActasOperativoBoardProps = {
   categories: ActasOperativoCategory[];
@@ -46,7 +47,6 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   } = props;
   const asOfDate = mode === "historical" ? props.asOfDate : undefined;
   const readOnly = mode === "historical";
-  const { showCompleted } = useShowCompletedOperativo();
   const [statusOverrides, setStatusOverrides] = useState<
     Record<string, ElementStatus>
   >({});
@@ -59,19 +59,20 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   const enableDragDrop = !readOnly && hasWriteAccess;
   const enableSelection = !readOnly && hasWriteAccess;
 
-  const filteredCategories = useMemo(
-    () =>
-      filterOperativoCategories(
-        optimisticCategories,
-        showCompleted,
-        statusOverrides,
-      ),
-    [optimisticCategories, showCompleted, statusOverrides],
+  const splitCategories = useMemo(
+    () => splitOperativoCategories(optimisticCategories, statusOverrides),
+    [optimisticCategories, statusOverrides],
   );
 
   const parentOptions = useMemo(
-    () => collectRootElementOptions(filteredCategories),
-    [filteredCategories],
+    () =>
+      collectRootElementOptions(
+        splitCategories.map((split) => ({
+          ...split.category,
+          elements: split.activeElements,
+        })),
+      ),
+    [splitCategories],
   );
 
   const handleStatusOverride = (elementId: string, status: ElementStatus) => {
@@ -99,17 +100,17 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
 
   const categoryList = (
     <>
-      {filteredCategories.length === 0 ? (
+      {splitCategories.length === 0 ? (
         <p className="rounded-md border border-dashed border-subtle/60 bg-card px-4 py-8 text-center text-sm text-text-muted">
-          {showCompleted
-            ? "No hay elementos activos en este proyecto."
-            : "Todos los elementos visibles están completados. Activa «Mostrar completados» o abre la pestaña Completados."}
+          No hay elementos activos en este proyecto.
         </p>
       ) : (
-        filteredCategories.map((category) => (
+        splitCategories.map((split) => (
           <ActasCategoryGroup
-            key={category.id}
-            category={category}
+            key={split.category.id}
+            category={{ ...split.category, elements: split.activeElements }}
+            allCategories={optimisticCategories}
+            completedElements={split.completedElements}
             categories={optimisticCategories}
             parentOptions={parentOptions}
             projectCode={projectCode}
@@ -118,7 +119,6 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
             hasWriteAccess={hasWriteAccess && !readOnly}
             readOnly={readOnly}
             asOfDate={asOfDate}
-            showCompletedStyle={showCompleted}
             onElementStatusLiveChange={handleStatusOverride}
             onElementArchived={readOnly ? undefined : showToast}
             onToast={readOnly ? undefined : showToast}

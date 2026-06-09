@@ -3,7 +3,12 @@
 import { useState } from "react";
 
 import { childContainerKey, rootContainerKey } from "@/modules/pm/actas/logic/operativo-dnd";
-import type { ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
+import { findOperativoElementInCategories } from "@/modules/pm/actas/logic/find-operativo-element";
+import type {
+  ActasOperativoCategory,
+  ActasOperativoElement,
+  ElementStatus,
+} from "@/modules/pm/actas/types";
 
 import { ActasElementRow } from "./ActasElementRow";
 import { ActasOperativoElementContainer } from "./ActasOperativoElementContainer";
@@ -16,6 +21,7 @@ import { ActasOperativoSortableElement } from "./ActasOperativoSortableElement";
 interface ActasOperativoElementBranchProps {
   element: ActasOperativoElement;
   categoryId: string;
+  allCategories: ActasOperativoCategory[];
   depth?: number;
   projectCode: string;
   currentAuthUserId: string | null;
@@ -35,6 +41,7 @@ interface ActasOperativoElementBranchProps {
 export function ActasOperativoElementBranch({
   element,
   categoryId,
+  allCategories,
   depth = 0,
   projectCode,
   currentAuthUserId,
@@ -49,9 +56,12 @@ export function ActasOperativoElementBranch({
 }: ActasOperativoElementBranchProps) {
   const dnd = useOperativoDnd();
   const childContainer = childContainerKey(element.id);
+  const rawElement =
+    findOperativoElementInCategories(allCategories, element.id) ?? element;
   const childMap = new Map(element.children.map((c) => [c.id, c]));
+  const directChildCount = rawElement.children.length;
   const hasDirectChildren =
-    element.canHaveSubelements && element.children.length > 0;
+    rawElement.canHaveSubelements && directChildCount > 0;
   const [childrenExpanded, setChildrenExpanded] = useState(true);
 
   return (
@@ -64,6 +74,7 @@ export function ActasOperativoElementBranch({
           <ActasElementRow
             element={element}
             depth={depth}
+            directChildCount={hasDirectChildren ? directChildCount : 0}
             projectCode={projectCode}
             currentAuthUserId={currentAuthUserId}
             isPmAdmin={isPmAdmin}
@@ -100,6 +111,7 @@ export function ActasOperativoElementBranch({
                         key={child.id}
                         element={child}
                         categoryId={categoryId}
+                        allCategories={allCategories}
                         depth={depth + 1}
                         projectCode={projectCode}
                         currentAuthUserId={currentAuthUserId}
@@ -129,10 +141,12 @@ export function ActasOperativoElementBranch({
 export function OperativoCategoryRootList({
   categoryId,
   elements,
+  allCategories,
   ...branchProps
-}: Omit<ActasOperativoElementBranchProps, "element" | "categoryId"> & {
+}: Omit<ActasOperativoElementBranchProps, "element"> & {
   categoryId: string;
   elements: ActasOperativoElement[];
+  allCategories: ActasOperativoCategory[];
 }) {
   const dnd = useOperativoDnd();
   const containerKey = rootContainerKey(categoryId);
@@ -159,10 +173,8 @@ export function OperativoCategoryRootList({
           key={el.id}
           element={el}
           categoryId={categoryId}
+          allCategories={allCategories}
           {...branchProps}
-          showAsCompleted={
-            Boolean(branchProps.showAsCompleted) && el.status === "done"
-          }
         />
       ));
 

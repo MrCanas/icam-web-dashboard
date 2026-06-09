@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -73,6 +74,7 @@ export function ActasOwnerPicker({
   onOwnersChange,
   onError,
 }: ActasOwnerPickerProps) {
+  const router = useRouter();
   const selection = useOperativoSelection();
   const canAssign = hasWriteAccess && !readOnly;
   const inputId = useId();
@@ -198,10 +200,7 @@ export function ActasOwnerPicker({
     }
 
     const bulkIds =
-      !isOwner &&
-      selection?.selectionActive &&
-      selection.isSelected(elementId) &&
-      selection.selectedIds.size > 1
+      !isOwner && selection?.selectionActive
         ? [...selection.selectedIds]
         : [elementId];
 
@@ -223,6 +222,14 @@ export function ActasOwnerPicker({
     if (!result.ok) {
       onOwnersChange(previous);
       onError(result.error);
+      return;
+    }
+
+    if (bulkIds.length > 1) {
+      selection?.clearAll();
+      router.refresh();
+    } else if (!isOwner) {
+      router.refresh();
     }
   };
 

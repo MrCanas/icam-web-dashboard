@@ -140,3 +140,36 @@ export function groupDoneElementsByCategory(
   }
   return map;
 }
+
+export type SplitOperativoCategory = {
+  category: ActasOperativoCategory;
+  activeElements: ActasOperativoElement[];
+  completedElements: ActasDoneElementRef[];
+};
+
+/** Separa elementos activos y completados por categoría (tablero operativo). */
+export function splitOperativoCategory(
+  category: ActasOperativoCategory,
+  statusOverrides: Record<string, ElementStatus> = {},
+): SplitOperativoCategory {
+  const activeElements = filterElementTree(
+    category.elements,
+    false,
+    statusOverrides,
+  );
+  const completedElements: ActasDoneElementRef[] = [];
+  walkDoneElements(category.elements, category, statusOverrides, 0, completedElements);
+  return { category, activeElements, completedElements };
+}
+
+export function splitOperativoCategories(
+  categories: ActasOperativoCategory[],
+  statusOverrides: Record<string, ElementStatus> = {},
+): SplitOperativoCategory[] {
+  return categories
+    .map((category) => splitOperativoCategory(category, statusOverrides))
+    .filter(
+      (split) =>
+        split.activeElements.length > 0 || split.completedElements.length > 0,
+    );
+}

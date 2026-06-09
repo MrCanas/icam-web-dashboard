@@ -3,13 +3,10 @@
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 import {
   loadLogEntryForAuthorAction,
-  LOG_ENTRY_SELECT,
+  mutateLogEntryRow,
   requireLogEntryAuthor,
 } from "@/modules/pm/actas/actions/log-entry-auth";
-import {
-  mapLogEntryRow,
-  type LogEntryRow,
-} from "@/modules/pm/actas/data/map-log-entry";
+import { mapLogEntryRow } from "@/modules/pm/actas/data/map-log-entry";
 import { resolveUserDisplayMap } from "@/modules/pm/actas/logic/user-display";
 import type { ActasLogEntryItem } from "@/modules/pm/actas/types";
 
@@ -69,24 +66,20 @@ export async function updateLogEntry(
     return { ok: false, error: "No se puede editar una entrada borrada" };
   }
 
-  const { data: row, error: updateError } = await client
-    .from("log_entry")
-    .update({
-      content,
-      entry_date: entryDateIso,
-      edited_at: new Date().toISOString(),
-    })
-    .eq("id", logEntryId)
-    .select(LOG_ENTRY_SELECT)
-    .single();
+  const updateResult = await mutateLogEntryRow(logEntryId, {
+    content,
+    entry_date: entryDateIso,
+    edited_at: new Date().toISOString(),
+  });
 
-  if (updateError) {
-    return { ok: false, error: updateError.message };
+  if (!updateResult.ok) {
+    return { ok: false, error: updateResult.error };
   }
 
-  const displayAuthorId = (row.author_id as string | null) ?? authorId;
+  const row = updateResult.row;
+  const displayAuthorId = row.author_id ?? authorId;
   const userDisplayMap = await resolveUserDisplayMap([displayAuthorId]);
-  const entry = mapLogEntryRow(row as LogEntryRow, userDisplayMap);
+  const entry = mapLogEntryRow(row, userDisplayMap);
 
   return { ok: true, entry };
 }

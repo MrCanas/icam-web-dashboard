@@ -32,6 +32,8 @@ interface ActasElementRowProps {
   isPmAdmin?: boolean;
   hasWriteAccess?: boolean;
   depth?: number;
+  /** Recuento de sub-elementos (incluye completados ocultos del listado activo). */
+  directChildCount?: number;
   /** Asa de arrastre (DnD operativo); si está presente, los hijos se renderizan fuera. */
   dragHandle?: React.ReactNode | null;
   /** Control externo del colapso de sub-elementos (modo DnD). */
@@ -57,6 +59,7 @@ export function ActasElementRow({
   isPmAdmin = false,
   hasWriteAccess = true,
   depth = 0,
+  directChildCount: directChildCountProp,
   dragHandle = null,
   childrenExpanded: childrenExpandedProp,
   onChildrenExpandedChange,
@@ -142,8 +145,9 @@ export function ActasElementRow({
   );
   const rowIndent = depth * INDENT_PX;
   const isSubElement = depth > 0;
-  const directChildCount = element.children.length;
-  const hasDirectChildren = !isSubElement && directChildCount > 0;
+  const directChildCount = directChildCountProp ?? element.children.length;
+  const hasDirectChildren =
+    !isSubElement && element.canHaveSubelements && directChildCount > 0;
   const [childrenExpandedLocal, setChildrenExpandedLocal] = useState(true);
   const childrenExpanded = childrenExpandedProp ?? childrenExpandedLocal;
   const setChildrenExpanded =

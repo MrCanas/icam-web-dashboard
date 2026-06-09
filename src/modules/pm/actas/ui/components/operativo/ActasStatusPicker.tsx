@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -42,6 +43,7 @@ export function ActasStatusPicker({
   onStatusChange,
   onError,
 }: ActasStatusPickerProps) {
+  const router = useRouter();
   const selection = useOperativoSelection();
   const listId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -115,10 +117,9 @@ export function ActasStatusPicker({
 
     setOpen(false);
     const previous = status;
-    const targetIds =
-      selection?.selectionActive && selection.isSelected(elementId)
-        ? [...selection.selectedIds]
-        : [elementId];
+    const targetIds = selection?.selectionActive
+      ? [...selection.selectedIds]
+      : [elementId];
 
     if (targetIds.length > 1) {
       selection?.applyStatusLive(targetIds, newStatus);
@@ -149,7 +150,10 @@ export function ActasStatusPicker({
           onError(STATUS_CHANGE_ERROR);
           return;
         }
-        if (targetIds.length === 1 && "entry" in result && result.entry) {
+        if (targetIds.length > 1) {
+          selection?.clearAll();
+          router.refresh();
+        } else if ("entry" in result && result.entry) {
           onStatusChange(result.elementStatus, result.entry);
         }
       })

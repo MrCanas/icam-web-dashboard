@@ -65,8 +65,7 @@ export function ActasBulkSelectionBar({ onError }: ActasBulkSelectionBarProps) {
 
   const count = selection?.selectedIds.size ?? 0;
   const elementIds = selection ? [...selection.selectedIds] : [];
-
-  if (!selection?.selectionActive) return null;
+  const selectionActive = selection?.selectionActive ?? false;
 
   const updateStatusPosition = useCallback(() => {
     const el = statusBtnRef.current;
@@ -126,6 +125,7 @@ export function ActasBulkSelectionBar({ onError }: ActasBulkSelectionBarProps) {
   }, [ownerOpen, query, loadUsers]);
 
   const applyStatus = (newStatus: ElementStatus) => {
+    if (!selection) return;
     setStatusOpen(false);
     selection.applyStatusLive(elementIds, newStatus);
 
@@ -150,6 +150,7 @@ export function ActasBulkSelectionBar({ onError }: ActasBulkSelectionBarProps) {
   };
 
   const applyOwner = (userId: string) => {
+    if (!selection) return;
     setOwnerOpen(false);
 
     startTransition(async () => {
@@ -162,6 +163,8 @@ export function ActasBulkSelectionBar({ onError }: ActasBulkSelectionBarProps) {
       router.refresh();
     });
   };
+
+  if (!selectionActive || !selection) return null;
 
   return (
     <div
