@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
-import { checkWriteAccess } from "@/lib/auth/permissions";
-import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
 import {
   assertUniqueCategoryNameInProject,
   normalizeCategoryName,
@@ -32,14 +30,11 @@ export async function createCategory(
     return { ok: false, error: "projectId requerido" };
   }
 
-  const user = await requireCurrentUser();
-  const writeDenied = checkWriteAccess(user, "pm");
-  if (writeDenied) return { ok: false, error: writeDenied };
-
-  const { client, error: clientError } = await getActasAuthenticatedSupabase();
-  if (!client) {
-    return { ok: false, error: clientError };
+  const write = await requireActasWriteSupabase();
+  if (!write.ok) {
+    return { ok: false, error: write.error };
   }
+  const { client } = write;
 
   const { data: project, error: projectError } = await client
     .from("project")

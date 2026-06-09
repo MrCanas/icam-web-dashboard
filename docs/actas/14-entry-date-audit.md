@@ -1,6 +1,6 @@
 # Auditoría entry_date (log_entry vs tablero Monday)
 
-Generado: 2026-06-02T14:34:06.856Z
+Generado: 2026-06-09T14:53:59.236Z
 
 ## Procedencia y método
 
@@ -18,18 +18,18 @@ Generado: 2026-06-02T14:34:06.856Z
 
 | Proyecto | log_entries | snapshot auditables | correctas | incorrectas | excluidas* | Snapshots canónicos | Estado |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| CA1 | 170 | 134 | 134 | 0 | 36 | 13 | ✓ limpio |
-| CSP10 | 303 | 292 | 292 | 0 | 11 | 35 | ✓ limpio |
-| DC15 | 534 | 531 | 371 | 160 | 3 | 51 | ✗ requiere fix |
-| GQ8 | 464 | 447 | 337 | 110 | 17 | 51 | ✗ requiere fix |
-| LSE84 | 192 | 191 | 161 | 30 | 1 | 49 | ✗ requiere fix |
-| PC25 | 644 | 644 | 644 | 0 | 0 | 40 | ✓ limpio |
+| CA1 | 190 | 134 | 134 | 0 | 56 | 13 | ✓ limpio |
+| CSP10 | 306 | 292 | 292 | 0 | 14 | 35 | ✓ limpio |
+| DC15 | 537 | 531 | 371 | 160 | 6 | 51 | ✗ requiere fix |
+| GQ8 | 473 | 414 | 312 | 102 | 59 | 51 | ✗ requiere fix |
+| LSE84 | 194 | 191 | 161 | 30 | 3 | 49 | ✗ requiere fix |
+| PC25 | 681 | 642 | 642 | 0 | 39 | 40 | ✓ limpio |
 | RLS-1779720803507 | 1 | — | — | — | — | — | sin extract |
-| SA31 | 739 | 599 | 479 | 120 | 140 | 55 | ✗ requiere fix |
-| SE84 | 401 | 400 | 334 | 66 | 1 | 52 | ✗ requiere fix |
+| SA31 | 763 | 598 | 478 | 120 | 165 | 55 | ✗ requiere fix |
+| SE84 | 413 | 366 | 306 | 60 | 47 | 52 | ✗ requiere fix |
 | SICC II | 0 | — | — | — | — | 0 | sin datos BD |
 | VBARE | 95 | 90 | 90 | 0 | 5 | 1 | ✓ limpio |
-| VE1 | 281 | 241 | 241 | 0 | 40 | 26 | ✓ limpio |
+| VE1 | 295 | 241 | 241 | 0 | 54 | 26 | ✓ limpio |
 
 \* Excluidas: entradas de app (`created_at >= 2026-05-27`), `monday_update`, sin par, o anomalías de match.
 
@@ -39,10 +39,10 @@ CA1, CSP10, PC25, VBARE, VE1 — si el apply de esa rama se aplicó en BD, deber
 
 ## CA1
 
-- Total `log_entry` (elementos actuales): **170**
+- Total `log_entry` (elementos actuales): **190**
 - Snapshot auditables (emparejadas): **134**
 - Correctas: **134** · Incorrectas: **0**
-- Excluidas del audit de bug: **36**
+- Excluidas del audit de bug: **56**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -51,10 +51,10 @@ _Ninguna._
 
 ## CSP10
 
-- Total `log_entry` (elementos actuales): **303**
+- Total `log_entry` (elementos actuales): **306**
 - Snapshot auditables (emparejadas): **292**
 - Correctas: **292** · Incorrectas: **0**
-- Excluidas del audit de bug: **11**
+- Excluidas del audit de bug: **14**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -63,10 +63,10 @@ _Ninguna._
 
 ## DC15
 
-- Total `log_entry` (elementos actuales): **534**
+- Total `log_entry` (elementos actuales): **537**
 - Snapshot auditables (emparejadas): **531**
 - Correctas: **371** · Incorrectas: **160**
-- Excluidas del audit de bug: **3**
+- Excluidas del audit de bug: **6**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -87,10 +87,10 @@ _Ninguna._
 
 ## GQ8
 
-- Total `log_entry` (elementos actuales): **464**
-- Snapshot auditables (emparejadas): **447**
-- Correctas: **337** · Incorrectas: **110**
-- Excluidas del audit de bug: **17**
+- Total `log_entry` (elementos actuales): **473**
+- Snapshot auditables (emparejadas): **414**
+- Correctas: **312** · Incorrectas: **102**
+- Excluidas del audit de bug: **59**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -107,14 +107,14 @@ _Ninguna._
 | `898deec0…` | 2025-08-06 | 2025-08-07 | GQ8 - 07/08/2025 |
 | `69924493…` | 2025-09-17 | 2025-09-18 | GQ8 - 18/09/2025 |
 | `28d10a8b…` | 2025-12-10 | 2025-12-11 | GQ8 - 11/12/2025 |
-| … | | | _y 100 más_ |
+| … | | | _y 92 más_ |
 
 ## LSE84
 
-- Total `log_entry` (elementos actuales): **192**
+- Total `log_entry` (elementos actuales): **194**
 - Snapshot auditables (emparejadas): **191**
 - Correctas: **161** · Incorrectas: **30**
-- Excluidas del audit de bug: **1**
+- Excluidas del audit de bug: **3**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -135,10 +135,10 @@ _Ninguna._
 
 ## PC25
 
-- Total `log_entry` (elementos actuales): **644**
-- Snapshot auditables (emparejadas): **644**
-- Correctas: **644** · Incorrectas: **0**
-- Excluidas del audit de bug: **0**
+- Total `log_entry` (elementos actuales): **681**
+- Snapshot auditables (emparejadas): **642**
+- Correctas: **642** · Incorrectas: **0**
+- Excluidas del audit de bug: **39**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -147,10 +147,10 @@ _Ninguna._
 
 ## SA31
 
-- Total `log_entry` (elementos actuales): **739**
-- Snapshot auditables (emparejadas): **599**
-- Correctas: **479** · Incorrectas: **120**
-- Excluidas del audit de bug: **140**
+- Total `log_entry` (elementos actuales): **763**
+- Snapshot auditables (emparejadas): **598**
+- Correctas: **478** · Incorrectas: **120**
+- Excluidas del audit de bug: **165**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -171,10 +171,10 @@ _Ninguna._
 
 ## SE84
 
-- Total `log_entry` (elementos actuales): **401**
-- Snapshot auditables (emparejadas): **400**
-- Correctas: **334** · Incorrectas: **66**
-- Excluidas del audit de bug: **1**
+- Total `log_entry` (elementos actuales): **413**
+- Snapshot auditables (emparejadas): **366**
+- Correctas: **306** · Incorrectas: **60**
+- Excluidas del audit de bug: **47**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -186,12 +186,12 @@ _Ninguna._
 | `9bdde350…` | 2025-03-13 | 2025-03-06 | SE84 - 06/03/2025 |
 | `17c2972c…` | 2025-08-06 | 2025-08-07 | SE84 - 07/08/2025 |
 | `7a117953…` | 2025-08-06 | 2025-08-07 | SE84 - 07/08/2025 |
-| `a7b1118f…` | 2025-08-06 | 2025-08-07 | SE84 - 07/08/2025 |
-| `5207c714…` | 2025-09-04 | 2025-08-28 | SE84 - 28/08/2025 |
-| `057bcceb…` | 2025-09-17 | 2025-09-18 | SE84 - 18/09/2025 |
-| `e62b1507…` | 2025-12-10 | 2025-12-11 | SE84 - 11/12/2025 |
-| `d1462399…` | 2026-02-25 | 2026-02-26 | SE84 - 26/02/2026 |
-| … | | | _y 56 más_ |
+| `a468b0e1…` | 2025-08-06 | 2025-08-07 | SE84 - 07/08/2025 |
+| `cfd1d059…` | 2025-09-17 | 2025-09-18 | SE84 - 18/09/2025 |
+| `767dbe20…` | 2026-05-14 | 2026-05-07 | SE84 - 07/05/2026 |
+| `107e6475…` | 2025-09-17 | 2025-09-18 | SE84 - 18/09/2025 |
+| `bae8c1ab…` | 2025-12-10 | 2025-12-11 | SE84 - 11/12/2025 |
+| … | | | _y 50 más_ |
 
 ## VBARE
 
@@ -207,10 +207,10 @@ _Ninguna._
 
 ## VE1
 
-- Total `log_entry` (elementos actuales): **281**
+- Total `log_entry` (elementos actuales): **295**
 - Snapshot auditables (emparejadas): **241**
 - Correctas: **241** · Incorrectas: **0**
-- Excluidas del audit de bug: **40**
+- Excluidas del audit de bug: **54**
 - Filas con `source='snapshot'` en BD: **0**
 
 ### Primeras discrepancias (máx. 10)
@@ -219,5 +219,5 @@ _Ninguna._
 
 ## Conclusión
 
-Hay **486** entradas snapshot con fecha incorrecta en total. Ejecutar `npm run actas:fix-entry-dates -- --apply` (opcionalmente por `--project`).
+Hay **472** entradas snapshot con fecha incorrecta en total. Ejecutar `npm run actas:fix-entry-dates -- --apply` (opcionalmente por `--project`).
 

@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
-import { checkWriteAccess } from "@/lib/auth/permissions";
-import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
 import { assertUniqueElementNameInCategory } from "@/modules/pm/actas/logic/element-name-validation";
 
 export type CreateElementInput = {
@@ -36,14 +34,11 @@ export async function createElement(
     return { ok: false, error: "categoryId requerido" };
   }
 
-  const user = await requireCurrentUser();
-  const writeDenied = checkWriteAccess(user, "pm");
-  if (writeDenied) return { ok: false, error: writeDenied };
-
-  const { client, error: clientError } = await getActasAuthenticatedSupabase();
-  if (!client) {
-    return { ok: false, error: clientError };
+  const write = await requireActasWriteSupabase();
+  if (!write.ok) {
+    return { ok: false, error: write.error };
   }
+  const { client } = write;
 
   const parentElementId = input.parentElementId?.trim() || null;
 

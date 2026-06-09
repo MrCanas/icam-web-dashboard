@@ -82,11 +82,6 @@ export function ActasElementNotificationBell({
     setItems(res.notifications);
   }, [elementId, onError]);
 
-  useEffect(() => {
-    if (!canUse) return;
-    void loadList();
-  }, [canUse, loadList]);
-
   const updatePosition = useCallback(() => {
     const el = anchorRef.current;
     if (!el) return;

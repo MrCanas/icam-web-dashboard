@@ -39,19 +39,25 @@ export function ActasAddCategoryModal({
     if (!canSubmit) return;
     setError(null);
     startTransition(async () => {
-      const result = await createCategory({ projectId, name });
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await createCategory({ projectId, name });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        onOptimisticAction?.({
+          type: "addCategory",
+          categoryId: result.categoryId,
+          name: name.trim(),
+          displayName: name.trim(),
+        });
+        onClose();
+        router.refresh();
+      } catch {
+        setError(
+          "No se pudo crear el grupo. Comprueba la conexión e inténtalo de nuevo.",
+        );
       }
-      onOptimisticAction?.({
-        type: "addCategory",
-        categoryId: result.categoryId,
-        name: name.trim(),
-        displayName: name.trim(),
-      });
-      onClose();
-      router.refresh();
     });
   };
 
