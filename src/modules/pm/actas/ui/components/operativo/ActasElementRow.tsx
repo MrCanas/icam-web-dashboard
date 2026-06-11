@@ -20,6 +20,8 @@ import { ActasElementSelectCheckbox } from "./ActasElementSelectCheckbox";
 import { useOperativoSelection } from "./ActasOperativoSelectionContext";
 import { useInlineCreate } from "./ActasInlineCreateContext";
 import { useSubelementCollapse } from "./useSubelementCollapse";
+import { ActasAttachmentsButton } from "./ActasAttachmentsButton";
+import { ActasAttachmentsSection } from "./ActasAttachmentsSection";
 import { ActasAddLogEntryPanel } from "./ActasAddLogEntryPanel";
 import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementInlineHistory } from "./ActasElementInlineHistory";
@@ -27,6 +29,7 @@ import { ActasElementQuickActions } from "./ActasElementQuickActions";
 import { ActasElementNameCell } from "./ActasElementNameCell";
 import { ActasLastEntryCell } from "./ActasLastEntryCell";
 import { ActasOwnerPicker } from "./ActasOwnerPicker";
+import { ActasProgressCell } from "./ActasProgressCell";
 import { ActasStatusPicker } from "./ActasStatusPicker";
 import { ActasElementNotificationBell } from "./ActasElementNotificationBell";
 import { ActasTimelinePicker } from "./ActasTimelinePicker";
@@ -107,6 +110,11 @@ export function ActasElementRow({
   );
   const [displayName, setDisplayName] = useState(element.name);
   const [owners, setOwners] = useState(element.owners);
+  const [progress, setProgress] = useState(element.progress ?? 0);
+  const [attachmentCount, setAttachmentCount] = useState(
+    element.attachmentCount ?? 0,
+  );
+  const [attachmentNonce, setAttachmentNonce] = useState(0);
   const [timelineStart, setTimelineStart] = useState<string | null>(
     element.timelineStart,
   );
@@ -125,6 +133,12 @@ export function ActasElementRow({
   useEffect(() => {
     setOwners(element.owners);
   }, [element.owners]);
+  useEffect(() => {
+    setProgress(element.progress ?? 0);
+  }, [element.progress]);
+  useEffect(() => {
+    setAttachmentCount(element.attachmentCount ?? 0);
+  }, [element.attachmentCount]);
   useEffect(() => {
     setTimelineStart(element.timelineStart);
     setTimelineEnd(element.timelineEnd);
@@ -324,6 +338,17 @@ export function ActasElementRow({
               readOnly={readOnly}
               onError={(msg) => onToast?.(msg)}
             />
+            {!readOnly && hasWriteAccess ? (
+              <ActasAttachmentsButton
+                elementId={element.id}
+                count={attachmentCount}
+                onUploaded={() => {
+                  setHistoryOpen(true);
+                  setAttachmentNonce((n) => n + 1);
+                }}
+                onError={(msg) => onToast?.(msg)}
+              />
+            ) : null}
           </div>
 
           <ActasOwnerPicker
@@ -341,6 +366,15 @@ export function ActasElementRow({
             status={rowStatus}
             readOnly={readOnly}
             onStatusChange={handleStatusChange}
+            onError={(msg) => onToast?.(msg)}
+          />
+
+          <ActasProgressCell
+            elementId={element.id}
+            progress={readOnly ? (element.progress ?? 0) : progress}
+            readOnly={readOnly}
+            hasWriteAccess={hasWriteAccess && !readOnly}
+            onProgressChange={setProgress}
             onError={(msg) => onToast?.(msg)}
           />
 
@@ -397,6 +431,18 @@ export function ActasElementRow({
             setHistoryReloadNonce((n) => n + 1);
             setHistoryOpen(true);
           }}
+        />
+      ) : null}
+
+      {historyOpen ? (
+        <ActasAttachmentsSection
+          elementId={element.id}
+          indentPx={rowIndent + (isSubElement ? 8 : 0)}
+          hasWriteAccess={hasWriteAccess && !readOnly}
+          readOnly={readOnly}
+          reloadNonce={attachmentNonce}
+          onCountChange={setAttachmentCount}
+          onError={(msg) => onToast?.(msg)}
         />
       ) : null}
 

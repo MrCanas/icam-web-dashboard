@@ -39,7 +39,9 @@ function filterElementTree(
     );
 
     if (!shouldShowInOperativoBoard(status, showCompleted)) {
-      result.push(...children);
+      // Hecho fuera del tablero: al ocultar un elemento "done" se va con TODO su
+      // subárbol (no promocionamos sus hijos al nivel del padre). Marcar Hecho un
+      // padre lo archiva con sus sub-elementos.
       continue;
     }
 
@@ -88,10 +90,14 @@ function walkDoneElements(
   statusOverrides: Record<string, ElementStatus>,
   depth: number,
   out: ActasDoneElementRef[],
+  parentDone = false,
 ): void {
   for (const element of elements) {
     const status = getEffectiveElementStatus(element, statusOverrides);
-    if (isDoneStatus(status)) {
+    const done = isDoneStatus(status);
+    // Si el padre está Hecho, todo su subárbol se muestra en Completados (se
+    // archiva con sus sub-elementos), aunque algún hijo no esté Hecho.
+    if (done || parentDone) {
       out.push({
         element: { ...element, status },
         categoryId: category.id,
@@ -105,6 +111,7 @@ function walkDoneElements(
       statusOverrides,
       depth + 1,
       out,
+      done || parentDone,
     );
   }
 }

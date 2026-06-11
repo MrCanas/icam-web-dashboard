@@ -20,6 +20,7 @@ export function ActasOperativoColumnHeader({
       <span>Elemento</span>
       <span>Owner</span>
       <span>Status</span>
+      <span>Avance</span>
       <span>Plazo</span>
       <span>Última entrada</span>
       <span>Actualizado</span>
