@@ -104,7 +104,6 @@ export function ActasOperativoSortableElement({
       {...attributes}
       {...listeners}
       onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
     >
       <DragHandleIcon />
     </button>

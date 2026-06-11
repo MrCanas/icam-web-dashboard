@@ -111,6 +111,9 @@ export function ActasElementNameCell({
           }`}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
+            // Aísla el input del onKeyDown de la fila (role=button) que hace
+            // preventDefault en " " — si no, no se puede escribir el espacio.
+            e.stopPropagation();
             if (e.key === "Enter") {
               e.preventDefault();
               saveEdit();

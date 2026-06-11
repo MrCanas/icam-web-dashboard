@@ -125,6 +125,7 @@ export function ActasLastEntryCell({
           disabled={pending}
           className="w-full resize-none rounded border border-subtle/80 bg-page px-2 py-1 text-xs text-text-body focus:border-icam-900/40 focus:outline-none focus:ring-1 focus:ring-icam-900/20"
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
         />
         {error ? (
           <p className="text-[10px] text-red-600" role="alert">

@@ -166,12 +166,10 @@ export function splitOperativoCategories(
   categories: ActasOperativoCategory[],
   statusOverrides: Record<string, ElementStatus> = {},
 ): SplitOperativoCategory[] {
-  return categories
-    .map((category) => splitOperativoCategory(category, statusOverrides))
-    .filter(
-      (split) =>
-        split.activeElements.length > 0 ||
-        split.completedElements.length > 0 ||
-        (split.category.archivedElements?.length ?? 0) > 0,
-    );
+  // Renderizamos TODAS las categorías del proyecto, incluidas las vacías: un
+  // grupo recién creado (sin elementos) debe aparecer con su cabecera y su
+  // botón "Añadir elemento". No filtramos por contenido.
+  return categories.map((category) =>
+    splitOperativoCategory(category, statusOverrides),
+  );
 }

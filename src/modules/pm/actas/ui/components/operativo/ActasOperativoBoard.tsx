@@ -2,8 +2,6 @@
 
 import { useMemo, useOptimistic, useState } from "react";
 
-import { ActasAddCategoryModal } from "./ActasAddCategoryModal";
-
 import {
   splitOperativoCategories,
 } from "@/modules/pm/actas/logic/operativo-done-filter";
@@ -22,6 +20,7 @@ import { ActasLogEntryUndoProvider } from "./ActasLogEntryUndoContext";
 import { ActasOperativoSelectionProvider } from "./ActasOperativoSelectionContext";
 import { ActasOperativoDndProvider } from "./ActasOperativoDndContext";
 import { ActasInlineCreateProvider } from "./ActasInlineCreateContext";
+import { ActasAddGroupButton } from "./ActasAddGroupButton";
 
 type ActasOperativoBoardProps = {
   categories: ActasOperativoCategory[];
@@ -51,7 +50,6 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     Record<string, ElementStatus>
   >({});
   const [toast, setToast] = useState<string | null>(null);
-  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [optimisticCategories, applyOptimisticCategories] = useOptimistic(
     categories,
     applyOperativoOptimisticAction,
@@ -132,24 +130,11 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
       )}
 
       {!readOnly && hasWriteAccess ? (
-        <button
-          type="button"
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-subtle bg-card px-4 py-3 text-sm font-medium text-icam-900 hover:bg-icam-900/5 transition-colors"
-          onClick={() => setAddCategoryOpen(true)}
-        >
-          <span className="text-lg leading-none font-light" aria-hidden>
-            +
-          </span>
-          Nuevo grupo
-        </button>
-      ) : null}
-
-      {!readOnly && hasWriteAccess ? (
-        <ActasAddCategoryModal
-          open={addCategoryOpen}
+        <ActasAddGroupButton
           projectId={projectId}
-          onClose={() => setAddCategoryOpen(false)}
+          existingNames={optimisticCategories.map((c) => c.name)}
           onOptimisticAction={handleOptimisticAction}
+          onToast={showToast}
         />
       ) : null}
 
