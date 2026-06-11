@@ -9,7 +9,7 @@ export type ListElementLogEntriesResult =
   | { ok: true; entries: ActasLogEntryItem[] }
   | { ok: false; error: string };
 
-/** Lectura del histórico: cualquier usuario con sesión ICAM (lector, editor, admin). */
+
 export async function listElementLogEntries(
   elementId: string,
   asOfDate?: string,
@@ -23,8 +23,6 @@ export async function listElementLogEntries(
   if (!ctx) {
     return { ok: false, error: "No autorizado" };
   }
-
-  const asOfIsoDate = parseAsOfDateParam(asOfDate?.trim()) ?? undefined;
   const { entries, error } = await fetchElementLogEntries(ctx, id, {
     asOfIsoDate,
   });
