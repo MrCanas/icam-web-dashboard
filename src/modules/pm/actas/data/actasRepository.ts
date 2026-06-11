@@ -8,6 +8,7 @@ import { toElementStatus } from "../logic/element-status";
 import { mapLogEntryRow } from "./map-log-entry";
 import { resolveUserDisplayMap } from "../logic/user-display";
 import type {
+  ActasArchivedElementRef,
   ActasArchivedProjectListItem,
   ActasArchivedProjectRef,
   ActasElementOwner,
@@ -50,6 +51,7 @@ export async function fetchActasProjects(
     .from("project")
     .select("id, code, name, phase")
     .is("archived_at", null)
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) {
@@ -328,6 +330,48 @@ export async function fetchActasProjectOperativo(
   const allElements = elRows ?? [];
   const elementIds = allElements.map((el) => el.id as string);
 
+  // Elementos archivados (soft-delete) por categoría → sección "Archivados".
+  const { data: archivedRows, error: archErr } = await supabase
+    .from("element")
+    .select("id, category_id, name, parent_element_id, archived_at")
+    .in("category_id", categoryIds)
+    .not("archived_at", "is", null)
+    .order("archived_at", { ascending: false });
+
+  if (archErr) {
+    return { categories: [], error: archErr.message };
+  }
+
+  const archivedAll = archivedRows ?? [];
+  const archivedIds = new Set(archivedAll.map((r) => r.id as string));
+
+  const countArchivedDescendants = (id: string): number => {
+    let n = 0;
+    for (const r of archivedAll) {
+      if (((r.parent_element_id as string | null) ?? null) === id) {
+        n += 1 + countArchivedDescendants(r.id as string);
+      }
+    }
+    return n;
+  };
+
+  const archivedByCategory = new Map<string, ActasArchivedElementRef[]>();
+  for (const r of archivedAll) {
+    const parentId = (r.parent_element_id as string | null) ?? null;
+    // Solo "raíces de archivado": sin padre o con padre no archivado.
+    if (parentId != null && archivedIds.has(parentId)) continue;
+    const cid = r.category_id as string;
+    const list = archivedByCategory.get(cid) ?? [];
+    list.push({
+      id: r.id as string,
+      name: r.name as string,
+      isSubelement: parentId != null,
+      archivedAt: (r.archived_at as string | null) ?? null,
+      descendantCount: countArchivedDescendants(r.id as string),
+    });
+    archivedByCategory.set(cid, list);
+  }
+
   const [ownerResult, logResult] = await Promise.all([
     elementIds.length > 0
       ? supabase
@@ -446,6 +490,7 @@ export async function fetchActasProjectOperativo(
       sublotLabel,
       masterGroupId: (cat.master_group_id as string | null) ?? null,
       elements: buildElementTree(flat),
+      archivedElements: archivedByCategory.get(cat.id as string) ?? [],
     };
   });
 

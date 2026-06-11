@@ -6,6 +6,49 @@ export type IssueSupabaseTokenResult =
   | { ok: true; access_token: string; expires_at: string }
   | { ok: false; status: 401 | 404 | 500; error: string };
 
+/** Margen antes de expirar para reutilizar el JWT sin llamar a verifyOtp de nuevo. */
+const TOKEN_REUSE_BUFFER_MS = 2 * 60 * 1000;
+
+type CachedBridgeToken = {
+  access_token: string;
+  expires_at: string;
+  expires_at_ms: number;
+};
+
+const bridgeTokenCache = new Map<string, CachedBridgeToken>();
+const bridgeTokenInflight = new Map<string, Promise<IssueSupabaseTokenResult>>();
+
+function cacheKeyForEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function readCachedToken(key: string): CachedBridgeToken | null {
+  const cached = bridgeTokenCache.get(key);
+  if (!cached) return null;
+  if (cached.expires_at_ms - Date.now() <= TOKEN_REUSE_BUFFER_MS) {
+    bridgeTokenCache.delete(key);
+    return null;
+  }
+  return cached;
+}
+
+function storeCachedToken(key: string, access_token: string, expires_at: string) {
+  const expires_at_ms = new Date(expires_at).getTime();
+  bridgeTokenCache.set(key, { access_token, expires_at, expires_at_ms });
+}
+
+/** Invalida la caché del bridge (p. ej. logout). */
+export function clearSupabaseBridgeTokenServerCache(email?: string): void {
+  if (email) {
+    const key = cacheKeyForEmail(email);
+    bridgeTokenCache.delete(key);
+    bridgeTokenInflight.delete(key);
+    return;
+  }
+  bridgeTokenCache.clear();
+  bridgeTokenInflight.clear();
+}
+
 function getConfig() {
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
@@ -42,15 +85,12 @@ function getConfig() {
  *   La clave privada no es accesible desde fuera; el approach HS256 con
  *   SUPABASE_JWT_SECRET está deprecated en proyectos con asymmetric signing.
  *
- * Coste: 2 round-trips a Supabase Auth por emisión. La caché de 5 min en el
- *   cliente browser (`supabase-browser.ts`) limita las llamadas a ~12/hora/usuario.
+ * Coste: 2 round-trips a Supabase Auth por emisión si no hay token en caché.
+ *   Servidor y navegador reutilizan el JWT hasta ~2 min antes de `expires_at`.
  */
-export async function issueSupabaseTokenForIcamSession(): Promise<IssueSupabaseTokenResult> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return { ok: false, status: 401, error: "No autorizado" };
-  }
-
+async function mintSupabaseTokenForEmail(
+  email: string,
+): Promise<IssueSupabaseTokenResult> {
   let url: string;
   let serviceKey: string;
   let anonKey: string;
@@ -72,7 +112,7 @@ export async function issueSupabaseTokenForIcamSession(): Promise<IssueSupabaseT
   const { data: linkData, error: linkError } =
     await adminClient.auth.admin.generateLink({
       type: "magiclink",
-      email: user.email,
+      email,
     });
 
   if (linkError) {
@@ -113,11 +153,47 @@ export async function issueSupabaseTokenForIcamSession(): Promise<IssueSupabaseT
 
   const { access_token, expires_at } = sessionData.session;
 
-  return {
-    ok: true,
-    access_token,
-    expires_at: typeof expires_at === "number"
+  const expires_at_iso =
+    typeof expires_at === "number"
       ? new Date(expires_at * 1000).toISOString()
-      : expires_at ?? new Date(Date.now() + 3600 * 1000).toISOString(),
-  };
+      : expires_at ?? new Date(Date.now() + 3600 * 1000).toISOString();
+
+  return { ok: true, access_token, expires_at: expires_at_iso };
+}
+
+export async function issueSupabaseTokenForIcamSession(): Promise<IssueSupabaseTokenResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, status: 401, error: "No autorizado" };
+  }
+
+  const cacheKey = cacheKeyForEmail(user.email);
+  const cached = readCachedToken(cacheKey);
+  if (cached) {
+    return {
+      ok: true,
+      access_token: cached.access_token,
+      expires_at: cached.expires_at,
+    };
+  }
+
+  const inflight = bridgeTokenInflight.get(cacheKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = mintSupabaseTokenForEmail(user.email).then((result) => {
+    if (result.ok) {
+      storeCachedToken(cacheKey, result.access_token, result.expires_at);
+    }
+    return result;
+  });
+
+  bridgeTokenInflight.set(cacheKey, promise);
+
+  try {
+    return await promise;
+  } finally {
+    bridgeTokenInflight.delete(cacheKey);
+  }
 }

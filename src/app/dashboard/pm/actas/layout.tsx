@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { getUserRole } from "@/lib/auth/permissions";
 import {
   fetchActasArchivedProjectsCount,
   fetchActasProjects,
@@ -24,11 +25,14 @@ export default async function ActasLayout({
     fetchActasArchivedProjectsCount(ctx),
   ]);
 
+  const hasWriteAccess = getUserRole(ctx, "pm") !== "lector";
+
   return (
     <ActasShell
       projects={projects}
       archivedCount={archivedCount}
       loadError={error}
+      hasWriteAccess={hasWriteAccess}
     >
       {children}
     </ActasShell>

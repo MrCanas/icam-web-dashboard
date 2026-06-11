@@ -205,6 +205,7 @@ export function ActasHistoryEntryItem({
           resizeTextarea();
         }}
         onInput={resizeTextarea}
+        onKeyDown={(e) => e.stopPropagation()}
         rows={variant === "inline" ? 2 : 2}
         className="w-full resize-none rounded-md border border-subtle/80 bg-page px-2 py-1.5 text-sm text-text-body focus:border-icam-900/40 focus:outline-none focus:ring-1 focus:ring-icam-900/20"
         disabled={pending}

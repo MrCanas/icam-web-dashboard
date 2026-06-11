@@ -1,8 +1,9 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
-import { checkWriteAccess } from "@/lib/auth/permissions";
-import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
+import { revalidatePath } from "next/cache";
+
+import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
+import { assertUniqueElementNameInCategory } from "@/modules/pm/actas/logic/element-name-validation";
 
 export type CreateElementInput = {
   categoryId: string;
@@ -33,14 +34,11 @@ export async function createElement(
     return { ok: false, error: "categoryId requerido" };
   }
 
-  const user = await requireCurrentUser();
-  const writeDenied = checkWriteAccess(user, "pm");
-  if (writeDenied) return { ok: false, error: writeDenied };
-
-  const { client, error: clientError } = await getActasAuthenticatedSupabase();
-  if (!client) {
-    return { ok: false, error: clientError };
+  const write = await requireActasWriteSupabase();
+  if (!write.ok) {
+    return { ok: false, error: write.error };
   }
+  const { client } = write;
 
   const parentElementId = input.parentElementId?.trim() || null;
 
@@ -75,32 +73,13 @@ export async function createElement(
     }
   }
 
-  const siblingQuery = client
-    .from("element")
-    .select("id, name")
-    .eq("category_id", categoryId)
-    .is("archived_at", null);
-
-  if (parentElementId) {
-    siblingQuery.eq("parent_element_id", parentElementId);
-  } else {
-    siblingQuery.is("parent_element_id", null);
-  }
-
-  const { data: siblings, error: sibErr } = await siblingQuery;
-  if (sibErr) {
-    return { ok: false, error: sibErr.message };
-  }
-
-  const nameLower = name.toLowerCase();
-  const duplicate = (siblings ?? []).some(
-    (row) => (row.name as string).trim().toLowerCase() === nameLower,
-  );
-  if (duplicate) {
-    return {
-      ok: false,
-      error: "Ya existe un elemento con ese nombre en esta categoría",
-    };
+  const unique = await assertUniqueElementNameInCategory(client, {
+    categoryId,
+    parentElementId,
+    name,
+  });
+  if (!unique.ok) {
+    return { ok: false, error: unique.error };
   }
 
   let orderQuery = client
@@ -161,6 +140,23 @@ export async function createElement(
       if (copyErr) {
         return { ok: false, error: copyErr.message };
       }
+    }
+  }
+
+  const { data: projectRow, error: projectErr } = await client
+    .from("category")
+    .select("project_id")
+    .eq("id", categoryId)
+    .maybeSingle();
+
+  if (!projectErr && projectRow?.project_id) {
+    const { data: project, error: codeErr } = await client
+      .from("project")
+      .select("code")
+      .eq("id", projectRow.project_id as string)
+      .maybeSingle();
+    if (!codeErr && project?.code) {
+      revalidatePath(`/dashboard/pm/actas/${project.code as string}`);
     }
   }
 

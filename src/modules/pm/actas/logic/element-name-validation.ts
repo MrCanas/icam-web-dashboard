@@ -48,7 +48,7 @@ export async function assertUniqueElementNameInCategory(
   if (duplicate) {
     return {
       ok: false,
-      error: "Ya existe un elemento con ese nombre en esta categoría",
+      error: "Ya existe un elemento hermano con ese nombre en este proyecto",
     };
   }
 

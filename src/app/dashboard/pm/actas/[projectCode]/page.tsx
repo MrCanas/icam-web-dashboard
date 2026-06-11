@@ -6,6 +6,9 @@ import { ActasProjectPage } from "@/modules/pm/actas/ui/pages/ActasProjectPage";
 import type { ActasProjectTab } from "@/modules/pm/actas/types";
 import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
+/** Server Actions del tablero (crear grupo, drag-drop, etc.) pueden ser lentas en preview. */
+export const maxDuration = 30;
+
 interface PageProps {
   params: Promise<{ projectCode: string }>;
   searchParams: Promise<{ tab?: string; asOf?: string }>;

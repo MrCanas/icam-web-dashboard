@@ -30,10 +30,16 @@ export interface ActasArchivedProjectRef {
   archivedAt: string;
 }
 
-export type ActasProjectTab = "operativo" | "acta" | "historico" | "ajustes";
+export type ActasProjectTab =
+  | "operativo"
+  | "completados"
+  | "acta"
+  | "historico"
+  | "ajustes";
 
 export const ACTAS_PROJECT_TABS: { key: ActasProjectTab; label: string }[] = [
   { key: "operativo", label: "Operativo" },
+  { key: "completados", label: "Completados" },
   { key: "acta", label: "Acta" },
   { key: "historico", label: "Histórico" },
   { key: "ajustes", label: "Ajustes" },
@@ -94,6 +100,17 @@ export interface ActasLogEntryItem {
   author: ActasElementOwner | null;
 }
 
+/** Elemento archivado (soft-delete) mostrado en la sección "Archivados" del grupo. */
+export interface ActasArchivedElementRef {
+  id: string;
+  name: string;
+  /** true si su padre no está archivado (se archivó solo este sub-elemento). */
+  isSubelement: boolean;
+  archivedAt: string | null;
+  /** Nº de descendientes también archivados que se restaurarían con él. */
+  descendantCount: number;
+}
+
 export interface ActasOperativoCategory {
   id: string;
   name: string;
@@ -102,6 +119,8 @@ export interface ActasOperativoCategory {
   sublotLabel: string | null;
   masterGroupId: string | null;
   elements: ActasOperativoElement[];
+  /** Raíces de archivado de la categoría (soft-delete); opcional fuera del tablero live. */
+  archivedElements?: ActasArchivedElementRef[];
 }
 
 /** Preset de rango temporal en la vista Acta. */

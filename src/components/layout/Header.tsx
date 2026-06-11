@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardNav } from "@/components/layout/DashboardNav";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -42,7 +43,8 @@ export function Header() {
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-3 shrink-0">
+          <div className="hidden lg:flex items-center gap-1 shrink-0">
+            <NotificationBell />
             <Link
               href="/dashboard/perfil"
               className="min-h-11 flex items-center text-white/50 text-xs hover:text-white/80 transition"
@@ -95,6 +97,9 @@ export function Header() {
               <DashboardNav layout="vertical" onNavigate={() => setMenuOpen(false)} />
             </div>
             <div className="p-3 border-t border-white/10 shrink-0 space-y-1">
+              <div className="px-2 pb-2 flex justify-end">
+                <NotificationBell />
+              </div>
               <Link
                 href="/dashboard/perfil"
                 onClick={() => setMenuOpen(false)}

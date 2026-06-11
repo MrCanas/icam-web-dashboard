@@ -29,16 +29,19 @@ Contenedor de fila: `group/row`. Barra: `opacity-0 group-hover/row:opacity-100`.
 | Icono | Acción | Comportamiento |
 |-------|--------|----------------|
 | ➕ | Añadir entrada | `ActasAddLogEntryPanel` bajo la fila |
-| ⏬ | Sub-elemento | Solo en elementos raíz → `ActasAddSubelementPanel` |
+| ⏬ | Sub-elemento | Solo en elementos raíz → creación inline (`createSubelement`) con nombre por defecto; la fila nueva aparece en modo edición con foco |
 | 🕐 | Histórico | Expande `ActasElementHistoryPanel` |
 | 🗑 | Eliminar | Modal → `archiveElement` (soft-delete) |
 
 Iconos: SVG inline 16px (`ActasElementQuickActions.tsx`). Sin Lucide en el proyecto.
 
+### Creación inline (P-UX-feedback-v2)
+
+Tanto «Añadir elemento» (footer del grupo, `ActasCategoryGroup`) como «+ Sub-elemento» (quick-action de fila, `ActasElementRow`) crean directamente en BD con un nombre por defecto único entre hermanos (`logic/default-element-name.ts`) y dejan la fila recién creada en **modo edición con foco**. La señal de auto-edición la coordina `ActasInlineCreateContext` (solo estado de UI, no renderiza DOM → no afecta al grid). Ya no hay modal/panel intermedios para escribir el nombre.
+
 ### Ajustes del DOM
 
 - Botones texto «Histórico» / «+ Añadir entrada» a la derecha  
-- Fila «+ Sub-elemento» bajo cada padre  
 
 ## Server Actions
 
@@ -157,7 +160,7 @@ Monday agrupa acciones en iconos al hover de la fila y evita filas secundarias d
 ## Archivos principales
 
 - `ActasElementRow.tsx`, `ActasElementQuickActions.tsx`  
-- `ActasAddSubelementPanel.tsx`, `ActasArchiveElementModal.tsx`  
+- `ActasInlineCreateContext.tsx`, `logic/default-element-name.ts`, `ActasArchiveElementModal.tsx`  
 - `ActasStatusPicker.tsx`, `ActasTimelinePicker.tsx`, `ActasOwnerPicker.tsx`, `ActasOwnerAvatars.tsx`
 - `actions/change-element-status.ts`, `actions/update-element-timeline.ts`, `actions/element-owner.ts`, `actions/create-subelement.ts`, `actions/archive-element.ts`  
 - `ActasOperativoColumnHeader.tsx`, `element-display.ts`

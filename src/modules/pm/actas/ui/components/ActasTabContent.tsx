@@ -8,6 +8,7 @@ interface ActasTabContentProps {
 const PLACEHOLDER: Record<ActasProjectTab, string> = {
   operativo:
     "Vista operativa del proyecto — árbol de categorías y elementos con estado.",
+  completados: "Elementos marcados como Hecho.",
   acta: "Vista de acta consolidada por rango de fechas.",
   historico: "Evolución completa de un elemento concreto.",
   ajustes: "Configuración del proyecto (fase, tipo de activo, módulos) — próximamente.",

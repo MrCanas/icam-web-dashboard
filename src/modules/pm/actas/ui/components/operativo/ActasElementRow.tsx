@@ -1,15 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
+import { createSubelement } from "@/modules/pm/actas/actions/create-subelement";
 import { countElementDescendants } from "@/modules/pm/actas/logic/count-element-descendants";
-import { OPERATIVO_ROW_GRID } from "@/modules/pm/actas/logic/element-display";
+import {
+  DEFAULT_SUBELEMENT_NAME,
+  nextDefaultName,
+} from "@/modules/pm/actas/logic/default-element-name";
+import {
+  OPERATIVO_ROW_GRID,
+  OPERATIVO_ROW_GRID_WITH_SELECTION,
+} from "@/modules/pm/actas/logic/element-display";
 import { formatRelativeEntryDate } from "@/modules/pm/actas/logic/actas-time";
 import type { ActasLogEntryItem, ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
 
+import { ActasElementSelectCheckbox } from "./ActasElementSelectCheckbox";
+import { useOperativoSelection } from "./ActasOperativoSelectionContext";
+import { useInlineCreate } from "./ActasInlineCreateContext";
+import { useSubelementCollapse } from "./useSubelementCollapse";
 import { ActasAddLogEntryPanel } from "./ActasAddLogEntryPanel";
-import { ActasAddSubelementPanel } from "./ActasAddSubelementPanel";
 import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementInlineHistory } from "./ActasElementInlineHistory";
 import { ActasElementQuickActions } from "./ActasElementQuickActions";
@@ -17,6 +28,7 @@ import { ActasElementNameCell } from "./ActasElementNameCell";
 import { ActasLastEntryCell } from "./ActasLastEntryCell";
 import { ActasOwnerPicker } from "./ActasOwnerPicker";
 import { ActasStatusPicker } from "./ActasStatusPicker";
+import { ActasElementNotificationBell } from "./ActasElementNotificationBell";
 import { ActasTimelinePicker } from "./ActasTimelinePicker";
 
 interface ActasElementRowProps {
@@ -26,8 +38,20 @@ interface ActasElementRowProps {
   isPmAdmin?: boolean;
   hasWriteAccess?: boolean;
   depth?: number;
+  /** Recuento de sub-elementos (incluye completados ocultos del listado activo). */
+  directChildCount?: number;
+  /** Asa de arrastre (DnD operativo); si está presente, los hijos se renderizan fuera. */
+  dragHandle?: React.ReactNode | null;
+  /** Control externo del colapso de sub-elementos (modo DnD). */
+  childrenExpanded?: boolean;
+  onChildrenExpandedChange?: (expanded: boolean) => void;
   readOnly?: boolean;
   asOfDate?: string;
+  showAsCompleted?: boolean;
+  onElementStatusLiveChange?: (
+    elementId: string,
+    status: ElementStatus,
+  ) => void;
   onElementArchived?: (message: string) => void;
   onToast?: (message: string) => void;
 }
@@ -41,15 +65,28 @@ export function ActasElementRow({
   isPmAdmin = false,
   hasWriteAccess = true,
   depth = 0,
+  directChildCount: directChildCountProp,
+  dragHandle = null,
+  childrenExpanded: childrenExpandedProp,
+  onChildrenExpandedChange,
   readOnly = false,
   asOfDate,
+  showAsCompleted = false,
+  onElementStatusLiveChange,
   onElementArchived,
   onToast,
 }: ActasElementRowProps) {
   const router = useRouter();
+  const selection = useOperativoSelection();
+  const inlineCreate = useInlineCreate();
+  const [subPending, startSubTransition] = useTransition();
+  const showSelectionColumn =
+    Boolean(selection?.enabled) && hasWriteAccess && !readOnly;
+  const rowGrid = showSelectionColumn
+    ? OPERATIVO_ROW_GRID_WITH_SELECTION
+    : OPERATIVO_ROW_GRID;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [subOpen, setSubOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [historyReloadNonce, setHistoryReloadNonce] = useState(0);
   const [displayStatus, setDisplayStatus] = useState<ElementStatus>(
@@ -81,6 +118,11 @@ export function ActasElementRow({
     setDisplayName(element.name);
   }, [element.name]);
   useEffect(() => {
+    if (!selection?.liveStatusById[element.id]) {
+      setDisplayStatus(element.status);
+    }
+  }, [element.status, element.id, selection?.liveStatusById]);
+  useEffect(() => {
     setOwners(element.owners);
   }, [element.owners]);
   useEffect(() => {
@@ -101,20 +143,33 @@ export function ActasElementRow({
     element.lastEntrySource,
   ]);
 
-  const rowStatus = readOnly ? element.status : displayStatus;
+  const bulkStatus = selection?.liveStatusById[element.id];
+  const rowStatus = readOnly
+    ? element.status
+    : (bulkStatus ?? displayStatus);
   const relativeDate = formatRelativeEntryDate(
     readOnly ? element.lastEntryDate : lastDate,
   );
   const rowIndent = depth * INDENT_PX;
   const isSubElement = depth > 0;
+  const directChildCount = directChildCountProp ?? element.children.length;
+  const hasDirectChildren =
+    !isSubElement && element.canHaveSubelements && directChildCount > 0;
+  const [childrenExpandedLocal, setChildrenExpandedLocal] =
+    useSubelementCollapse(element.id);
+  const childrenExpanded = childrenExpandedProp ?? childrenExpandedLocal;
+  const setChildrenExpanded =
+    onChildrenExpandedChange ?? setChildrenExpandedLocal;
   const descendantCount = countElementDescendants(element);
-  const expanded = historyOpen || addOpen || subOpen;
+  const expanded = historyOpen || addOpen;
+  const renderChildrenInline = dragHandle == null;
 
   const handleStatusChange = (
     newStatus: ElementStatus,
     entry: ActasLogEntryItem | null,
   ) => {
     setDisplayStatus(newStatus);
+    onElementStatusLiveChange?.(element.id, newStatus);
     if (entry) {
       setLastPreview(entry.content);
       setLastDate(entry.entryDate);
@@ -126,8 +181,29 @@ export function ActasElementRow({
   };
 
   const handleRowToggle = () => {
-    if (addOpen || subOpen) return;
+    if (addOpen) return;
     setHistoryOpen((v) => !v);
+  };
+
+  const handleAddSubelement = () => {
+    if (subPending) return;
+    const name = nextDefaultName(
+      DEFAULT_SUBELEMENT_NAME,
+      element.children.map((c) => c.name),
+    );
+    setChildrenExpanded(true);
+    startSubTransition(async () => {
+      const result = await createSubelement({
+        parentElementId: element.id,
+        name,
+      });
+      if (!result.ok) {
+        onToast?.(result.error || "No se pudo guardar el cambio");
+        return;
+      }
+      inlineCreate?.requestAutoEdit(result.elementId);
+      router.refresh();
+    });
   };
 
   const syncLastFromHistory = (latest: ActasLogEntryItem | null) => {
@@ -151,31 +227,35 @@ export function ActasElementRow({
               handleRowToggle();
             }
           }}
-          className={`group/row ${OPERATIVO_ROW_GRID} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
+          className={`group/row ${rowGrid} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
             isSubElement
               ? "bg-page/30 hover:bg-page/50"
               : "bg-card hover:bg-page/60"
-          } ${expanded ? "bg-page/40" : ""} ${historyOpen ? "bg-page/50" : ""}`}
+          } ${showAsCompleted ? "opacity-60" : ""} ${expanded ? "bg-page/40" : ""} ${historyOpen ? "bg-page/50" : ""}`}
           aria-expanded={historyOpen}
         >
+          {showSelectionColumn ? (
+            <div className="flex items-center justify-center self-center">
+              <ActasElementSelectCheckbox elementId={element.id} />
+            </div>
+          ) : null}
           <div
             className={`flex min-w-0 items-center gap-1 ${
               isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
             }`}
             style={{ paddingLeft: rowIndent }}
           >
+            {dragHandle}
             {!readOnly ? (
               <ActasElementQuickActions
                 canAddSubelement={element.canHaveSubelements}
                 onAddEntry={(e) => {
                   e.stopPropagation();
                   setAddOpen(true);
-                  setSubOpen(false);
                 }}
                 onAddSubelement={(e) => {
                   e.stopPropagation();
-                  setSubOpen(true);
-                  setAddOpen(false);
+                  handleAddSubelement();
                 }}
                 onDelete={(e) => {
                   e.stopPropagation();
@@ -185,12 +265,49 @@ export function ActasElementRow({
             ) : (
               <span className="w-0 shrink-0" aria-hidden />
             )}
-            {isSubElement ? (
+            {hasDirectChildren ? (
+              <button
+                type="button"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold text-text-muted hover:bg-icam-900/10 hover:text-icam-900"
+                aria-expanded={childrenExpanded}
+                aria-label={
+                  childrenExpanded
+                    ? "Colapsar sub-elementos"
+                    : "Expandir sub-elementos"
+                }
+                title={
+                  childrenExpanded
+                    ? "Colapsar sub-elementos"
+                    : "Expandir sub-elementos"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setChildrenExpanded(!childrenExpanded);
+                }}
+              >
+                {childrenExpanded ? "▾" : "▸"}
+              </button>
+            ) : isSubElement ? (
               <span
-                className="shrink-0 text-text-muted/60 text-[10px] select-none"
+                className="shrink-0 text-text-muted/60 text-[10px] select-none w-5 text-center"
                 aria-hidden
               >
                 └
+              </span>
+            ) : (
+              <span className="w-5 shrink-0" aria-hidden />
+            )}
+            {hasDirectChildren ? (
+              <span
+                className="shrink-0 rounded bg-icam-900/10 px-1 py-px text-[9px] font-semibold tabular-nums text-icam-900/80"
+                title={`${directChildCount} sub-elemento${directChildCount === 1 ? "" : "s"}`}
+              >
+                {directChildCount}
+              </span>
+            ) : null}
+            {showAsCompleted ? (
+              <span className="shrink-0 rounded bg-emerald-600/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
+                Completado
               </span>
             ) : null}
             <ActasElementNameCell
@@ -200,6 +317,11 @@ export function ActasElementRow({
               hasWriteAccess={hasWriteAccess && !readOnly}
               readOnly={readOnly}
               onNameChange={setDisplayName}
+              onError={(msg) => onToast?.(msg)}
+            />
+            <ActasElementNotificationBell
+              elementId={element.id}
+              readOnly={readOnly}
               onError={(msg) => onToast?.(msg)}
             />
           </div>
@@ -278,18 +400,6 @@ export function ActasElementRow({
         />
       ) : null}
 
-      {!readOnly && subOpen && element.canHaveSubelements ? (
-        <ActasAddSubelementPanel
-          parentElementId={element.id}
-          indentPx={rowIndent + 8}
-          onCancel={() => setSubOpen(false)}
-          onCreated={() => {
-            setSubOpen(false);
-            router.refresh();
-          }}
-        />
-      ) : null}
-
       {historyOpen ? (
         <ActasElementInlineHistory
           elementId={element.id}
@@ -319,21 +429,25 @@ export function ActasElementRow({
         />
       ) : null}
 
-      {element.children.map((child) => (
-        <ActasElementRow
-          key={child.id}
-          element={child}
-          projectCode={projectCode}
-          currentAuthUserId={currentAuthUserId}
-          isPmAdmin={isPmAdmin}
-          hasWriteAccess={hasWriteAccess}
-          depth={depth + 1}
-          readOnly={readOnly}
-          asOfDate={asOfDate}
-          onElementArchived={onElementArchived}
-          onToast={onToast}
-        />
-      ))}
+      {renderChildrenInline &&
+        (!hasDirectChildren || childrenExpanded) &&
+        element.children.map((child) => (
+          <ActasElementRow
+            key={child.id}
+            element={child}
+            projectCode={projectCode}
+            currentAuthUserId={currentAuthUserId}
+            isPmAdmin={isPmAdmin}
+            hasWriteAccess={hasWriteAccess}
+            depth={depth + 1}
+            readOnly={readOnly}
+            asOfDate={asOfDate}
+            showAsCompleted={showAsCompleted && child.status === "done"}
+            onElementStatusLiveChange={onElementStatusLiveChange}
+            onElementArchived={onElementArchived}
+            onToast={onToast}
+          />
+        ))}
     </>
   );
 }

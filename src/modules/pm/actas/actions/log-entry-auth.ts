@@ -8,6 +8,8 @@ import {
   WriteAccessDeniedError,
 } from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
+import { createServiceRoleClient } from "@/lib/db/admin";
+import type { LogEntryRow } from "@/modules/pm/actas/data/map-log-entry";
 
 export const LOG_ENTRY_SELECT =
   "id, content, entry_date, deleted_at, status_before, status_after, author_id, source, edited_at";
@@ -99,4 +101,56 @@ export async function loadLogEntryForAuthorAction(
     ok: true,
     existing: existing as ExistingRow,
   };
+}
+
+/**
+ * Mutación de log_entry tras comprobar autorización en la app.
+ * Usa service role para evitar desajustes entre ICAM pm-admin y RLS org_admin.
+ */
+export async function mutateLogEntryRow(
+  logEntryId: string,
+  patch: Record<string, unknown>,
+): Promise<
+  | { ok: true; row: LogEntryRow }
+  | { ok: false; error: string }
+> {
+  const admin = createServiceRoleClient();
+  const { data, error } = await admin
+    .from("log_entry")
+    .update(patch)
+    .eq("id", logEntryId)
+    .select(LOG_ENTRY_SELECT)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Entrada no encontrada tras actualizar" };
+  }
+
+  return { ok: true, row: data as LogEntryRow };
+}
+
+export async function fetchLogEntryRow(
+  logEntryId: string,
+): Promise<
+  | { ok: true; row: LogEntryRow }
+  | { ok: false; error: string }
+> {
+  const admin = createServiceRoleClient();
+  const { data, error } = await admin
+    .from("log_entry")
+    .select(LOG_ENTRY_SELECT)
+    .eq("id", logEntryId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Entrada no encontrada" };
+  }
+
+  return { ok: true, row: data as LogEntryRow };
 }

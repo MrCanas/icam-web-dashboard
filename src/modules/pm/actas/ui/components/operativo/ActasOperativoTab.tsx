@@ -74,6 +74,7 @@ export async function ActasOperativoTab({
           mode="historical"
           asOfDate={asOfIso}
           categories={snapshotResult.categories}
+          projectId={projectId}
           projectCode={projectCode}
           currentAuthUserId={currentAuthUserId}
           isPmAdmin={isPmAdmin}
@@ -101,6 +102,7 @@ export async function ActasOperativoTab({
     <ActasOperativoBoard
       mode="live"
       categories={categories}
+      projectId={projectId}
       projectCode={projectCode}
       currentAuthUserId={currentAuthUserId}
       isPmAdmin={isPmAdmin}

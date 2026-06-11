@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -9,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { bulkAddElementOwner } from "@/modules/pm/actas/actions/bulk-add-element-owner";
 import {
   addElementOwner,
   removeElementOwner,
@@ -22,6 +24,7 @@ import { isUnresolvedOwner } from "@/modules/pm/actas/logic/owner-display";
 import type { ActasElementOwner } from "@/modules/pm/actas/types";
 
 import { ActasOwnerAvatars } from "./ActasOwnerAvatars";
+import { useOperativoSelection } from "./ActasOperativoSelectionContext";
 
 const POPOVER_WIDTH = 300;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -71,6 +74,8 @@ export function ActasOwnerPicker({
   onOwnersChange,
   onError,
 }: ActasOwnerPickerProps) {
+  const router = useRouter();
+  const selection = useOperativoSelection();
   const canAssign = hasWriteAccess && !readOnly;
   const inputId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -194,9 +199,19 @@ export function ActasOwnerPicker({
       onOwnersChange([...owners, nextOwner]);
     }
 
+    const bulkIds =
+      !isOwner && selection?.selectionActive
+        ? [...selection.selectedIds]
+        : [elementId];
+
     const result = isOwner
       ? await removeElementOwner({ elementId, userId: member.userId })
-      : await addElementOwner({ elementId, userId: member.userId });
+      : bulkIds.length > 1
+        ? await bulkAddElementOwner({
+            elementIds: bulkIds,
+            userId: member.userId,
+          })
+        : await addElementOwner({ elementId, userId: member.userId });
 
     setPendingUserIds((s) => {
       const n = new Set(s);
@@ -207,6 +222,14 @@ export function ActasOwnerPicker({
     if (!result.ok) {
       onOwnersChange(previous);
       onError(result.error);
+      return;
+    }
+
+    if (bulkIds.length > 1) {
+      selection?.clearAll();
+      router.refresh();
+    } else if (!isOwner) {
+      router.refresh();
     }
   };
 
