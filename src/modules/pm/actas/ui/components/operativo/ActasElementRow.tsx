@@ -10,8 +10,8 @@ import {
   nextDefaultName,
 } from "@/modules/pm/actas/logic/default-element-name";
 import {
-  OPERATIVO_ROW_GRID,
-  OPERATIVO_ROW_GRID_WITH_SELECTION,
+  OPERATIVO_GRID_BASE_CLASS,
+  operativoGridTemplate,
 } from "@/modules/pm/actas/logic/element-display";
 import { formatRelativeEntryDate } from "@/modules/pm/actas/logic/actas-time";
 import type { ActasLogEntryItem, ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
@@ -85,9 +85,6 @@ export function ActasElementRow({
   const [subPending, startSubTransition] = useTransition();
   const showSelectionColumn =
     Boolean(selection?.enabled) && hasWriteAccess && !readOnly;
-  const rowGrid = showSelectionColumn
-    ? OPERATIVO_ROW_GRID_WITH_SELECTION
-    : OPERATIVO_ROW_GRID;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -241,11 +238,12 @@ export function ActasElementRow({
               handleRowToggle();
             }
           }}
-          className={`group/row ${rowGrid} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
+          className={`group/row ${OPERATIVO_GRID_BASE_CLASS} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
             isSubElement
               ? "bg-page/30 hover:bg-page/50"
               : "bg-card hover:bg-page/60"
           } ${showAsCompleted ? "opacity-60" : ""} ${expanded ? "bg-page/40" : ""} ${historyOpen ? "bg-page/50" : ""}`}
+          style={{ gridTemplateColumns: operativoGridTemplate(showSelectionColumn) }}
           aria-expanded={historyOpen}
         >
           {showSelectionColumn ? (
@@ -253,12 +251,7 @@ export function ActasElementRow({
               <ActasElementSelectCheckbox elementId={element.id} />
             </div>
           ) : null}
-          <div
-            className={`flex min-w-0 items-center gap-1 ${
-              isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
-            }`}
-            style={{ paddingLeft: rowIndent }}
-          >
+          <div className="flex items-center gap-1 self-center overflow-hidden">
             {dragHandle}
             {!readOnly ? (
               <ActasElementQuickActions
@@ -319,6 +312,14 @@ export function ActasElementRow({
                 {directChildCount}
               </span>
             ) : null}
+          </div>
+
+          <div
+            className={`flex min-w-0 items-center gap-1 ${
+              isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
+            }`}
+            style={{ paddingLeft: rowIndent }}
+          >
             {showAsCompleted ? (
               <span className="shrink-0 rounded bg-emerald-600/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
                 Completado
