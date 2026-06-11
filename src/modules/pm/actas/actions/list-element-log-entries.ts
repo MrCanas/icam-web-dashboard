@@ -23,6 +23,8 @@ export async function listElementLogEntries(
   if (!ctx) {
     return { ok: false, error: "No autorizado" };
   }
+
+  const asOfIsoDate = parseAsOfDateParam(asOfDate?.trim()) ?? undefined;
   const { entries, error } = await fetchElementLogEntries(ctx, id, {
     asOfIsoDate,
   });
