@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSessionAuthenticated } from "@/lib/auth/currentUser";
 
-export function proxy(request: NextRequest) {
-  const authCookie = request.cookies.get("icam-auth");
+export async function proxy(request: NextRequest) {
+  const isAuthenticated = await isSessionAuthenticated(request);
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
@@ -11,16 +12,15 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api/upload-logs") ||
     pathname.startsWith("/api/replace-proyectos-status") ||
     pathname.startsWith("/api/replace-pm-portfolio-status") ||
-    pathname.startsWith("/api/monday");
+    pathname.startsWith("/api/monday") ||
+    pathname.startsWith("/api/actas");
 
   if (isApiRoute) {
-    if (isProtectedDataApi && authCookie?.value !== "authenticated") {
+    if (isProtectedDataApi && !isAuthenticated) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     return NextResponse.next();
   }
-
-  const isAuthenticated = authCookie?.value === "authenticated";
 
   if (isLoginPage && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard/portfolio", request.url));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { CompareField, PortfolioDiffResult } from "@/lib/portfolio-diff";
+import type { CompareField, PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
 import { fmtInt, fmtMEuros, fmtMult, fmtPct } from "@/lib/formatters";
 
 const FIELD_LABELS: Record<CompareField, string> = {

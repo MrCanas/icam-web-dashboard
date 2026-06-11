@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isIcamAuthenticated } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/auth/currentUser";
+import { writeAccessResponse } from "@/lib/auth/api-guard";
 import {
   isLikelyExcelBuffer,
   parseMaestroWorkbook,
   type MaestroParseResult,
   type ProyectoInsert,
-} from "@/lib/excel-parser";
+} from "@/modules/portfolio/data/excel-parser";
+import {
+  countProyectosUltimaFilaForDev,
+  listProyectosWithServiceRole,
+  replaceProyectos,
+} from "@/modules/portfolio/data/proyectosRepository";
+import { insertUploadLog } from "@/modules/portfolio/data/uploadLogsRepository";
 import { formatReplaceProyectosRpcError } from "@/lib/format-replace-proyectos-error";
-import { buildUploadLogDetalle, comparePortfolios, type PortfolioDiffResult } from "@/lib/portfolio-diff";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
-import type { Proyecto } from "@/lib/types";
+import { buildUploadLogDetalle, comparePortfolios, type PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
 
 function previewPayload(parsed: MaestroParseResult, archivoNombre: string) {
   return {
@@ -26,31 +31,13 @@ function previewPayload(parsed: MaestroParseResult, archivoNombre: string) {
   };
 }
 
-async function fetchProyectosWithServiceRole(): Promise<{
-  rows: Proyecto[];
-  error: string | null;
-}> {
-  try {
-    const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
-      .from("proyectos")
-      .select("*")
-      .eq("es_ultima_fila", 1)
-      .order("proyecto", { ascending: true });
-    if (error) {
-      return { rows: [], error: error.message };
-    }
-    return { rows: (data ?? []) as Proyecto[], error: null };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "No se pudo conectar a Supabase";
-    return { rows: [], error: msg };
-  }
-}
-
 export async function POST(request: NextRequest) {
-  if (!isIcamAuthenticated(request)) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = writeAccessResponse(user, "financiero");
+  if (denied) return denied;
 
   const confirm = request.nextUrl.searchParams.get("confirm") === "true";
 
@@ -89,7 +76,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!confirm) {
-    const { rows: currentRows, error: loadErr } = await fetchProyectosWithServiceRole();
+    const { rows: currentRows, error: loadErr } = await listProyectosWithServiceRole(user);
     let comparison: PortfolioDiffResult | null = null;
     let comparisonError: string | null = loadErr;
     if (!loadErr && parsed.rows.length >= 0) {
@@ -119,15 +106,8 @@ export async function POST(request: NextRequest) {
   }
 
   const started = Date.now();
-  let supabase;
-  try {
-    supabase = createServiceRoleClient();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Configuración incompleta";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
 
-  const { rows: currentBefore, error: beforeErr } = await fetchProyectosWithServiceRole();
+  const { rows: currentBefore, error: beforeErr } = await listProyectosWithServiceRole(user);
   if (beforeErr) {
     return NextResponse.json(
       { error: `No se pudo leer el portfolio actual: ${beforeErr}` },
@@ -138,9 +118,7 @@ export async function POST(request: NextRequest) {
   const diff = comparePortfolios(currentBefore, parsed.rows);
   const payload = parsed.rows.map((r) => serializeRow(r));
 
-  const { error: rpcError } = await supabase.rpc("replace_proyectos", {
-    p_rows: payload,
-  });
+  const { error: rpcError } = await replaceProyectos(user, payload);
 
   const duracion_ms = Date.now() - started;
 
@@ -148,10 +126,7 @@ export async function POST(request: NextRequest) {
     if (rpcError) {
       console.error("[upload-excel] RPC error", rpcError);
     } else {
-      const { count, error: cErr } = await supabase
-        .from("proyectos")
-        .select("*", { count: "exact", head: true })
-        .eq("es_ultima_fila", 1);
+      const { count, error: cErr } = await countProyectosUltimaFilaForDev(user);
       console.log(
         "[upload-excel] RPC ok, filas con es_ultima_fila=1:",
         count,
@@ -162,7 +137,7 @@ export async function POST(request: NextRequest) {
 
   if (rpcError) {
     const friendly = formatReplaceProyectosRpcError(rpcError.message);
-    await supabase.from("upload_logs").insert({
+    await insertUploadLog(user, {
       archivo: archivoNombre,
       num_proyectos: parsed.rows.length,
       estado: "error",
@@ -190,7 +165,7 @@ export async function POST(request: NextRequest) {
     stats: parsed.stats,
   });
 
-  await supabase.from("upload_logs").insert({
+  await insertUploadLog(user, {
     archivo: archivoNombre,
     num_proyectos: parsed.rows.length,
     estado: "completado",

@@ -1,7 +1,7 @@
 "use client";
 
 import { DataComparisonPanel } from "@/components/data/DataComparisonPanel";
-import type { PortfolioDiffResult } from "@/lib/portfolio-diff";
+import type { PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
