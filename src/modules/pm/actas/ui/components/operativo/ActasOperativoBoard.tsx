@@ -4,7 +4,6 @@ import { useMemo, useOptimistic, useState } from "react";
 
 import { ActasAddCategoryModal } from "./ActasAddCategoryModal";
 
-import { collectRootElementOptions } from "@/modules/pm/actas/logic/collect-root-elements";
 import {
   splitOperativoCategories,
 } from "@/modules/pm/actas/logic/operativo-done-filter";
@@ -22,6 +21,7 @@ import { ActasBulkSelectionBar } from "./ActasBulkSelectionBar";
 import { ActasLogEntryUndoProvider } from "./ActasLogEntryUndoContext";
 import { ActasOperativoSelectionProvider } from "./ActasOperativoSelectionContext";
 import { ActasOperativoDndProvider } from "./ActasOperativoDndContext";
+import { ActasInlineCreateProvider } from "./ActasInlineCreateContext";
 
 type ActasOperativoBoardProps = {
   categories: ActasOperativoCategory[];
@@ -64,17 +64,6 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     [optimisticCategories, statusOverrides],
   );
 
-  const parentOptions = useMemo(
-    () =>
-      collectRootElementOptions(
-        splitCategories.map((split) => ({
-          ...split.category,
-          elements: split.activeElements,
-        })),
-      ),
-    [splitCategories],
-  );
-
   const handleStatusOverride = (elementId: string, status: ElementStatus) => {
     setStatusOverrides((prev) => ({ ...prev, [elementId]: status }));
   };
@@ -111,8 +100,6 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
             category={{ ...split.category, elements: split.activeElements }}
             allCategories={optimisticCategories}
             completedElements={split.completedElements}
-            categories={optimisticCategories}
-            parentOptions={parentOptions}
             projectCode={projectCode}
             currentAuthUserId={currentAuthUserId}
             isPmAdmin={isPmAdmin}
@@ -189,5 +176,9 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     board
   );
 
-  return <ActasLogEntryUndoProvider>{wrapped}</ActasLogEntryUndoProvider>;
+  return (
+    <ActasLogEntryUndoProvider>
+      <ActasInlineCreateProvider>{wrapped}</ActasInlineCreateProvider>
+    </ActasLogEntryUndoProvider>
+  );
 }

@@ -170,6 +170,8 @@ export function splitOperativoCategories(
     .map((category) => splitOperativoCategory(category, statusOverrides))
     .filter(
       (split) =>
-        split.activeElements.length > 0 || split.completedElements.length > 0,
+        split.activeElements.length > 0 ||
+        split.completedElements.length > 0 ||
+        (split.category.archivedElements?.length ?? 0) > 0,
     );
 }

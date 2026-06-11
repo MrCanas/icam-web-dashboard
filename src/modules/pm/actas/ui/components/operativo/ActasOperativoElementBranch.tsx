@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { childContainerKey, rootContainerKey } from "@/modules/pm/actas/logic/operativo-dnd";
 import { findOperativoElementInCategories } from "@/modules/pm/actas/logic/find-operativo-element";
 import type {
@@ -12,6 +10,7 @@ import type {
 
 import { ActasElementRow } from "./ActasElementRow";
 import { ActasOperativoElementContainer } from "./ActasOperativoElementContainer";
+import { useSubelementCollapse } from "./useSubelementCollapse";
 import {
   OperativoElementSortableList,
   useOperativoDnd,
@@ -62,7 +61,9 @@ export function ActasOperativoElementBranch({
   const directChildCount = rawElement.children.length;
   const hasDirectChildren =
     rawElement.canHaveSubelements && directChildCount > 0;
-  const [childrenExpanded, setChildrenExpanded] = useState(true);
+  const [childrenExpanded, setChildrenExpanded] = useSubelementCollapse(
+    element.id,
+  );
 
   return (
     <ActasOperativoSortableElement

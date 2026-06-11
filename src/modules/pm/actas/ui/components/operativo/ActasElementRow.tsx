@@ -1,9 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
+import { createSubelement } from "@/modules/pm/actas/actions/create-subelement";
 import { countElementDescendants } from "@/modules/pm/actas/logic/count-element-descendants";
+import {
+  DEFAULT_SUBELEMENT_NAME,
+  nextDefaultName,
+} from "@/modules/pm/actas/logic/default-element-name";
 import {
   OPERATIVO_ROW_GRID,
   OPERATIVO_ROW_GRID_WITH_SELECTION,
@@ -13,8 +18,9 @@ import type { ActasLogEntryItem, ActasOperativoElement, ElementStatus } from "@/
 
 import { ActasElementSelectCheckbox } from "./ActasElementSelectCheckbox";
 import { useOperativoSelection } from "./ActasOperativoSelectionContext";
+import { useInlineCreate } from "./ActasInlineCreateContext";
+import { useSubelementCollapse } from "./useSubelementCollapse";
 import { ActasAddLogEntryPanel } from "./ActasAddLogEntryPanel";
-import { ActasAddSubelementPanel } from "./ActasAddSubelementPanel";
 import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementInlineHistory } from "./ActasElementInlineHistory";
 import { ActasElementQuickActions } from "./ActasElementQuickActions";
@@ -72,6 +78,8 @@ export function ActasElementRow({
 }: ActasElementRowProps) {
   const router = useRouter();
   const selection = useOperativoSelection();
+  const inlineCreate = useInlineCreate();
+  const [subPending, startSubTransition] = useTransition();
   const showSelectionColumn =
     Boolean(selection?.enabled) && hasWriteAccess && !readOnly;
   const rowGrid = showSelectionColumn
@@ -79,7 +87,6 @@ export function ActasElementRow({
     : OPERATIVO_ROW_GRID;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [subOpen, setSubOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [historyReloadNonce, setHistoryReloadNonce] = useState(0);
   const [displayStatus, setDisplayStatus] = useState<ElementStatus>(
@@ -148,12 +155,13 @@ export function ActasElementRow({
   const directChildCount = directChildCountProp ?? element.children.length;
   const hasDirectChildren =
     !isSubElement && element.canHaveSubelements && directChildCount > 0;
-  const [childrenExpandedLocal, setChildrenExpandedLocal] = useState(true);
+  const [childrenExpandedLocal, setChildrenExpandedLocal] =
+    useSubelementCollapse(element.id);
   const childrenExpanded = childrenExpandedProp ?? childrenExpandedLocal;
   const setChildrenExpanded =
     onChildrenExpandedChange ?? setChildrenExpandedLocal;
   const descendantCount = countElementDescendants(element);
-  const expanded = historyOpen || addOpen || subOpen;
+  const expanded = historyOpen || addOpen;
   const renderChildrenInline = dragHandle == null;
 
   const handleStatusChange = (
@@ -173,8 +181,29 @@ export function ActasElementRow({
   };
 
   const handleRowToggle = () => {
-    if (addOpen || subOpen) return;
+    if (addOpen) return;
     setHistoryOpen((v) => !v);
+  };
+
+  const handleAddSubelement = () => {
+    if (subPending) return;
+    const name = nextDefaultName(
+      DEFAULT_SUBELEMENT_NAME,
+      element.children.map((c) => c.name),
+    );
+    setChildrenExpanded(true);
+    startSubTransition(async () => {
+      const result = await createSubelement({
+        parentElementId: element.id,
+        name,
+      });
+      if (!result.ok) {
+        onToast?.(result.error || "No se pudo guardar el cambio");
+        return;
+      }
+      inlineCreate?.requestAutoEdit(result.elementId);
+      router.refresh();
+    });
   };
 
   const syncLastFromHistory = (latest: ActasLogEntryItem | null) => {
@@ -223,12 +252,10 @@ export function ActasElementRow({
                 onAddEntry={(e) => {
                   e.stopPropagation();
                   setAddOpen(true);
-                  setSubOpen(false);
                 }}
                 onAddSubelement={(e) => {
                   e.stopPropagation();
-                  setSubOpen(true);
-                  setAddOpen(false);
+                  handleAddSubelement();
                 }}
                 onDelete={(e) => {
                   e.stopPropagation();
@@ -369,18 +396,6 @@ export function ActasElementRow({
             setDisplayStatus(elementStatus);
             setHistoryReloadNonce((n) => n + 1);
             setHistoryOpen(true);
-          }}
-        />
-      ) : null}
-
-      {!readOnly && subOpen && element.canHaveSubelements ? (
-        <ActasAddSubelementPanel
-          parentElementId={element.id}
-          indentPx={rowIndent + 8}
-          onCancel={() => setSubOpen(false)}
-          onCreated={() => {
-            setSubOpen(false);
-            router.refresh();
           }}
         />
       ) : null}

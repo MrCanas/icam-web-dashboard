@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 
+import { createElement } from "@/modules/pm/actas/actions/create-element";
 import {
   OPERATIVO_BOARD_MIN_WIDTH_PX,
   OPERATIVO_BOARD_MIN_WIDTH_WITH_SELECTION_PX,
 } from "@/modules/pm/actas/logic/element-display";
+import {
+  DEFAULT_ELEMENT_NAME,
+  nextDefaultName,
+} from "@/modules/pm/actas/logic/default-element-name";
 import { getCategoryGroupStyle } from "@/modules/pm/actas/logic/category-group-style";
 import type {
   ActasOperativoCategory,
@@ -13,12 +19,12 @@ import type {
 } from "@/modules/pm/actas/types";
 import type { ActasDoneElementRef } from "@/modules/pm/actas/logic/operativo-done-filter";
 
-import type { ActasRootElementOption } from "@/modules/pm/actas/logic/collect-root-elements";
 import type { OperativoOptimisticAction } from "@/modules/pm/actas/logic/operativo-optimistic";
 
-import { ActasAddElementModal } from "./ActasAddElementModal";
+import { ActasArchivedElementsSection } from "./ActasArchivedElementsSection";
 import { ActasCategoryNameCell } from "./ActasCategoryNameCell";
 import { ActasElementRow } from "./ActasElementRow";
+import { useInlineCreate } from "./ActasInlineCreateContext";
 import { OperativoCategoryRootList } from "./ActasOperativoElementBranch";
 import { ActasOperativoColumnHeader } from "./ActasOperativoColumnHeader";
 
@@ -26,8 +32,6 @@ interface ActasCategoryGroupProps {
   category: ActasOperativoCategory;
   allCategories: ActasOperativoCategory[];
   completedElements?: ActasDoneElementRef[];
-  categories: ActasOperativoCategory[];
-  parentOptions: ActasRootElementOption[];
   projectCode: string;
   currentAuthUserId: string | null;
   isPmAdmin?: boolean;
@@ -60,8 +64,6 @@ export function ActasCategoryGroup({
   category,
   allCategories,
   completedElements = [],
-  categories,
-  parentOptions,
   projectCode,
   currentAuthUserId,
   isPmAdmin = false,
@@ -74,9 +76,11 @@ export function ActasCategoryGroup({
   onToast,
   onOptimisticAction,
 }: ActasCategoryGroupProps) {
+  const router = useRouter();
+  const inlineCreate = useInlineCreate();
+  const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [completedExpanded, setCompletedExpanded] = useState(false);
-  const [addElementOpen, setAddElementOpen] = useState(false);
   const [categoryName, setCategoryName] = useState(category.name);
   const [categoryDisplayName, setCategoryDisplayName] = useState(
     category.displayName,
@@ -92,6 +96,31 @@ export function ActasCategoryGroup({
     setCategoryName(category.name);
     setCategoryDisplayName(category.displayName);
   }, [category.name, category.displayName]);
+
+  const handleAddElement = () => {
+    if (pending) return;
+    const name = nextDefaultName(
+      DEFAULT_ELEMENT_NAME,
+      category.elements.map((e) => e.name),
+    );
+    setExpanded(true);
+    startTransition(async () => {
+      const result = await createElement({ categoryId: category.id, name });
+      if (!result.ok) {
+        onToast?.(result.error || "No se pudo guardar el cambio");
+        return;
+      }
+      onOptimisticAction?.({
+        type: "addElement",
+        categoryId: category.id,
+        parentElementId: null,
+        elementId: result.elementId,
+        name,
+      });
+      inlineCreate?.requestAutoEdit(result.elementId);
+      router.refresh();
+    });
+  };
 
   return (
     <section className="rounded-md overflow-hidden border border-subtle/50 shadow-sm">
@@ -194,31 +223,29 @@ export function ActasCategoryGroup({
             </div>
           ) : null}
 
+          {!readOnly && hasWriteAccess &&
+          (category.archivedElements?.length ?? 0) > 0 ? (
+            <ActasArchivedElementsSection
+              archivedElements={category.archivedElements!}
+              onToast={onToast}
+            />
+          ) : null}
+
           {!readOnly && hasWriteAccess ? (
             <button
               type="button"
-              className="flex w-full items-center gap-2 border-t border-subtle/40 px-4 py-2.5 text-sm text-icam-900/80 hover:bg-icam-900/5 transition-colors"
-              onClick={() => setAddElementOpen(true)}
+              disabled={pending}
+              className="flex w-full items-center gap-2 border-t border-subtle/40 px-4 py-2.5 text-sm text-icam-900/80 hover:bg-icam-900/5 transition-colors disabled:opacity-50"
+              onClick={handleAddElement}
             >
               <span className="text-lg leading-none font-light" aria-hidden>
                 +
               </span>
-              Añadir elemento
+              {pending ? "Añadiendo…" : "Añadir elemento"}
             </button>
           ) : null}
           </div>
         </div>
-      ) : null}
-
-      {!readOnly && hasWriteAccess ? (
-        <ActasAddElementModal
-          open={addElementOpen}
-          defaultCategoryId={category.id}
-          categories={categories}
-          parentOptions={parentOptions}
-          onClose={() => setAddElementOpen(false)}
-          onOptimisticAction={onOptimisticAction}
-        />
       ) : null}
     </section>
   );

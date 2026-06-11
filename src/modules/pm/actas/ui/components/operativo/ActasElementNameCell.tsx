@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { updateElementName } from "@/modules/pm/actas/actions/update-element-name";
 
+import { useInlineCreate } from "./ActasInlineCreateContext";
+
 interface ActasElementNameCellProps {
   elementId: string;
   name: string;
@@ -25,6 +27,8 @@ export function ActasElementNameCell({
   onError,
 }: ActasElementNameCellProps) {
   const router = useRouter();
+  const inlineCreate = useInlineCreate();
+  const autoEditId = inlineCreate?.autoEditId ?? null;
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -36,6 +40,17 @@ export function ActasElementNameCell({
   useEffect(() => {
     if (!editing) setDraft(name);
   }, [name, editing]);
+
+  // Auto-edición tras creación inline: la fila recién creada abre su nombre en
+  // modo edición con el texto seleccionado. Solo es estado de UI (no escribe).
+  useEffect(() => {
+    if (!canEdit || autoEditId !== elementId) return;
+    inlineCreate?.consumeAutoEdit(elementId);
+    setDraft(name);
+    setError(null);
+    setEditing(true);
+    requestAnimationFrame(() => inputRef.current?.select());
+  }, [autoEditId, elementId, canEdit, name, inlineCreate]);
 
   const startEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
