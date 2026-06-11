@@ -317,7 +317,7 @@ export async function fetchActasProjectOperativo(
   const { data: elRows, error: elErr } = await supabase
     .from("element")
     .select(
-      "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end",
+      "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end, progress",
     )
     .in("category_id", categoryIds)
     .is("archived_at", null)
@@ -329,6 +329,23 @@ export async function fetchActasProjectOperativo(
 
   const allElements = elRows ?? [];
   const elementIds = allElements.map((el) => el.id as string);
+
+  // Recuento de adjuntos por elemento. No fatal: si la tabla aún no existe
+  // (migración 014 sin aplicar) seguimos con 0 para no romper el tablero.
+  const attachmentCountByElement = new Map<string, number>();
+  if (elementIds.length > 0) {
+    const { data: attachmentRows } = await supabase
+      .from("actas_attachment")
+      .select("element_id")
+      .in("element_id", elementIds);
+    for (const row of attachmentRows ?? []) {
+      const eid = row.element_id as string;
+      attachmentCountByElement.set(
+        eid,
+        (attachmentCountByElement.get(eid) ?? 0) + 1,
+      );
+    }
+  }
 
   // Elementos archivados (soft-delete) por categoría → sección "Archivados".
   const { data: archivedRows, error: archErr } = await supabase
@@ -472,6 +489,8 @@ export async function fetchActasProjectOperativo(
         parentElementId,
         canHaveSubelements: parentElementId === null,
         owners,
+        progress: (el.progress as number | null) ?? 0,
+        attachmentCount: attachmentCountByElement.get(eid) ?? 0,
         timelineStart: (el.timeline_start as string | null) ?? null,
         timelineEnd: (el.timeline_end as string | null) ?? null,
         lastEntryContent: lastLog?.content ?? null,

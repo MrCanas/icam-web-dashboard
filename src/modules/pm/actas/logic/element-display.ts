@@ -30,17 +30,31 @@ export function formatTimelineRange(
 }
 
 /** Ancho mínimo del tablero (scroll horizontal en pantallas estrechas). */
-export const OPERATIVO_BOARD_MIN_WIDTH_PX = 780;
+export const OPERATIVO_BOARD_MIN_WIDTH_PX = 960;
 
 export const OPERATIVO_BOARD_MIN_WIDTH_WITH_SELECTION_PX =
   OPERATIVO_BOARD_MIN_WIDTH_PX + 28;
 
 /**
- * Grid compacto: elemento (+ acciones hover), owner, status, plazo, última entrada, actualizado.
+ * Plantilla de columnas del tablero, definida UNA vez y compartida por la
+ * cabecera y por cada fila vía `style={{ gridTemplateColumns }}` → imposible
+ * que diverjan (y sin depender del JIT de Tailwind para valores arbitrarios).
+ *
+ * Orden visual: [controles: grip + acciones + chevron/contador]
+ * [nombre ELEMENTO + iconos] [owner] [status] [avance] [plazo]
+ * [última entrada] [actualizado]. La columna de controles es de ancho fijo para
+ * que el NOMBRE (y el título "ELEMENTO") empiece en la misma posición en todas
+ * las filas.
  */
-export const OPERATIVO_ROW_GRID =
-  "grid grid-cols-[minmax(200px,1.4fr)_56px_88px_minmax(120px,0.9fr)_minmax(120px,1fr)_72px] gap-x-2 items-center";
+export const OPERATIVO_GRID_BASE_CLASS = "grid gap-x-2 items-center";
 
-/** Tablero operativo con columna de selección múltiple. */
-export const OPERATIVO_ROW_GRID_WITH_SELECTION =
-  "grid grid-cols-[28px_minmax(200px,1.4fr)_56px_88px_minmax(120px,0.9fr)_minmax(120px,1fr)_72px] gap-x-2 items-center";
+export const OPERATIVO_GRID_TEMPLATE =
+  "164px minmax(160px,1.3fr) 56px 88px 120px minmax(120px,0.9fr) minmax(120px,1fr) 72px";
+
+export const OPERATIVO_GRID_TEMPLATE_WITH_SELECTION = `28px ${OPERATIVO_GRID_TEMPLATE}`;
+
+export function operativoGridTemplate(showSelectionColumn: boolean): string {
+  return showSelectionColumn
+    ? OPERATIVO_GRID_TEMPLATE_WITH_SELECTION
+    : OPERATIVO_GRID_TEMPLATE;
+}

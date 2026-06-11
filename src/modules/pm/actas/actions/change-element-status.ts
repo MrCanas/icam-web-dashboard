@@ -136,6 +136,15 @@ export async function changeElementStatus(
     return { ok: false, error: insertError?.message ?? "Error al insertar" };
   }
 
+  // Marca/limpia completed_at según el nuevo estado (P4: ciclo "Hecho").
+  // El estado de element lo sincroniza el trigger desde el log_entry; aquí solo
+  // gestionamos la marca temporal. Es secundaria: si falla (p.ej. columna aún
+  // no migrada) no rompemos el cambio de estado ya realizado.
+  await client
+    .from("element")
+    .update({ completed_at: newStatus === "done" ? entryDate : null })
+    .eq("id", elementId);
+
   const userDisplayMap = await resolveUserDisplayMap([authorId]);
   const mapped = mapLogEntryRow(row as LogEntryRow, userDisplayMap);
   const entry: ActasLogEntryItem = {

@@ -233,6 +233,34 @@ export function ActasOwnerPicker({
     }
   };
 
+  const clearAllOwners = async () => {
+    if (!canAssign || owners.length === 0) return;
+    const previous = owners;
+    const ids = owners.map((o) => o.userId);
+    setPendingUserIds((s) => {
+      const n = new Set(s);
+      ids.forEach((id) => n.add(id));
+      return n;
+    });
+    onOwnersChange([]);
+
+    const results = await Promise.all(
+      ids.map((userId) => removeElementOwner({ elementId, userId })),
+    );
+
+    setPendingUserIds((s) => {
+      const n = new Set(s);
+      ids.forEach((id) => n.delete(id));
+      return n;
+    });
+
+    const failed = results.find((r) => !r.ok);
+    if (failed && !failed.ok) {
+      onOwnersChange(previous);
+      onError(failed.error);
+    }
+  };
+
   const removeCurrentOwner = async (owner: ActasElementOwner) => {
     if (!canAssign || pendingUserIds.has(owner.userId)) return;
     const previous = owners;
@@ -347,7 +375,7 @@ export function ActasOwnerPicker({
 
               <div className="p-3 space-y-2">
                 <label htmlFor={inputId} className="sr-only">
-                  Buscar usuario PM
+                  Buscar usuario
                 </label>
                 <input
                   id={inputId}
@@ -359,11 +387,25 @@ export function ActasOwnerPicker({
                   onChange={(e) => setQuery(e.target.value)}
                 />
 
+                {canAssign ? (
+                  <button
+                    type="button"
+                    disabled={owners.length === 0}
+                    onClick={() => void clearAllOwners()}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-text-muted hover:bg-page disabled:opacity-40"
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-subtle text-[10px]">
+                      —
+                    </span>
+                    Sin asignar
+                  </button>
+                ) : null}
+
                 {loadingUsers ? (
                   <p className="py-2 text-xs text-text-muted">Cargando…</p>
                 ) : users.length === 0 ? (
                   <p className="py-2 text-xs text-text-muted leading-snug">
-                    Sin coincidencias entre usuarios con acceso a PM.
+                    Sin coincidencias.
                   </p>
                 ) : (
                   <ul className="max-h-52 overflow-y-auto -mx-1">

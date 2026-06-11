@@ -77,6 +77,10 @@ export interface ActasOperativoElement {
   /** Raíz de árbol: puede tener sub-elementos (botón + Sub-elemento). */
   canHaveSubelements: boolean;
   owners: ActasElementOwner[];
+  /** Avance 0–100 (%); opcional fuera del tablero live (default 0). */
+  progress?: number;
+  /** Nº de adjuntos (imágenes); opcional, default 0. */
+  attachmentCount?: number;
   timelineStart: string | null;
   timelineEnd: string | null;
   lastEntryContent: string | null;

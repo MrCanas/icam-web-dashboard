@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useOptimistic, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 
+import { deleteCategory } from "@/modules/pm/actas/actions/delete-category";
 import {
   splitOperativoCategories,
 } from "@/modules/pm/actas/logic/operativo-done-filter";
@@ -46,6 +48,8 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
   } = props;
   const asOfDate = mode === "historical" ? props.asOfDate : undefined;
   const readOnly = mode === "historical";
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [statusOverrides, setStatusOverrides] = useState<
     Record<string, ElementStatus>
   >({});
@@ -68,6 +72,19 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
 
   const handleOptimisticAction = (action: OperativoOptimisticAction) => {
     applyOptimisticCategories(action);
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    startTransition(async () => {
+      applyOptimisticCategories({ type: "removeCategory", categoryId });
+      const result = await deleteCategory(categoryId);
+      if (!result.ok) {
+        // Sin refresh → el estado optimista revierte al terminar la transición.
+        showToast(result.error || "No se pudo eliminar el grupo");
+        return;
+      }
+      router.refresh();
+    });
   };
 
   const showToast = (message: string) => {
@@ -108,6 +125,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
             onElementArchived={readOnly ? undefined : showToast}
             onToast={readOnly ? undefined : showToast}
             onOptimisticAction={readOnly ? undefined : handleOptimisticAction}
+            onDeleteCategory={readOnly ? undefined : handleDeleteCategory}
           />
         ))
       )}

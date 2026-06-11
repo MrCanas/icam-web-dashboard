@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -66,6 +67,16 @@ export function ActasOperativoSelectionProvider({
     (elementId: string) => selectedIds.has(elementId),
     [selectedIds],
   );
+
+  // Escape limpia la selección (suscripción a evento; no es estado derivado).
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clearAll();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedIds.size, clearAll]);
 
   const applyStatusLive = useCallback(
     (elementIds: string[], status: ElementStatus) => {

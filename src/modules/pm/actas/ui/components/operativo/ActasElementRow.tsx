@@ -10,8 +10,8 @@ import {
   nextDefaultName,
 } from "@/modules/pm/actas/logic/default-element-name";
 import {
-  OPERATIVO_ROW_GRID,
-  OPERATIVO_ROW_GRID_WITH_SELECTION,
+  OPERATIVO_GRID_BASE_CLASS,
+  operativoGridTemplate,
 } from "@/modules/pm/actas/logic/element-display";
 import { formatRelativeEntryDate } from "@/modules/pm/actas/logic/actas-time";
 import type { ActasLogEntryItem, ActasOperativoElement, ElementStatus } from "@/modules/pm/actas/types";
@@ -20,6 +20,8 @@ import { ActasElementSelectCheckbox } from "./ActasElementSelectCheckbox";
 import { useOperativoSelection } from "./ActasOperativoSelectionContext";
 import { useInlineCreate } from "./ActasInlineCreateContext";
 import { useSubelementCollapse } from "./useSubelementCollapse";
+import { ActasAttachmentsButton } from "./ActasAttachmentsButton";
+import { ActasAttachmentsSection } from "./ActasAttachmentsSection";
 import { ActasAddLogEntryPanel } from "./ActasAddLogEntryPanel";
 import { ActasArchiveElementModal } from "./ActasArchiveElementModal";
 import { ActasElementInlineHistory } from "./ActasElementInlineHistory";
@@ -27,6 +29,7 @@ import { ActasElementQuickActions } from "./ActasElementQuickActions";
 import { ActasElementNameCell } from "./ActasElementNameCell";
 import { ActasLastEntryCell } from "./ActasLastEntryCell";
 import { ActasOwnerPicker } from "./ActasOwnerPicker";
+import { ActasProgressCell } from "./ActasProgressCell";
 import { ActasStatusPicker } from "./ActasStatusPicker";
 import { ActasElementNotificationBell } from "./ActasElementNotificationBell";
 import { ActasTimelinePicker } from "./ActasTimelinePicker";
@@ -82,9 +85,6 @@ export function ActasElementRow({
   const [subPending, startSubTransition] = useTransition();
   const showSelectionColumn =
     Boolean(selection?.enabled) && hasWriteAccess && !readOnly;
-  const rowGrid = showSelectionColumn
-    ? OPERATIVO_ROW_GRID_WITH_SELECTION
-    : OPERATIVO_ROW_GRID;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -107,6 +107,11 @@ export function ActasElementRow({
   );
   const [displayName, setDisplayName] = useState(element.name);
   const [owners, setOwners] = useState(element.owners);
+  const [progress, setProgress] = useState(element.progress ?? 0);
+  const [attachmentCount, setAttachmentCount] = useState(
+    element.attachmentCount ?? 0,
+  );
+  const [attachmentNonce, setAttachmentNonce] = useState(0);
   const [timelineStart, setTimelineStart] = useState<string | null>(
     element.timelineStart,
   );
@@ -125,6 +130,12 @@ export function ActasElementRow({
   useEffect(() => {
     setOwners(element.owners);
   }, [element.owners]);
+  useEffect(() => {
+    setProgress(element.progress ?? 0);
+  }, [element.progress]);
+  useEffect(() => {
+    setAttachmentCount(element.attachmentCount ?? 0);
+  }, [element.attachmentCount]);
   useEffect(() => {
     setTimelineStart(element.timelineStart);
     setTimelineEnd(element.timelineEnd);
@@ -227,11 +238,12 @@ export function ActasElementRow({
               handleRowToggle();
             }
           }}
-          className={`group/row ${rowGrid} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
+          className={`group/row ${OPERATIVO_GRID_BASE_CLASS} px-3 py-1.5 min-h-9 transition-colors cursor-pointer ${
             isSubElement
               ? "bg-page/30 hover:bg-page/50"
               : "bg-card hover:bg-page/60"
           } ${showAsCompleted ? "opacity-60" : ""} ${expanded ? "bg-page/40" : ""} ${historyOpen ? "bg-page/50" : ""}`}
+          style={{ gridTemplateColumns: operativoGridTemplate(showSelectionColumn) }}
           aria-expanded={historyOpen}
         >
           {showSelectionColumn ? (
@@ -239,12 +251,7 @@ export function ActasElementRow({
               <ActasElementSelectCheckbox elementId={element.id} />
             </div>
           ) : null}
-          <div
-            className={`flex min-w-0 items-center gap-1 ${
-              isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
-            }`}
-            style={{ paddingLeft: rowIndent }}
-          >
+          <div className="flex items-center gap-1 self-center overflow-hidden">
             {dragHandle}
             {!readOnly ? (
               <ActasElementQuickActions
@@ -305,6 +312,14 @@ export function ActasElementRow({
                 {directChildCount}
               </span>
             ) : null}
+          </div>
+
+          <div
+            className={`flex min-w-0 items-center gap-1 ${
+              isSubElement ? "border-l-2 border-icam-900/20 pl-1.5" : ""
+            }`}
+            style={{ paddingLeft: rowIndent }}
+          >
             {showAsCompleted ? (
               <span className="shrink-0 rounded bg-emerald-600/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
                 Completado
@@ -324,6 +339,17 @@ export function ActasElementRow({
               readOnly={readOnly}
               onError={(msg) => onToast?.(msg)}
             />
+            {!readOnly && hasWriteAccess ? (
+              <ActasAttachmentsButton
+                elementId={element.id}
+                count={attachmentCount}
+                onUploaded={() => {
+                  setHistoryOpen(true);
+                  setAttachmentNonce((n) => n + 1);
+                }}
+                onError={(msg) => onToast?.(msg)}
+              />
+            ) : null}
           </div>
 
           <ActasOwnerPicker
@@ -341,6 +367,15 @@ export function ActasElementRow({
             status={rowStatus}
             readOnly={readOnly}
             onStatusChange={handleStatusChange}
+            onError={(msg) => onToast?.(msg)}
+          />
+
+          <ActasProgressCell
+            elementId={element.id}
+            progress={readOnly ? (element.progress ?? 0) : progress}
+            readOnly={readOnly}
+            hasWriteAccess={hasWriteAccess && !readOnly}
+            onProgressChange={setProgress}
             onError={(msg) => onToast?.(msg)}
           />
 
@@ -397,6 +432,18 @@ export function ActasElementRow({
             setHistoryReloadNonce((n) => n + 1);
             setHistoryOpen(true);
           }}
+        />
+      ) : null}
+
+      {historyOpen ? (
+        <ActasAttachmentsSection
+          elementId={element.id}
+          indentPx={rowIndent + (isSubElement ? 8 : 0)}
+          hasWriteAccess={hasWriteAccess && !readOnly}
+          readOnly={readOnly}
+          reloadNonce={attachmentNonce}
+          onCountChange={setAttachmentCount}
+          onError={(msg) => onToast?.(msg)}
         />
       ) : null}
 
