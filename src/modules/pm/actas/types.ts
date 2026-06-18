@@ -45,9 +45,19 @@ export const ACTAS_PROJECT_TABS: { key: ActasProjectTab; label: string }[] = [
   { key: "ajustes", label: "Ajustes" },
 ];
 
+/** Responsable (owner) de un proyecto, resuelto para mostrar avatar + nombre. */
+export interface ActasProjectOwner {
+  userId: string;
+  email: string | null;
+  /** Nombre para mostrar (metadata.name o parte local del email). */
+  displayName: string;
+  /** Iniciales para el avatar. */
+  initials: string;
+}
+
 export interface ActasProjectDetail extends ActasProjectListItem {
-  /** Email of the principal owner, null if not set. */
-  ownerEmail: string | null;
+  /** Responsable del proyecto, null si no hay (Sin responsable). */
+  owner: ActasProjectOwner | null;
   /** ISO date string of the latest log_entry.entry_date, null if no entries. */
   lastLogEntryAt: string | null;
   /** Count of active (non-archived) elements. */

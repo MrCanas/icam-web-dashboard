@@ -17,12 +17,16 @@ export function ActasOperativoColumnHeader({
       {/* Columna de controles (grip / acciones / chevron): sin etiqueta. */}
       <span aria-hidden />
       <span>Elemento</span>
-      <span className="text-center">Owner</span>
-      <span className="text-center">Status</span>
+      {/* Cada título se alinea igual que su contenido dentro de la columna:
+          OWNER/STATUS/PLAZO/ACTUALIZADO a la izquierda (avatar, píldora con
+          justify-self-start, plazo text-left y fecha relativa pegan a la izq.);
+          AVANCE centrado porque la barra de progreso ocupa toda la columna. */}
+      <span>Owner</span>
+      <span>Status</span>
       <span className="text-center">Avance</span>
-      <span className="text-center">Plazo</span>
+      <span>Plazo</span>
       <span>Última entrada</span>
-      <span className="text-center">Actualizado</span>
+      <span>Actualizado</span>
     </div>
   );
 }
