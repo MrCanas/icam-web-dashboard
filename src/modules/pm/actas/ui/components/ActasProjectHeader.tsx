@@ -2,11 +2,18 @@ import { daysSince, formatLastActivity } from "@/modules/pm/actas/logic/actas-ti
 import { projectPhaseLabel } from "@/modules/pm/actas/logic/project-phase";
 import type { ActasProjectDetail } from "@/modules/pm/actas/types";
 
+import { ActasProjectOwnerPicker } from "./ActasProjectOwnerPicker";
+
 interface ActasProjectHeaderProps {
   project: ActasProjectDetail;
+  /** true si el usuario puede modificar el responsable (editor de la zona pm). */
+  canEditOwner: boolean;
 }
 
-export function ActasProjectHeader({ project }: ActasProjectHeaderProps) {
+export function ActasProjectHeader({
+  project,
+  canEditOwner,
+}: ActasProjectHeaderProps) {
   const days = daysSince(project.lastLogEntryAt);
   const activityLabel = formatLastActivity(days);
 
@@ -25,20 +32,16 @@ export function ActasProjectHeader({ project }: ActasProjectHeaderProps) {
           <h2 className="mt-0.5 text-lg font-semibold text-text-primary leading-snug">
             {project.name}
           </h2>
+          <div className="mt-2">
+            <ActasProjectOwnerPicker
+              projectId={project.id}
+              owner={project.owner}
+              canEdit={canEditOwner}
+            />
+          </div>
         </div>
 
         <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm shrink-0">
-          {project.ownerEmail ? (
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-                Owner
-              </dt>
-              <dd className="text-text-body truncate max-w-[180px]" title={project.ownerEmail}>
-                {project.ownerEmail}
-              </dd>
-            </div>
-          ) : null}
-
           <div className="flex flex-col gap-0.5">
             <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
               Última actividad
