@@ -17,6 +17,9 @@ export interface Proyecto {
   bcr: number | null;
   ubicacion: string | null;
   equity: number | null;
+  entry_yield: number | null;
+  exit_yield: number | null;
+  credito_total: number | null;
   holding_period: number | null;
   superficie_edificable: number | null;
   es_ultima_fila: number;
@@ -29,9 +32,9 @@ export interface KPIBundle {
   nActivos: number;
   nCulminados: number;
   inversionTotal: number;
-  /** Suma de equity gestionado (col AY) de los proyectos activos ("En Marcha"). */
+  /** Suma de equity gestionado (col AY) del conjunto de proyectos evaluado (respeta filtros). */
   fondosPropiosTotales: number;
-  /** Media del equity gestionado entre proyectos activos con equity > 0. */
+  /** Media del equity gestionado entre proyectos con equity > 0 del conjunto evaluado. */
   fondosPropiosMedia: number;
   gdvTotal: number;
   beneficioTotal: number;

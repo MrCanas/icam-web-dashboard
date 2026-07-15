@@ -222,7 +222,7 @@ export default async function PortfolioExecutivePage({ searchParams }: Dashboard
 
           value={fmtMEuros(view.kpis.fondosPropiosTotales)}
 
-          subtitle={`Equity activos · Media: ${fmtMEuros(view.kpis.fondosPropiosMedia)}`}
+          subtitle={`Equity gestionado · Media: ${fmtMEuros(view.kpis.fondosPropiosMedia)}`}
 
         />
 

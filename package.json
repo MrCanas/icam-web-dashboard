@@ -35,6 +35,7 @@
     "actas:send-test-alert": "tsx scripts/actas/send-test-alert.ts",
     "actas:test-migration-resolve": "tsx --test scripts/actas/lib/__tests__/migration-resolve.test.ts",
     "portfolio:check-sharepoint": "tsx scripts/portfolio/check-sharepoint.ts",
+    "portfolio:sync-maestro": "tsx scripts/portfolio/sync-local-maestro.ts",
     "auth:seed-hardcoded": "tsx scripts/auth/seed-hardcoded-users.ts",
     "auth:grant": "tsx scripts/auth/grant-zone-role.ts",
     "auth:test-login": "tsx scripts/auth/test-login.ts"
