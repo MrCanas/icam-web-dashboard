@@ -38,11 +38,10 @@ export function computeKPIs(data: Proyecto[]): KPIBundle {
     .map((item) => toNumber(item.unidades_totales))
     .filter((value) => value > 0);
 
-  const activos = data.filter((item) => item.situacion === "En Marcha");
-  const equityActivosValues = activos
+  const equityValues = data
     .map((item) => toNumber(item.equity))
     .filter((value) => value > 0);
-  const fondosPropiosTotales = activos.reduce((acc, item) => acc + toNumber(item.equity), 0);
+  const fondosPropiosTotales = data.reduce((acc, item) => acc + toNumber(item.equity), 0);
 
   const inversionTotal = data.reduce((acc, item) => acc + toNumber(item.inversion_total), 0);
   const gdvTotal = data.reduce((acc, item) => acc + toNumber(item.total_ingresos_venta), 0);
@@ -71,7 +70,7 @@ export function computeKPIs(data: Proyecto[]): KPIBundle {
     nCulminados,
     inversionTotal,
     fondosPropiosTotales,
-    fondosPropiosMedia: mean(equityActivosValues),
+    fondosPropiosMedia: mean(equityValues),
     gdvTotal,
     beneficioTotal,
     margenPct: inversionTotal > 0 ? beneficioTotal / inversionTotal : 0,

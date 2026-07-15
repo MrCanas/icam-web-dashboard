@@ -1,6 +1,11 @@
 import { Proyecto } from "@/modules/portfolio/types";
 
-const seedBase: Array<Omit<Proyecto, "fecha_inicio" | "tipo_proyecto"> & { tipo_proyecto: string }> = [
+const seedBase: Array<
+  Omit<
+    Proyecto,
+    "fecha_inicio" | "tipo_proyecto" | "entry_yield" | "exit_yield" | "credito_total"
+  > & { tipo_proyecto: string }
+> = [
   { id: 1, proyecto: "BA49", situacion: "Culminado", tipo_proyecto: "Promoci?n", inversion_total: 9533509, total_ingresos_venta: 10079498, beneficios: 2413514, unidades_totales: 18, tir_desp_is: 0.168, roe_desp_is: 0.45, multiplo: 1.45, project_irr: 0.263, bcr: 0.253161, ubicacion: "Barquillo 49", equity: 5367722, holding_period: 50, superficie_edificable: 1798, es_ultima_fila: 1 },
   { id: 2, proyecto: "TO123", situacion: "Culminado", tipo_proyecto: "Promoci?n", inversion_total: 5089316, total_ingresos_venta: 6461312, beneficios: 1429421, unidades_totales: 22, tir_desp_is: 0.216, roe_desp_is: 0.358, multiplo: 1.36, project_irr: 0.296, bcr: 0.280867, ubicacion: "Toledo 123", equity: 3153195, holding_period: 44, superficie_edificable: 1462, es_ultima_fila: 1 },
   { id: 3, proyecto: "CA82", situacion: "Culminado", tipo_proyecto: "Promoci?n", inversion_total: null, total_ingresos_venta: 1912000, beneficios: null, unidades_totales: 0, tir_desp_is: null, roe_desp_is: null, multiplo: null, project_irr: null, bcr: null, ubicacion: "Castello 82", equity: null, holding_period: 24, superficie_edificable: 410, es_ultima_fila: 1 },
@@ -34,5 +39,8 @@ const seedBase: Array<Omit<Proyecto, "fecha_inicio" | "tipo_proyecto"> & { tipo_
 export const seedProyectos: Proyecto[] = seedBase.map((project) => ({
   ...project,
   tipo_proyecto: project.tipo_proyecto.startsWith("Promoci") ? "Promoci\u00f3n" : "Fondo",
+  entry_yield: null,
+  exit_yield: null,
+  credito_total: null,
   fecha_inicio: null,
 }));
