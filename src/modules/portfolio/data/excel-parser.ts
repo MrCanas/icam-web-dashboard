@@ -20,9 +20,12 @@ type FieldKey =
   | "tirDespuesIS"
   | "roeDespuesIS"
   | "projectIRR"
+  | "entryYield"
+  | "exitYield"
   | "beneficios"
   | "multiplo"
   | "bcr"
+  | "creditoTotal"
   | "tipoProyecto"
   | "situacion";
 
@@ -40,9 +43,12 @@ const FIELD_KEYS: FieldKey[] = [
   "tirDespuesIS",
   "roeDespuesIS",
   "projectIRR",
+  "entryYield",
+  "exitYield",
   "beneficios",
   "multiplo",
   "bcr",
+  "creditoTotal",
   "tipoProyecto",
   "situacion",
 ];
@@ -66,9 +72,12 @@ const HEADER_ALIASES: Record<FieldKey, string[]> = {
   tirDespuesIS: ["tir desp. is", "tir desp is"],
   roeDespuesIS: ["roe desp. is", "roe desp is"],
   projectIRR: ["project irr"],
+  entryYield: ["entry yield"],
+  exitYield: ["exit yield"],
   beneficios: ["beneficios"],
   multiplo: ["multiplo"],
   bcr: ["bcr"],
+  creditoTotal: ["credito total"],
   tipoProyecto: ["tipo de proyecto"],
   situacion: ["situacion"],
 };
@@ -327,6 +336,9 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
       bcr: toNum(cellFor(rawRow, "bcr")),
       ubicacion: trimStr(cellFor(rawRow, "ubicacion")) || null,
       equity: toNum(cellFor(rawRow, "equity")),
+      entry_yield: toNum(cellFor(rawRow, "entryYield")),
+      exit_yield: toNum(cellFor(rawRow, "exitYield")),
+      credito_total: toNum(cellFor(rawRow, "creditoTotal")),
       holding_period: hp === null ? null : Math.round(hp),
       superficie_edificable: toNum(cellFor(rawRow, "superficieEdificable")),
       es_ultima_fila: 1,

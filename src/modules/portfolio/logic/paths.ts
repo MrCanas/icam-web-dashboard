@@ -11,6 +11,7 @@ function routePath(key: string): string {
 /** Rutas derivadas del registro del módulo — evita strings duplicadas en UI. */
 export const portfolioPaths = {
   executive: portfolioModule.defaultPath,
+  overview: routePath("portfolio.overview"),
   rentabilidad: routePath("portfolio.rentabilidad"),
   proyectos: routePath("portfolio.proyectos"),
   tendencias: routePath("portfolio.tendencias"),

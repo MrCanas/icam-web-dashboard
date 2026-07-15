@@ -1,6 +1,7 @@
 import { SupabaseEmptyProjectsBanner } from "@/modules/portfolio/ui/SupabaseEmptyProjectsBanner";
 import { ProjectCard } from "@/modules/portfolio/ui/ProjectCard";
 import { SortSelector } from "@/modules/portfolio/ui/SortSelector";
+import { SituacionFilter } from "@/modules/portfolio/ui/SituacionFilter";
 import { fmtMEuros } from "@/lib/formatters";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { buildProyectosActivosPageModel } from "@/modules/portfolio/logic/pageViewModels";
@@ -12,15 +13,23 @@ import {
 import { sanitizeSort } from "@/modules/portfolio/logic/proyectoSort";
 import { Proyecto } from "@/modules/portfolio/types";
 
+const SITUACIONES_VALIDAS = ["En Marcha", "Culminado"] as const;
+
 interface ProyectosPageProps {
   searchParams: Promise<{
     sort?: string;
+    situacion?: string;
   }>;
 }
 
 export default async function ProyectosPage({ searchParams }: ProyectosPageProps) {
   const params = await searchParams;
   const selectedSort = params.sort;
+  const selectedSituacion = SITUACIONES_VALIDAS.includes(
+    params.situacion as (typeof SITUACIONES_VALIDAS)[number],
+  )
+    ? params.situacion
+    : undefined;
 
   const ctx = await getCurrentUser();
   if (!ctx) {
@@ -31,7 +40,10 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
     );
   }
 
-  const { portfolioCount, countError, data, error } = await loadProyectosPageData(ctx);
+  const { portfolioCount, countError, data, error } = await loadProyectosPageData(
+    ctx,
+    selectedSituacion,
+  );
 
   if (error || countError) {
     const msg = error?.message ?? countError?.message ?? "Error desconocido";
@@ -47,19 +59,32 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
   const rows = showRlsEmpty ? [] : baseRows;
   const view = buildProyectosActivosPageModel(rows, selectedSort);
 
+  const resumen =
+    selectedSituacion === "En Marcha"
+      ? `${view.activeCount} proyectos en marcha`
+      : selectedSituacion === "Culminado"
+        ? `${view.culminadoCount} proyectos culminados`
+        : `${view.totalCount} proyectos · ${view.activeCount} en marcha · ${view.culminadoCount} culminados`;
+
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
       {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
-        <h1 className="text-xl font-semibold text-text-primary">Proyectos Activos</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Proyectos</h1>
         <p className="mt-1 text-sm text-text-muted">
-          {view.activeCount} proyectos en marcha · Inversión comprometida:{" "}
-          {fmtMEuros(view.inversionComprometida)}
+          {resumen} · Inversión comprometida: {fmtMEuros(view.inversionComprometida)}
         </p>
       </section>
 
+      <SituacionFilter
+        selectedSituacion={selectedSituacion}
+        selectedSort={sanitizeSort(selectedSort)}
+        basePath={portfolioPaths.proyectos}
+      />
+
       <SortSelector
         selectedSort={sanitizeSort(selectedSort)}
+        selectedSituacion={selectedSituacion}
         basePath={portfolioPaths.proyectos}
       />
 
