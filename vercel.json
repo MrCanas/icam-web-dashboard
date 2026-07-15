@@ -2,5 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm ci --include=optional",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "crons": [
+    { "path": "/api/cron/portfolio-sync", "schedule": "0 8 * * 3" },
+    { "path": "/api/cron/portfolio-sync", "schedule": "0 9 * * 3" }
+  ]
 }

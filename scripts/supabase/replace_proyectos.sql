@@ -1,4 +1,7 @@
 -- =============================================================================
+-- [SUPERSEDED] Versionado ahora en supabase/migrations/20260715130000_018_replace_proyectos_rpc.sql
+-- Se mantiene solo como referencia / ejecución manual de emergencia.
+-- =============================================================================
 -- MAESTRO ICAM — Reemplazo atómico de la tabla public.proyectos
 -- =============================================================================
 -- 1) Abre el proyecto correcto en Supabase (el de NEXT_PUBLIC_SUPABASE_URL).

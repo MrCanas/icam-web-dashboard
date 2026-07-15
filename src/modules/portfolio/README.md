@@ -10,6 +10,8 @@ Dashboard financiero del portfolio inmobiliario ICAM: KPIs ejecutivos, análisis
 - Tabla **`upload_logs`**: historial de cargas Excel del portfolio (`archivo`, `num_proyectos`, `estado`, `duracion_ms`, `detalle` jsonb).
 - RPC **`replace_proyectos`**: reemplazo atómico del snapshot de proyectos tras un upload.
 
+> Esquema versionado en `supabase/migrations/` (`017_proyectos`, `018_replace_proyectos_rpc`). Los scripts en `scripts/supabase/` quedan como referencia/uso manual.
+
 ## Acciones definidas
 
 Claves en `module.ts` (permisos futuros / RBAC):
