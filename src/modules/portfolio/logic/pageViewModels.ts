@@ -126,7 +126,9 @@ export function buildTendenciasPageModel(rows: Proyecto[]): TendenciasPageModel 
 export interface ProyectosActivosPageModel {
   projects: Proyecto[];
   inversionComprometida: number;
+  totalCount: number;
   activeCount: number;
+  culminadoCount: number;
 }
 
 export function buildProyectosActivosPageModel(
@@ -141,7 +143,9 @@ export function buildProyectosActivosPageModel(
   return {
     projects,
     inversionComprometida,
-    activeCount: rows.length,
+    totalCount: rows.length,
+    activeCount: rows.filter((row) => row.situacion === "En Marcha").length,
+    culminadoCount: rows.filter((row) => row.situacion === "Culminado").length,
   };
 }
 

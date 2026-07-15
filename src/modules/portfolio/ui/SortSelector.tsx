@@ -5,6 +5,7 @@ export type { SortKey };
 
 interface SortSelectorProps {
   selectedSort: SortKey;
+  selectedSituacion?: string;
   basePath?: string;
 }
 
@@ -15,13 +16,20 @@ const options: { key: SortKey; label: string }[] = [
   { key: "beneficio", label: "Beneficio ↓" },
 ];
 
-function buildHref(basePath: string, sort: SortKey): string {
+function buildHref(basePath: string, sort: SortKey, situacion?: string): string {
   const params = new URLSearchParams();
+  if (situacion) {
+    params.set("situacion", situacion);
+  }
   params.set("sort", sort);
   return `${basePath}?${params.toString()}`;
 }
 
-export function SortSelector({ selectedSort, basePath = "/dashboard/portfolio/proyectos" }: SortSelectorProps) {
+export function SortSelector({
+  selectedSort,
+  selectedSituacion,
+  basePath = "/dashboard/portfolio/proyectos",
+}: SortSelectorProps) {
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -30,7 +38,7 @@ export function SortSelector({ selectedSort, basePath = "/dashboard/portfolio/pr
           {options.map((option) => (
             <Link
               key={option.key}
-              href={buildHref(basePath, option.key)}
+              href={buildHref(basePath, option.key, selectedSituacion)}
               className={`min-h-11 inline-flex items-center justify-center px-3 py-2 rounded-md text-sm border whitespace-nowrap ${
                 selectedSort === option.key
                   ? "bg-icam-900 text-white border-icam-900"
