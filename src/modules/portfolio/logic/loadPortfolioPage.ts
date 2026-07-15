@@ -36,11 +36,14 @@ export async function loadTendenciasPageData(ctx: UserContext) {
   return { portfolioCount, countError, data, error };
 }
 
-export async function loadProyectosPageData(ctx: UserContext) {
+export async function loadProyectosPageData(
+  ctx: UserContext,
+  situacion?: string,
+) {
   const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
     countProyectosUltimaFila(ctx),
     listProyectos(ctx, {
-      situacionEquals: "En Marcha",
+      situacionEquals: situacion,
       order: { column: "inversion_total", ascending: false, nullsFirst: false },
     }),
   ]);

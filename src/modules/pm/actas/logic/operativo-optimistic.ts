@@ -17,6 +17,10 @@ export type OperativoOptimisticAction =
       categoryId: string;
       name: string;
       displayName: string;
+    }
+  | {
+      type: "removeCategory";
+      categoryId: string;
     };
 
 function createOptimisticElement(
@@ -127,6 +131,8 @@ export function applyOperativoOptimisticAction(
       return addElementToCategories(current, action);
     case "addCategory":
       return addCategoryToCategories(current, action);
+    case "removeCategory":
+      return current.filter((cat) => cat.id !== action.categoryId);
     default:
       return current;
   }

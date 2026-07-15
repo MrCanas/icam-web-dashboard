@@ -13,6 +13,11 @@ export type PmZoneUserOption = {
   displayName: string;
 };
 
+/**
+ * Lista usuarios asignables como owner. Devuelve TODOS los usuarios de la app
+ * (auth.users), no solo los de la zona pm: el owner se puede asignar a cualquier
+ * usuario. Pagina la API admin para no perder usuarios.
+ */
 export async function searchPmZoneUsers(
   query: string,
   limit = 25,
@@ -21,55 +26,41 @@ export async function searchPmZoneUsers(
   | { ok: false; error: string }
 > {
   const admin = createServiceRoleClient();
-  const { data: zoneRows, error: zoneError } = await admin
-    .from("app_user_zone_role")
-    .select("user_id")
-    .eq("zone_key", "pm");
-
-  if (zoneError) {
-    return { ok: false, error: zoneError.message };
-  }
-
-  const userIds = [
-    ...new Set((zoneRows ?? []).map((row) => row.user_id as string)),
-  ];
-  if (userIds.length === 0) {
-    return { ok: true, users: [] };
-  }
-
   const q = query.trim().toLowerCase();
   const users: PmZoneUserOption[] = [];
+  const perPage = 200;
 
-  for (const userId of userIds) {
-    const { data, error } = await admin.auth.admin.getUserById(userId);
-    if (error || !data.user) continue;
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    const batch = data?.users ?? [];
 
-    const email = data.user.email?.trim() ?? "";
-    if (!email) continue;
+    for (const user of batch) {
+      const email = user.email?.trim() ?? "";
+      if (!email) continue;
 
-    const displayName = displayNameFromAuthMetadata(
-      email,
-      data.user.user_metadata as Record<string, unknown> | undefined,
-    );
-    const owner = ownerFromAuthUser(
-      userId,
-      email,
-      data.user.user_metadata as Record<string, unknown> | undefined,
-    );
+      const metadata = user.user_metadata as Record<string, unknown> | undefined;
+      const displayName = displayNameFromAuthMetadata(email, metadata);
+      const owner = ownerFromAuthUser(user.id, email, metadata);
 
-    if (q) {
-      const haystack =
-        `${email} ${displayName} ${owner.label} ${owner.initials}`.toLowerCase();
-      if (!haystack.includes(q)) continue;
+      if (q) {
+        const haystack =
+          `${email} ${displayName} ${owner.label} ${owner.initials}`.toLowerCase();
+        if (!haystack.includes(q)) continue;
+      }
+
+      users.push({
+        userId: user.id,
+        email,
+        label: owner.label,
+        initials: owner.initials,
+        displayName,
+      });
     }
 
-    users.push({
-      userId,
-      email,
-      label: owner.label,
-      initials: owner.initials,
-      displayName,
-    });
+    if (batch.length < perPage) break;
   }
 
   users.sort((a, b) => a.displayName.localeCompare(b.displayName, "es"));

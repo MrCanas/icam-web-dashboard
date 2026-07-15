@@ -14,6 +14,12 @@ export const portfolioModule: ModuleDefinition = {
       match: (p) => p === "/dashboard/portfolio",
     },
     {
+      key: "portfolio.overview",
+      path: "/dashboard/portfolio/overview",
+      label: "Overview",
+      match: (p) => p.startsWith("/dashboard/portfolio/overview"),
+    },
+    {
       key: "portfolio.rentabilidad",
       path: "/dashboard/portfolio/rentabilidad",
       label: "Rentabilidad",

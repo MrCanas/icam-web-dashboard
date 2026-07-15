@@ -18,6 +18,7 @@ import type {
   ActasOperativoCategory,
   ActasProjectDetail,
   ActasProjectListItem,
+  ActasProjectOwner,
   ProjectPhase,
 } from "../types";
 
@@ -184,7 +185,7 @@ export async function fetchActasProjectDetail(
   // Fetch base project row
   const { data: projectRow, error: projectErr } = await supabase
     .from("project")
-    .select("id, code, name, phase")
+    .select("id, code, name, phase, owner_user_id")
     .is("archived_at", null)
     .eq("code", code)
     .maybeSingle();
@@ -199,7 +200,7 @@ export async function fetchActasProjectDetail(
   const projectId = projectRow.id as string;
 
   // Fetch latest log_entry date and element count in parallel
-  const [logResult, elementResult, ownerResult] = await Promise.all([
+  const [logResult, elementResult] = await Promise.all([
     supabase
       .from("log_entry")
       .select("entry_date")
@@ -235,33 +236,22 @@ export async function fetchActasProjectDetail(
           .is("archived_at", null)
         ).data?.map((c: { id: string }) => c.id) ?? [],
       ),
-    // owner: first element_owner user email (lexicographic by user_id)
-    supabase
-      .from("element_owner")
-      .select("user_id")
-      .in(
-        "element_id",
-        (await supabase
-          .from("element")
-          .select("id")
-          .is("archived_at", null)
-          .in(
-            "category_id",
-            (await supabase
-              .from("category")
-              .select("id")
-              .eq("project_id", projectId)
-              .is("archived_at", null)
-            ).data?.map((c: { id: string }) => c.id) ?? [],
-          )
-        ).data?.map((e: { id: string }) => e.id) ?? [],
-      )
-      .limit(1),
   ]);
 
-  // Resolve owner email from auth.users via service role (supabase admin API not available in JS client; read from element_owner.user_id only for now)
-  const ownerUserId =
-    (ownerResult.data as { user_id: string }[] | null)?.[0]?.user_id ?? null;
+  // Responsable del proyecto (project.owner_user_id) resuelto a avatar + nombre.
+  const ownerUserId = (projectRow.owner_user_id as string | null) ?? null;
+  let owner: ActasProjectOwner | null = null;
+  if (ownerUserId) {
+    const displayMap = await resolveUserDisplayMap([ownerUserId]);
+    const resolved = displayMap.get(ownerUserId);
+    owner = {
+      userId: ownerUserId,
+      email: resolved?.email ?? null,
+      displayName:
+        resolved?.label || resolved?.email?.split("@")[0] || "Usuario",
+      initials: resolved?.initials ?? "?",
+    };
+  }
 
   const lastLogEntryAt =
     (logResult.data as { entry_date: string }[] | null)?.[0]?.entry_date ??
@@ -273,7 +263,7 @@ export async function fetchActasProjectDetail(
       code: projectRow.code as string,
       name: projectRow.name as string,
       phase: toProjectPhase(projectRow.phase as string),
-      ownerEmail: ownerUserId,
+      owner,
       lastLogEntryAt,
       elementCount: elementResult.count ?? 0,
     },
@@ -317,7 +307,7 @@ export async function fetchActasProjectOperativo(
   const { data: elRows, error: elErr } = await supabase
     .from("element")
     .select(
-      "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end",
+      "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end, progress",
     )
     .in("category_id", categoryIds)
     .is("archived_at", null)
@@ -329,6 +319,23 @@ export async function fetchActasProjectOperativo(
 
   const allElements = elRows ?? [];
   const elementIds = allElements.map((el) => el.id as string);
+
+  // Recuento de adjuntos por elemento. No fatal: si la tabla aún no existe
+  // (migración 014 sin aplicar) seguimos con 0 para no romper el tablero.
+  const attachmentCountByElement = new Map<string, number>();
+  if (elementIds.length > 0) {
+    const { data: attachmentRows } = await supabase
+      .from("actas_attachment")
+      .select("element_id")
+      .in("element_id", elementIds);
+    for (const row of attachmentRows ?? []) {
+      const eid = row.element_id as string;
+      attachmentCountByElement.set(
+        eid,
+        (attachmentCountByElement.get(eid) ?? 0) + 1,
+      );
+    }
+  }
 
   // Elementos archivados (soft-delete) por categoría → sección "Archivados".
   const { data: archivedRows, error: archErr } = await supabase
@@ -472,6 +479,8 @@ export async function fetchActasProjectOperativo(
         parentElementId,
         canHaveSubelements: parentElementId === null,
         owners,
+        progress: (el.progress as number | null) ?? 0,
+        attachmentCount: attachmentCountByElement.get(eid) ?? 0,
         timelineStart: (el.timeline_start as string | null) ?? null,
         timelineEnd: (el.timeline_end as string | null) ?? null,
         lastEntryContent: lastLog?.content ?? null,

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import { createElement } from "@/modules/pm/actas/actions/create-element";
 import {
@@ -46,6 +47,7 @@ interface ActasCategoryGroupProps {
   onElementArchived?: (message: string) => void;
   onToast?: (message: string) => void;
   onOptimisticAction?: (action: OperativoOptimisticAction) => void;
+  onDeleteCategory?: (categoryId: string) => void;
 }
 
 function countElements(elements: ActasOperativoCategory["elements"]): number {
@@ -75,12 +77,14 @@ export function ActasCategoryGroup({
   onElementArchived,
   onToast,
   onOptimisticAction,
+  onDeleteCategory,
 }: ActasCategoryGroupProps) {
   const router = useRouter();
   const inlineCreate = useInlineCreate();
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [completedExpanded, setCompletedExpanded] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [categoryName, setCategoryName] = useState(category.name);
   const [categoryDisplayName, setCategoryDisplayName] = useState(
     category.displayName,
@@ -159,7 +163,73 @@ export function ActasCategoryGroup({
         >
           {itemCount} {itemCount === 1 ? "elemento" : "elementos"}
         </span>
+
+        {!readOnly && hasWriteAccess && onDeleteCategory ? (
+          <button
+            type="button"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-70 hover:bg-black/15 hover:opacity-100"
+            style={{ color: style.text }}
+            aria-label="Eliminar grupo"
+            title="Eliminar grupo"
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmDeleteOpen(true);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+          </button>
+        ) : null}
       </div>
+
+      {confirmDeleteOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setConfirmDeleteOpen(false)}
+            >
+              <div
+                className="w-full max-w-md rounded-lg border border-subtle/60 bg-card p-5 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-base font-semibold text-text-primary">
+                  Eliminar grupo
+                </h2>
+                <p className="mt-2 text-sm text-text-body">
+                  ¿Eliminar el grupo «{categoryDisplayName}»?
+                  {itemCount > 0
+                    ? ` Se eliminarán también sus ${itemCount} ${itemCount === 1 ? "elemento" : "elementos"}, subelementos, entradas de histórico y adjuntos.`
+                    : ""}{" "}
+                  Esta acción es permanente y no se puede deshacer.
+                </p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-subtle px-4 py-2 text-sm text-text-body hover:bg-page"
+                    onClick={() => setConfirmDeleteOpen(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    onClick={() => {
+                      setConfirmDeleteOpen(false);
+                      onDeleteCategory?.(category.id);
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {expanded ? (
         <div className="bg-card overflow-x-auto">

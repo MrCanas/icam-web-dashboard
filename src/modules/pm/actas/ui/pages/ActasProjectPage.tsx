@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import type { UserContext } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import type { ActasProjectDetail, ActasProjectTab } from "@/modules/pm/actas/types";
 import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
@@ -33,12 +34,14 @@ export function ActasProjectPage({
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
     : "operativo";
+  // Puede cambiar el responsable quien tenga rol editor (o admin) de la zona pm.
+  const canEditOwner = checkWriteAccess(ctx, "pm") === null;
 
   return (
     <div className="flex flex-col gap-0">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <ActasProjectHeader project={project} />
+          <ActasProjectHeader project={project} canEditOwner={canEditOwner} />
         </div>
         {validTab === "operativo" ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">

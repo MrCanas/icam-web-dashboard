@@ -126,7 +126,9 @@ export function buildTendenciasPageModel(rows: Proyecto[]): TendenciasPageModel 
 export interface ProyectosActivosPageModel {
   projects: Proyecto[];
   inversionComprometida: number;
+  totalCount: number;
   activeCount: number;
+  culminadoCount: number;
 }
 
 export function buildProyectosActivosPageModel(
@@ -141,8 +143,87 @@ export function buildProyectosActivosPageModel(
   return {
     projects,
     inversionComprometida,
-    activeCount: rows.length,
+    totalCount: rows.length,
+    activeCount: rows.filter((row) => row.situacion === "En Marcha").length,
+    culminadoCount: rows.filter((row) => row.situacion === "Culminado").length,
   };
+}
+
+export interface OverviewPageModel {
+  /** TIR vs ROE por proyecto (fracciones). */
+  tirRoe: { name: string; a: number; b: number }[];
+  /** Inversión total vs Total ingresos por venta por proyecto (€). */
+  inversionVenta: { name: string; a: number; b: number }[];
+  /** Yield entrada vs Yield salida por proyecto (fracciones). */
+  yields: { name: string; a: number; b: number }[];
+  /** Crédito total por proyecto (€). */
+  credito: { name: string; value: number }[];
+  /** Reparto de equity gestionado por proyecto (€). */
+  equity: { label: string; value: number }[];
+  /** Reparto de beneficios por proyecto (€). */
+  beneficio: { label: string; value: number }[];
+}
+
+/** Modelo de la subpágina Overview: replica las gráficas de "Resumen Global". */
+export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel {
+  const byDesc = <T>(rows: T[], value: (row: T) => number): T[] =>
+    [...rows].sort((a, b) => value(b) - value(a));
+
+  const tirRoe = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.tir_desp_is) > 0 || toNumber(p.roe_desp_is) > 0)
+      .map((p) => ({
+        name: p.proyecto,
+        a: toNumber(p.tir_desp_is),
+        b: toNumber(p.roe_desp_is),
+      })),
+    (row) => row.a,
+  );
+
+  const inversionVenta = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.inversion_total) > 0 || toNumber(p.total_ingresos_venta) > 0)
+      .map((p) => ({
+        name: p.proyecto,
+        a: toNumber(p.inversion_total),
+        b: toNumber(p.total_ingresos_venta),
+      })),
+    (row) => row.a,
+  );
+
+  const yields = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.entry_yield) > 0 || toNumber(p.exit_yield) > 0)
+      .map((p) => ({
+        name: p.proyecto,
+        a: toNumber(p.entry_yield),
+        b: toNumber(p.exit_yield),
+      })),
+    (row) => row.a,
+  );
+
+  const credito = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.credito_total) > 0)
+      .map((p) => ({ name: p.proyecto, value: toNumber(p.credito_total) })),
+    (row) => row.value,
+  );
+
+  const equity = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.equity) > 0)
+      .map((p) => ({ label: p.proyecto, value: toNumber(p.equity) })),
+    (row) => row.value,
+  );
+
+  const beneficio = byDesc(
+    proyectos
+      .filter((p) => toNumber(p.beneficios) > 0)
+      .map((p) => ({ label: p.proyecto, value: toNumber(p.beneficios) })),
+    (row) => row.value,
+  );
+
+  return { tirRoe, inversionVenta, yields, credito, equity, beneficio };
 }
 
 /** Filtrado en cliente (hook useProyectos) — misma regla que applyPortfolioSearchFilters. */
