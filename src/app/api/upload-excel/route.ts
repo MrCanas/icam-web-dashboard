@@ -6,16 +6,10 @@ import {
   isLikelyExcelBuffer,
   parseMaestroWorkbook,
   type MaestroParseResult,
-  type ProyectoInsert,
 } from "@/modules/portfolio/data/excel-parser";
-import {
-  countProyectosUltimaFilaForDev,
-  listProyectosWithServiceRole,
-  replaceProyectos,
-} from "@/modules/portfolio/data/proyectosRepository";
-import { insertUploadLog } from "@/modules/portfolio/data/uploadLogsRepository";
-import { formatReplaceProyectosRpcError } from "@/lib/format-replace-proyectos-error";
-import { buildUploadLogDetalle, comparePortfolios, type PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
+import { listProyectosWithServiceRole } from "@/modules/portfolio/data/proyectosRepository";
+import { comparePortfolios, type PortfolioDiffResult } from "@/modules/portfolio/logic/portfolio-diff";
+import { commitMaestroReplace } from "@/modules/portfolio/logic/commitMaestroUpload";
 
 function previewPayload(parsed: MaestroParseResult, archivoNombre: string) {
   return {
@@ -67,19 +61,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let parsed: MaestroParseResult;
-  try {
-    parsed = parseMaestroWorkbook(buf);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Error al leer el Excel";
-    return NextResponse.json({ error: msg }, { status: 400 });
-  }
-
   if (!confirm) {
+    let parsed: MaestroParseResult;
+    try {
+      parsed = parseMaestroWorkbook(buf);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al leer el Excel";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
     const { rows: currentRows, error: loadErr } = await listProyectosWithServiceRole(user);
     let comparison: PortfolioDiffResult | null = null;
     let comparisonError: string | null = loadErr;
-    if (!loadErr && parsed.rows.length >= 0) {
+    if (!loadErr) {
       try {
         comparison = comparePortfolios(currentRows, parsed.rows);
       } catch (e) {
@@ -94,101 +88,26 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (parsed.rows.length === 0) {
+  // confirm = true → reemplazo atómico (pipeline compartido con el cron).
+  const result = await commitMaestroReplace(user, buf, archivoNombre);
+
+  if (!result.ok) {
     return NextResponse.json(
       {
-        error:
-          "No hay filas con EsUltimaFila = 1. No se ha modificado la base de datos.",
-        preview: previewPayload(parsed, archivoNombre),
+        error: result.error,
+        preview: result.parsed ? previewPayload(result.parsed, archivoNombre) : undefined,
+        comparison: result.comparison,
       },
-      { status: 400 },
+      { status: result.status },
     );
   }
-
-  const started = Date.now();
-
-  const { rows: currentBefore, error: beforeErr } = await listProyectosWithServiceRole(user);
-  if (beforeErr) {
-    return NextResponse.json(
-      { error: `No se pudo leer el portfolio actual: ${beforeErr}` },
-      { status: 500 },
-    );
-  }
-
-  const diff = comparePortfolios(currentBefore, parsed.rows);
-  const payload = parsed.rows.map((r) => serializeRow(r));
-
-  const { error: rpcError } = await replaceProyectos(user, payload);
-
-  const duracion_ms = Date.now() - started;
-
-  if (process.env.NODE_ENV === "development") {
-    if (rpcError) {
-      console.error("[upload-excel] RPC error", rpcError);
-    } else {
-      const { count, error: cErr } = await countProyectosUltimaFilaForDev(user);
-      console.log(
-        "[upload-excel] RPC ok, filas con es_ultima_fila=1:",
-        count,
-        cErr ? `(count error: ${cErr.message})` : "",
-      );
-    }
-  }
-
-  if (rpcError) {
-    const friendly = formatReplaceProyectosRpcError(rpcError.message);
-    await insertUploadLog(user, {
-      archivo: archivoNombre,
-      num_proyectos: parsed.rows.length,
-      estado: "error",
-      duracion_ms,
-      detalle: {
-        ...buildUploadLogDetalle(diff, { warnings: parsed.warnings, stats: parsed.stats }),
-        error: rpcError.message,
-        error_detail: friendly,
-        code: rpcError.code,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        error: `Fallo al guardar en Supabase: ${friendly}`,
-        preview: previewPayload(parsed, archivoNombre),
-        comparison: diff,
-      },
-      { status: 500 },
-    );
-  }
-
-  const detalle = buildUploadLogDetalle(diff, {
-    warnings: parsed.warnings,
-    stats: parsed.stats,
-  });
-
-  await insertUploadLog(user, {
-    archivo: archivoNombre,
-    num_proyectos: parsed.rows.length,
-    estado: "completado",
-    duracion_ms,
-    detalle,
-  });
 
   return NextResponse.json({
     success: true,
-    duracion_ms,
-    preview: previewPayload(parsed, archivoNombre),
-    comparison: diff,
+    duracion_ms: result.duracion_ms,
+    preview: previewPayload(result.parsed, archivoNombre),
+    comparison: result.comparison,
   });
-}
-
-/** Serializa filas para JSON/Postgres (sin undefined; null explícito). */
-function serializeRow(r: ProyectoInsert): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  (Object.keys(r) as (keyof ProyectoInsert)[]).forEach((k) => {
-    const v = r[k];
-    out[k] = v === undefined ? null : v;
-  });
-  return out;
 }
 
 export const maxDuration = 60;
