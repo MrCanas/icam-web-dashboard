@@ -29,6 +29,10 @@ export interface KPIBundle {
   nActivos: number;
   nCulminados: number;
   inversionTotal: number;
+  /** Suma de equity gestionado (col AY) de los proyectos activos ("En Marcha"). */
+  fondosPropiosTotales: number;
+  /** Media del equity gestionado entre proyectos activos con equity > 0. */
+  fondosPropiosMedia: number;
   gdvTotal: number;
   beneficioTotal: number;
   margenPct: number;

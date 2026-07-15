@@ -218,17 +218,17 @@ export default async function PortfolioExecutivePage({ searchParams }: Dashboard
 
         <KPICard
 
-          title="Inversión Total"
+          title="Fondos Propios Totales"
 
-          value={fmtMEuros(view.kpis.inversionTotal)}
+          value={fmtMEuros(view.kpis.fondosPropiosTotales)}
 
-          subtitle={`Media: ${fmtMEuros(view.kpis.inversionMedia)}`}
+          subtitle={`Equity activos · Media: ${fmtMEuros(view.kpis.fondosPropiosMedia)}`}
 
         />
 
         <KPICard
 
-          title="GDV Total"
+          title="Ventas Totales"
 
           value={fmtMEuros(view.kpis.gdvTotal)}
 
