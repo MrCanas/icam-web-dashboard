@@ -28,3 +28,29 @@ export function legacyProjectOrderIndex(idActivo: string): number {
   const i = (PM_PROJECT_ORDER_LEGACY as readonly string[]).indexOf(idActivo);
   return i >= 0 ? i : 1000;
 }
+
+/** Lo mínimo que necesita el orden; evita atar esta lógica a PmPortfolioRow. */
+interface OrdenableActivo {
+  activo: { id_activo: string; orden?: number };
+}
+
+/**
+ * Orden del Gantt: manda `pm_activos.orden`, editable desde PM → Proyectos.
+ *
+ * Si TODOS los activos siguen a 0 se cae a la lista histórica: es el estado tras
+ * restaurar el Excel, porque replace_pm_portfolio no conoce la columna `orden`.
+ * Basta con que uno tenga orden para que mande la base de datos — si no, un alta
+ * con orden=1 quedaría por detrás de los que valen 0 y el fallback los mezclaría.
+ *
+ * Desempate por id_activo para que el orden sea estable y no dependa de cómo
+ * venga la consulta.
+ */
+export function sortPortfolioRows<T extends OrdenableActivo>(rows: T[]): T[] {
+  const sinOrden = rows.every((r) => (r.activo.orden ?? 0) === 0);
+  const idx = (r: T) =>
+    sinOrden ? legacyProjectOrderIndex(r.activo.id_activo) : (r.activo.orden ?? 0);
+
+  return [...rows].sort(
+    (a, b) => idx(a) - idx(b) || a.activo.id_activo.localeCompare(b.activo.id_activo),
+  );
+}

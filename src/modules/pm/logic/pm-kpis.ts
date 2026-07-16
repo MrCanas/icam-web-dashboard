@@ -50,22 +50,36 @@ export function parsePmDate(iso: string | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Fin del día de `today`, para comparar contra fechas de hito.
+ *
+ * parsePmDate ancla las fechas a las 12:00, así que compararlas contra la
+ * medianoche de hoy dejaba un hito que vence HOY fuera de «cumplido», pese a que
+ * el KPI se anuncia como «con fecha ≤ hoy». Solo fallaba el día exacto del
+ * vencimiento, de ahí que pasara desapercibido.
+ */
+function endOfDay(today: Date): Date {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 /** Último hito con fecha_actual <= hoy (cumplido); si ninguno, primer hito pendiente sin fecha. */
 export function hitoActualYPendiente(row: PmPortfolioRow, today = new Date()) {
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const limite = endOfDay(today);
   let ultimoCumplido: (typeof row.hitos)[0] | null = null;
   let proximo: (typeof row.hitos)[0] | null = null;
 
   for (const h of row.hitos) {
     const fd = parsePmDate(h.fecha_actual);
-    if (fd && fd <= todayStart) {
+    if (fd && fd <= limite) {
       ultimoCumplido = h;
     }
   }
 
   for (const h of row.hitos) {
     const fd = parsePmDate(h.fecha_actual);
-    if (!fd || fd > todayStart) {
+    if (!fd || fd > limite) {
       proximo = h;
       break;
     }
@@ -74,11 +88,11 @@ export function hitoActualYPendiente(row: PmPortfolioRow, today = new Date()) {
   return { ultimoCumplido, proximo };
 }
 
-export function portfolioPmKpis(rows: PmPortfolioRow[]) {
+/** `today` es inyectable para poder testear; en la app se omite. */
+export function portfolioPmKpis(rows: PmPortfolioRow[], today = new Date()) {
   let totalHitos = 0;
   let hitosConFecha = 0;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const limite = endOfDay(today);
 
   const means: number[] = [];
   let worst: { id_activo: string; mean: number } | null = null;
@@ -87,7 +101,7 @@ export function portfolioPmKpis(rows: PmPortfolioRow[]) {
     totalHitos += row.hitos.length;
     for (const h of row.hitos) {
       const fd = parsePmDate(h.fecha_actual);
-      if (fd && fd <= todayStart) hitosConFecha += 1;
+      if (fd && fd <= limite) hitosConFecha += 1;
     }
     const m = meanAbsLevantamiento(row);
     if (m !== null) {

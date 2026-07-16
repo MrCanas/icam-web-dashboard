@@ -10,7 +10,7 @@ import {
 } from "@/modules/pm/logic/pm-hito-palette";
 import type { PmPortfolioRow } from "@/modules/pm/data/pmRepository";
 import { axisTopPadding, buildPmAxisModel } from "@/modules/pm/logic/pm-axis";
-import { legacyProjectOrderIndex } from "@/modules/pm/logic/pm-project-order";
+import { sortPortfolioRows } from "@/modules/pm/logic/pm-project-order";
 import {
   buildGanttSegmentsForProject,
   computeGanttExtentForPortfolio,
@@ -27,23 +27,6 @@ const PAD_R = 28;
 const PAD_B = 36;
 const AXIS_H = 22;
 
-/**
- * Orden del Gantt: manda `pm_activos.orden`, editable desde PM → Proyectos.
- *
- * Antes era una constante con los 9 activos de entonces, así que cualquier
- * proyecto nuevo caía al fondo por orden alfabético. Se conserva la lista
- * histórica como fallback: si todos los activos siguen a 0 (p. ej. tras
- * restaurar el Excel, que no conoce la columna), el Gantt se ve como siempre.
- */
-function sortPortfolioRows(rows: PmPortfolioRow[]): PmPortfolioRow[] {
-  const sinOrden = rows.every((r) => (r.activo.orden ?? 0) === 0);
-  const idx = (r: PmPortfolioRow) =>
-    sinOrden ? legacyProjectOrderIndex(r.activo.id_activo) : (r.activo.orden ?? 0);
-
-  return [...rows].sort(
-    (a, b) => idx(a) - idx(b) || a.activo.id_activo.localeCompare(b.activo.id_activo),
-  );
-}
 
 function formatDmY(d: Date): string {
   return d.toLocaleDateString("es-ES", {
