@@ -25,7 +25,7 @@ import type { PoolClient } from "pg";
 
 import { getHitoColor } from "../../src/modules/pm/logic/pm-hito-palette";
 import { PM_PROJECT_ORDER_LEGACY } from "../../src/modules/pm/logic/pm-project-order";
-import { compareQuarterCodes, isPmPuntoHito } from "../../src/modules/pm/logic/pm-viz";
+import { isPmPuntoHito } from "../../src/modules/pm/logic/pm-viz";
 import { closePgPool, withPgClient } from "../actas/lib/db";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -46,33 +46,26 @@ function canonicalHitoOrder(rows: HitoRow[]): HitoRow[] {
   );
 }
 
-/** levantamiento primero, luego trimestres en orden cronológico ascendente. */
-function snapshotOrden(code: string, quarters: string[]): number {
-  if (code === "levantamiento") return 0;
-  const i = quarters.indexOf(code);
-  return i >= 0 ? i + 1 : 900;
-}
-
 async function backfillSnapshots(client: PoolClient): Promise<string[]> {
-  const { rows } = await client.query<{ snapshot_code: string }>(
-    `SELECT DISTINCT snapshot_code FROM pm_snapshot_fechas`,
+  // El orden lo calcula pm_snapshot_orden() (migración 019), única fuente de
+  // verdad compartida con el RPC de congelar. Duplicar la fórmula aquí en TS
+  // sería pedir que las dos diverjan.
+  const { rows } = await client.query<{ snapshot_code: string; orden: number }>(
+    `SELECT DISTINCT snapshot_code, pm_snapshot_orden(snapshot_code) AS orden
+       FROM pm_snapshot_fechas
+      ORDER BY 2`,
   );
-  const codes = rows.map((r) => r.snapshot_code);
-  const quarters = codes
-    .filter((c) => c !== "levantamiento")
-    .sort(compareQuarterCodes);
 
   const report: string[] = [];
-  for (const code of codes) {
-    const orden = snapshotOrden(code, quarters);
-    report.push(`  ${code.padEnd(16)} orden=${orden}  visible=true`);
+  for (const { snapshot_code: code, orden } of rows) {
+    report.push(`  ${code.padEnd(16)} orden=${orden}`);
     if (DRY_RUN) continue;
-    // ON CONFLICT DO NOTHING: no pisa visible_en_dashboard ni label si la PMO
-    // ya los tocó. Reejecutar el backfill no debe deshacer sus decisiones.
+    // El orden sí se actualiza (es derivado); visible_en_dashboard y label NO
+    // se tocan al reinsertar: son decisiones de la PMO.
     await client.query(
       `INSERT INTO pm_snapshots (snapshot_code, orden, visible_en_dashboard)
        VALUES ($1, $2, true)
-       ON CONFLICT (snapshot_code) DO NOTHING`,
+       ON CONFLICT (snapshot_code) DO UPDATE SET orden = EXCLUDED.orden`,
       [code, orden],
     );
   }
@@ -161,6 +154,15 @@ async function main(): Promise<void> {
       throw new Error(
         "Faltan pm_hito_catalogo / pm_snapshots. Aplica primero la migración\n" +
           "supabase/migrations/20260716120000_018_pm_planificacion.sql",
+      );
+    }
+    const { rows: fn } = await client.query<{ n: string }>(
+      `SELECT count(*) AS n FROM pg_proc WHERE proname = 'pm_snapshot_orden'`,
+    );
+    if (Number(fn[0].n) === 0) {
+      throw new Error(
+        "Falta la función pm_snapshot_orden(). Aplica la migración\n" +
+          "supabase/migrations/20260716130000_019_congelar_pm_snapshot.sql",
       );
     }
 
