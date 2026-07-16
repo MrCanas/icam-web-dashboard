@@ -218,6 +218,27 @@ export function PmDataUpload() {
         </p>
 
         <div
+          className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+        >
+          <p className="font-medium">Vía de rescate — ya no es la forma normal de actualizar PM</p>
+          <p className="mt-1 leading-snug text-red-900/90">
+            Los hitos se editan en{" "}
+            <a href="/dashboard/pm/planificacion" className="underline">
+              PM → Planificación
+            </a>
+            . Esta importación <strong>borra las tres tablas</strong> y se lleva por
+            delante todo lo editado ahí y <strong>el histórico completo de
+            trimestres congelados</strong>, no solo lo que traiga el Excel.
+          </p>
+          <p className="mt-1 leading-snug text-red-900/90">
+            Después hay que reejecutar <code className="text-xs">npm run pm:backfill-planificacion</code>:
+            el reemplazo no conoce el catálogo de hitos ni el orden de proyectos y
+            los deja sin asignar.
+          </p>
+        </div>
+
+        <div
           className={`mt-4 flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition ${
             dragOver ? "border-icam-gold bg-icam-gold/5" : "border-subtle hover:border-icam-gold/60"
           }`}
@@ -336,7 +357,11 @@ export function PmDataUpload() {
               onChange={(e) => setUnderstood(e.target.checked)}
               className="mt-1"
             />
-            <span>Entiendo que esto borrará y reemplazará todos los datos PM actuales en Supabase.</span>
+            <span>
+              Entiendo que esto borrará todos los datos PM de Supabase, incluidos
+              los trimestres congelados y lo editado en Planificación, y que tendré
+              que reejecutar el backfill después.
+            </span>
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2">
