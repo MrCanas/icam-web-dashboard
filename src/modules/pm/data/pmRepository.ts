@@ -2,9 +2,16 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 import type { PmActivo, PmHito, PmSnapshotFecha } from "@/modules/pm/types";
 import { getPmReadSupabase, getPmWriteSupabase } from "@/modules/pm/data/readClient";
+import { deviationVsLevantamientoDays } from "@/modules/pm/logic/pm-viz";
 
 export interface PmHitoEnriched extends PmHito {
   snapshots: Record<string, string | null>;
+  /**
+   * Desviación vs levantamiento calculada desde las fechas, no leída de la
+   * columna del Excel. Se rellena en fetchPmPortfolio; null si falta el
+   * levantamiento o no hay ninguna previsión.
+   */
+  desviacion_lev_derivada?: number | null;
 }
 
 export interface PmPortfolioRow {
@@ -51,6 +58,15 @@ export async function fetchPmPortfolio(ctx: UserContext): Promise<{
     const list = hitosByActivo.get(hito.activo_id) ?? [];
     list.push(enriched);
     hitosByActivo.set(hito.activo_id, list);
+  }
+
+  // Derivar la desviación aquí y no en cada consumidor: los KPIs del Overview
+  // leían la columna del Excel mientras PmDeviationTable ya recalculaba desde
+  // las fechas, y podían discrepar. Ahora ambos salen del mismo número.
+  for (const list of hitosByActivo.values()) {
+    for (const h of list) {
+      h.desviacion_lev_derivada = deviationVsLevantamientoDays(h);
+    }
   }
 
   const rows: PmPortfolioRow[] = (activos ?? []).map((a) => {
