@@ -22,7 +22,7 @@ export type MapActivoProyectoResult =
  *
  * Varios activos pueden apuntar al mismo proyecto financiero: PM separa PC25 en
  * PC25-CP6 y PC25-26-RESIDENCIAL por uso y el maestro lo mantiene unido. La
- * migración 018 quitó el UNIQUE que lo impedía; es N:1 a propósito.
+ * migración 020 quitó el UNIQUE que lo impedía; es N:1 a propósito.
  */
 export async function mapActivoProyecto(
   input: MapActivoProyectoInput,

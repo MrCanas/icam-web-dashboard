@@ -22,7 +22,7 @@ export default async function PlanificacionPage() {
       <section className="rounded-lg border border-red-200 bg-card p-6 text-red-700">
         Error cargando Planificación: {error}
         <p className="mt-2 text-xs">
-          ¿Aplicaste las migraciones 018 y 019 y ejecutaste{" "}
+          ¿Aplicaste las migraciones 020 y 021 y ejecutaste{" "}
           <code className="text-xs">npm run pm:backfill-planificacion</code>?
         </p>
       </section>

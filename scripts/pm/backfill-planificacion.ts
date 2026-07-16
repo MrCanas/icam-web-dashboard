@@ -1,5 +1,5 @@
 /**
- * Backfill de los metadatos que introduce la migración 018 (PM Planificación).
+ * Backfill de los metadatos que introduce la migración 020 (PM Planificación).
  *
  * NO migra datos: pm_activos / pm_hitos / pm_snapshot_fechas ya contienen todo lo
  * que muestra el Overview, y Planificación lee y escribe esas mismas tablas. Este
@@ -47,7 +47,7 @@ function canonicalHitoOrder(rows: HitoRow[]): HitoRow[] {
 }
 
 async function backfillSnapshots(client: PoolClient): Promise<string[]> {
-  // El orden lo calcula pm_snapshot_orden() (migración 019), única fuente de
+  // El orden lo calcula pm_snapshot_orden() (migración 021), única fuente de
   // verdad compartida con el RPC de congelar. Duplicar la fórmula aquí en TS
   // sería pedir que las dos diverjan.
   const { rows } = await client.query<{ snapshot_code: string; orden: number }>(
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
     if (Number(tablas[0].n) < 2) {
       throw new Error(
         "Faltan pm_hito_catalogo / pm_snapshots. Aplica primero la migración\n" +
-          "supabase/migrations/20260716120000_018_pm_planificacion.sql",
+          "supabase/migrations/20260716140000_020_pm_planificacion.sql",
       );
     }
     const { rows: fn } = await client.query<{ n: string }>(
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     if (Number(fn[0].n) === 0) {
       throw new Error(
         "Falta la función pm_snapshot_orden(). Aplica la migración\n" +
-          "supabase/migrations/20260716130000_019_congelar_pm_snapshot.sql",
+          "supabase/migrations/20260716150000_021_congelar_pm_snapshot.sql",
       );
     }
 

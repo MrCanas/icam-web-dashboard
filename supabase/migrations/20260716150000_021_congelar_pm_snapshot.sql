@@ -1,4 +1,4 @@
--- PM 019 — Congelar el trimestre reportado por la PMO.
+-- PM 021 — Congelar el trimestre reportado por la PMO.
 --
 -- Sustituye a "añadir a mano una columna de trimestre a la hoja OVERVIEW":
 -- copia la previsión vigente de cada hito (pm_hitos.fecha_actual) a

@@ -24,11 +24,11 @@ export interface PmHito {
    */
   desviacion_vs_anterior_dias: number | null;
   desviacion_vs_levantamiento_dias: number | null;
-  /** FK al catálogo global (migración 018). Null si falta pasar el backfill. */
+  /** FK al catálogo global (migración 020). Null si falta pasar el backfill. */
   catalogo_id?: string | null;
 }
 
-/** Entrada del catálogo global de hitos (migración 018). */
+/** Entrada del catálogo global de hitos (migración 020). */
 export interface PmHitoCatalogo {
   id: string;
   nombre: string;
@@ -45,7 +45,7 @@ export interface PmHitoCatalogo {
   activo: boolean;
 }
 
-/** Un snapshot = un trimestre reportado por la PMO (migración 018). */
+/** Un snapshot = un trimestre reportado por la PMO (migración 020). */
 export interface PmSnapshot {
   snapshot_code: string;
   label: string | null;

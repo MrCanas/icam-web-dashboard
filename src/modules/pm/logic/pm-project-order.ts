@@ -3,7 +3,7 @@
  *
  * Vivía hardcodeado dentro de PmGanttOverview.tsx, lo que dejaba fuera del
  * gráfico a cualquier proyecto dado de alta por la PMO. La fuente real pasa a
- * ser `pm_activos.orden` (migración 018).
+ * ser `pm_activos.orden` (migración 020).
  *
  * Se conserva por dos motivos:
  *   1. Es la semilla de `pm_activos.orden` en scripts/pm/backfill-planificacion.ts,

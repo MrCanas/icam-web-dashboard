@@ -1,4 +1,4 @@
--- PM 018 — Planificación: catálogo global de hitos + registro de snapshots.
+-- PM 020 — Planificación: catálogo global de hitos + registro de snapshots.
 --
 -- Habilita que la PMO edite los hitos desde /dashboard/pm/planificacion en vez
 -- de subir la hoja OVERVIEW del Excel. El esquema pm_hitos + pm_snapshot_fechas

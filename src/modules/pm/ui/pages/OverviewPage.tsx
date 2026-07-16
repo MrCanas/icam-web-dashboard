@@ -42,7 +42,7 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
   ]);
 
   // Solo los snapshots que la PMO ha marcado como publicables en Planificación.
-  // Si el registro está vacío (migración 018 sin aplicar), se muestran todos:
+  // Si el registro está vacío (migración 020 sin aplicar), se muestran todos:
   // el Overview no debe quedarse en blanco por una migración pendiente.
   const codigosVisibles =
     publicados.length > 0
