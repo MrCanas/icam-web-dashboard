@@ -6,10 +6,22 @@ export type TrafficLight = "green" | "yellow" | "red";
 const GREEN_MAX_MONTHS = 2;
 const YELLOW_MAX_MONTHS = 6;
 
-/** Media de |desviacion_vs_levantamiento_dias| entre hitos con valor. */
+/**
+ * Media de |desviación vs levantamiento| entre hitos con valor.
+ *
+ * Usa la desviación derivada de las fechas, que rellena fetchPmPortfolio; solo
+ * cae a la columna del Excel si nadie la calculó (`undefined`). Distinguir
+ * `undefined` de `null` es deliberado: si el repositorio la calculó y dio null
+ * —porque el hito no tiene plan vigente— hay que respetar ese null. Con `??` se
+ * recaería en el valor del Excel, que queda rancio en cuanto la PMO edita.
+ */
 export function meanAbsLevantamiento(row: PmPortfolioRow): number | null {
   const vals = row.hitos
-    .map((h) => h.desviacion_vs_levantamiento_dias)
+    .map((h) =>
+      h.desviacion_lev_derivada !== undefined
+        ? h.desviacion_lev_derivada
+        : h.desviacion_vs_levantamiento_dias,
+    )
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
     .map((v) => Math.abs(v));
   if (vals.length === 0) return null;

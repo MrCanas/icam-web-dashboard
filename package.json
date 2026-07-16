@@ -35,6 +35,7 @@
     "actas:send-test-alert": "tsx scripts/actas/send-test-alert.ts",
     "actas:test-migration-resolve": "tsx --test scripts/actas/lib/__tests__/migration-resolve.test.ts",
     "pm:backfill-planificacion": "tsx scripts/pm/backfill-planificacion.ts",
+    "pm:verify-planificacion": "tsx scripts/pm/verify-planificacion.ts",
     "portfolio:sync-maestro": "tsx scripts/portfolio/sync-local-maestro.ts",
     "auth:seed-hardcoded": "tsx scripts/auth/seed-hardcoded-users.ts",
     "auth:grant": "tsx scripts/auth/grant-zone-role.ts",
