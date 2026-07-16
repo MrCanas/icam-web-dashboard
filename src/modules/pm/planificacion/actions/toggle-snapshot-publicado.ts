@@ -21,7 +21,7 @@ export type ToggleSnapshotPublicadoResult =
  * tenía sentido.
  *
  * Solo se guardan las excepciones: publicar borra la fila (sin fila = publicado)
- * y retirar la inserta. Así un trimestre recién congelado se publica solo y la
+ * y retirar la inserta. Así un trimestre recién añadido se publica solo y la
  * tabla no crece con filas que no dicen nada.
  *
  * No borra ninguna fecha: el trimestre sigue en la rejilla, solo deja de salir

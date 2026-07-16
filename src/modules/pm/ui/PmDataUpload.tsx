@@ -229,7 +229,7 @@ export function PmDataUpload() {
             </a>
             . Esta importación <strong>borra las tres tablas</strong> y se lleva por
             delante todo lo editado ahí y <strong>el histórico completo de
-            trimestres congelados</strong>, no solo lo que traiga el Excel.
+            los trimestres</strong>, no solo lo que traiga el Excel.
           </p>
           <p className="mt-1 leading-snug text-red-900/90">
             Después hay que reejecutar <code className="text-xs">npm run pm:backfill-planificacion</code>:
@@ -359,7 +359,7 @@ export function PmDataUpload() {
             />
             <span>
               Entiendo que esto borrará todos los datos PM de Supabase, incluidos
-              los trimestres congelados y lo editado en Planificación, y que tendré
+              los trimestres del histórico y lo editado en Planificación, y que tendré
               que reejecutar el backfill después.
             </span>
           </label>

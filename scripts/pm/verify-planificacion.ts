@@ -5,7 +5,7 @@
  *   1. Nada se ha perdido: el backfill no toca los datos del Overview.
  *   2. La desviación DERIVADA coincide con la que traía el Excel → los KPIs no cambian.
  *   3. Todo hito tiene entrada de catálogo y todo snapshot está registrado.
- *   4. Congelar un snapshot es idempotente (se prueba y se revierte).
+ *   4. Añadir un trimestre es idempotente (se prueba y se revierte).
  *
  * Solo lee, salvo la prueba 4, que escribe dentro de una transacción con ROLLBACK.
  *
@@ -94,6 +94,33 @@ async function main(): Promise<void> {
     check(c[0].hitos > 0, `${c[0].hitos} hitos`);
     check(c[0].fechas > 0, `${c[0].fechas} fechas de snapshot`);
 
+    // Inventario de trimestres. Contar solo el total no basta: unas pruebas
+    // dejaron 28 filas de un trimestre nuevo en producción y el recuento global
+    // no lo delató porque nadie miraba QUÉ trimestres existían.
+    console.log("\n1b. Inventario de trimestres (para detectar restos de pruebas)");
+    const { rows: inv } = await client.query<{
+      snapshot_code: string;
+      filas: number;
+      proyectos: number;
+    }>(
+      `SELECT s.snapshot_code, count(*)::int filas, count(DISTINCT h.activo_id)::int proyectos
+         FROM pm_snapshot_fechas s JOIN pm_hitos h ON h.id = s.hito_id
+        GROUP BY 1 ORDER BY 1`,
+    );
+    for (const t of inv) {
+      console.log(
+        `       ${t.snapshot_code.padEnd(16)} ${String(t.filas).padStart(3)} fechas · ${t.proyectos} proyecto(s)`,
+      );
+    }
+    const huerfanos = inv.filter((t) => t.proyectos === 1 && t.snapshot_code !== "levantamiento");
+    check(
+      huerfanos.length === 0,
+      "ningún trimestre cuelga de un solo proyecto",
+      huerfanos.length
+        ? `${huerfanos.map((t) => t.snapshot_code).join(", ")} — ¿restos de pruebas?`
+        : "",
+    );
+
     console.log("\n2. Desviación derivada vs la del Excel (los KPIs no deben cambiar)");
     let comparables = 0;
     const discrepancias: string[] = [];
@@ -139,7 +166,7 @@ async function main(): Promise<void> {
     );
     check(ord[0].n <= 1, "los activos tienen orden asignado", `${ord[0].n} con orden=0`);
 
-    console.log("\n4. Congelar snapshot es idempotente (en transacción, con rollback)");
+    console.log("\n4. Añadir un trimestre es idempotente (en transacción, con rollback)");
     await client.query("BEGIN");
     try {
       const CODE = "__verify_tmp__";
@@ -165,8 +192,8 @@ async function main(): Promise<void> {
         )
       ).rows[0].n;
 
-      check(n1 > 0, `congelar creó ${n1} fechas`);
-      check(n1 === n2, "congelar dos veces no duplica", `${n1} → ${n2}`);
+      check(n1 > 0, `añadir creó ${n1} fechas`);
+      check(n1 === n2, "añadir dos veces no duplica", `${n1} → ${n2}`);
     } finally {
       await client.query("ROLLBACK");
     }
@@ -213,13 +240,13 @@ async function main(): Promise<void> {
       ).rows[0].n;
       check(antes === despues, "retirar un trimestre no borra fechas", `${antes} → ${despues}`);
 
-      // Congelar selectivo: solo el proyecto elegido.
+      // Añadir selectivo: solo el proyecto elegido.
       await client.query(`DELETE FROM pm_snapshot_fechas WHERE snapshot_code = '2099_Q1'`);
       await client.query(
         `INSERT INTO pm_snapshots (snapshot_code, orden) VALUES ('2099_Q1', 998)
          ON CONFLICT DO NOTHING`,
       );
-      await client.query(`SELECT congelar_pm_snapshot('2099_Q1', ARRAY[$1::uuid])`, [
+      await client.query(`SELECT anadir_pm_snapshot('2099_Q1', ARRAY[$1::uuid])`, [
         activo.id,
       ]);
       const afectados = (
@@ -229,17 +256,17 @@ async function main(): Promise<void> {
             WHERE s.snapshot_code = '2099_Q1'`,
         )
       ).rows[0].n;
-      check(afectados === 1, "congelar selectivo solo toca el proyecto elegido", `${afectados} proyecto(s)`);
+      check(afectados === 1, "añadir selectivo solo toca el proyecto elegido", `${afectados} proyecto(s)`);
 
-      // Y no congela el hito archivado.
-      const archivadoCongelado = (
+      // Y no añade el hito archivado.
+      const archivadoAnadido = (
         await client.query<{ n: number }>(
           `SELECT count(*)::int n FROM pm_snapshot_fechas
             WHERE snapshot_code = '2099_Q1' AND hito_id = $1`,
           [victima.id],
         )
       ).rows[0].n;
-      check(archivadoCongelado === 0, "congelar ignora los hitos archivados");
+      check(archivadoAnadido === 0, "añadir ignora los hitos archivados");
     } finally {
       await client.query("ROLLBACK");
     }

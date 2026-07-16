@@ -18,7 +18,7 @@ const snap = (over: Partial<PmSnapshot> = {}): PmSnapshot => ({
   label: null,
   visible_en_dashboard: true,
   orden: 105,
-  congelado_at: null,
+  anadido_at: null,
   ...over,
 });
 

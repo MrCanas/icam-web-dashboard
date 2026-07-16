@@ -71,7 +71,7 @@ export interface PmSnapshot {
    */
   visible_en_dashboard: boolean;
   orden: number;
-  congelado_at: string | null;
+  anadido_at: string | null;
 }
 
 /** Mapeo activo PM → proyecto del maestro financiero. N:1 (caso PC25). */

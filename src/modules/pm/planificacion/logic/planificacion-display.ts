@@ -17,7 +17,7 @@ export function snapshotsConDatos(hitos: PmHitoEnriched[]): Set<string> {
 /**
  * Columnas de snapshot visibles al abrir un proyecto.
  *
- * Levantamiento (el plan original, siempre útil) + el último trimestre congelado
+ * Levantamiento (el plan original, siempre útil) + el último trimestre añadido
  * SI ese proyecto tiene datos en él. Si no los tiene, solo Levantamiento.
  *
  * Los proyectos ni empiezan a la vez ni se reportan todos cada trimestre: CA1 no
@@ -41,7 +41,7 @@ export function columnasPorDefecto(
   return cols;
 }
 
-/** Trimestre congelado más reciente del registro; null si solo hay levantamiento. */
+/** Último trimestre añadido al registro; null si solo hay levantamiento. */
 export function ultimoTrimestre(snapshots: PmSnapshot[]): string | null {
   const trimestres = snapshots
     .filter((s) => s.snapshot_code !== LEVANTAMIENTO)
@@ -156,7 +156,7 @@ export function formatFechaCorta(iso: string | null): string | null {
 }
 
 /**
- * Trimestre natural de hoy, como sugerencia al congelar. La PMO puede cambiarlo:
+ * Trimestre natural de hoy, como sugerencia al añadirlo. La PMO puede cambiarlo:
  * a veces se reporta un trimestre ya cerrado.
  */
 export function trimestreActual(hoy = new Date()): string {

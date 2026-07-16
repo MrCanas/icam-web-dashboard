@@ -29,7 +29,7 @@ test("despublicar todos los trimestres menos uno deja solo ese", () => {
 });
 
 test("un trimestre nuevo fuera de los presets se muestra", () => {
-  // Al congelar 2026_Q2 debe aparecer sin tocar ninguna constante del código.
+  // Al añadir 2026_Q2 debe aparecer sin tocar ninguna constante del código.
   const result = mergeQuarterCodes(["2026_Q2", "2026_Q1"]);
   assert.deepEqual(result, ["2026_Q2", "2026_Q1"]);
 });

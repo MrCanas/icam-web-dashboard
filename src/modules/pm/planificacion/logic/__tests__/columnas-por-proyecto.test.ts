@@ -20,7 +20,7 @@ const snap = (code: string, orden: number): PmSnapshot => ({
   label: null,
   visible_en_dashboard: true,
   orden,
-  congelado_at: null,
+  anadido_at: null,
 });
 
 // El registro real tras el backfill: la fórmula pm_snapshot_orden() da estos.
@@ -93,7 +93,7 @@ test("un proyecto sin levantamiento no lo muestra", () => {
   assert.deepEqual(columnasPorDefecto(REGISTRO, hitos), ["2026_Q1"]);
 });
 
-test("un proyecto recién creado, sin nada congelado, no muestra columnas", () => {
+test("un proyecto recién creado, sin ningún trimestre, no muestra columnas", () => {
   assert.deepEqual(columnasPorDefecto(REGISTRO, [hito({})]), []);
 });
 
@@ -114,17 +114,17 @@ test("ultimoTrimestre nunca devuelve levantamiento", () => {
   assert.equal(ultimoTrimestre([snap("levantamiento", 0)]), null);
 });
 
-test("al congelar un trimestre nuevo, pasa a ser el último", () => {
+test("al añadir un trimestre nuevo, pasa a ser el último", () => {
   const conQ2 = [...REGISTRO, snap("2026_Q2", 106)];
   assert.equal(ultimoTrimestre(conQ2), "2026_Q2");
 
-  // Y aparece por defecto en los proyectos que se hayan congelado.
-  const congelado = [hito({ levantamiento: "2026-01-01", "2026_Q2": "2026-04-01" })];
-  assert.deepEqual(columnasPorDefecto(conQ2, congelado), ["levantamiento", "2026_Q2"]);
+  // Y aparece por defecto en los proyectos a los que se haya añadido.
+  const anadido = [hito({ levantamiento: "2026-01-01", "2026_Q2": "2026-04-01" })];
+  assert.deepEqual(columnasPorDefecto(conQ2, anadido), ["levantamiento", "2026_Q2"]);
 
-  // Los que NO se congelaron siguen sin verlo.
-  const noCongelado = [hito({ levantamiento: "2026-01-01", "2026_Q1": "2026-03-01" })];
-  assert.deepEqual(columnasPorDefecto(conQ2, noCongelado), ["levantamiento"]);
+  // A los que NO se añadió siguen sin verlo.
+  const noAnadido = [hito({ levantamiento: "2026-01-01", "2026_Q1": "2026-03-01" })];
+  assert.deepEqual(columnasPorDefecto(conQ2, noAnadido), ["levantamiento"]);
 });
 
 // === columnasDisponibles ======================================================

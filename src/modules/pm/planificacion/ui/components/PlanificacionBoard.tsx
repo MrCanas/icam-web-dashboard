@@ -16,7 +16,7 @@ import {
   type ColumnaFijaKey,
 } from "@/modules/pm/planificacion/logic/planificacion-display";
 
-import { CongelarSnapshotDialog } from "./CongelarSnapshotDialog";
+import { AnadirTrimestreDialog } from "./AnadirTrimestreDialog";
 import { PlanificacionColumnHeader } from "./PlanificacionColumnHeader";
 import { PlanificacionHitoRow } from "./PlanificacionHitoRow";
 
@@ -341,14 +341,14 @@ export function PlanificacionBoard({
                 </div>
               ) : (
                 <p className="mt-1.5 border-t border-subtle/40 pt-1.5 text-[10px] text-text-muted">
-                  Este proyecto no tiene ningún trimestre congelado todavía.
+                  Este proyecto no tiene ningún trimestre añadido todavía.
                 </p>
               )}
             </div>
           </details>
 
           {hasWriteAccess ? (
-            <CongelarSnapshotDialog rows={rows} onDone={mostrarToast} />
+            <AnadirTrimestreDialog rows={rows} onDone={mostrarToast} />
           ) : null}
         </div>
       </div>

@@ -48,7 +48,7 @@ function canonicalHitoOrder(rows: HitoRow[]): HitoRow[] {
 
 async function backfillSnapshots(client: PoolClient): Promise<string[]> {
   // El orden lo calcula pm_snapshot_orden() (migración 021), única fuente de
-  // verdad compartida con el RPC de congelar. Duplicar la fórmula aquí en TS
+  // verdad compartida con el RPC de añadir. Duplicar la fórmula aquí en TS
   // sería pedir que las dos diverjan.
   const { rows } = await client.query<{ snapshot_code: string; orden: number }>(
     `SELECT DISTINCT snapshot_code, pm_snapshot_orden(snapshot_code) AS orden
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     if (Number(fn[0].n) === 0) {
       throw new Error(
         "Falta la función pm_snapshot_orden(). Aplica la migración\n" +
-          "supabase/migrations/20260716150000_021_congelar_pm_snapshot.sql",
+          "supabase/migrations/20260716150000_021_anadir_pm_snapshot.sql",
       );
     }
 

@@ -19,7 +19,7 @@ export type UpdateHitoFechaResult =
 /**
  * Edita la previsión vigente (`fecha_actual`) de un hito.
  *
- * Solo toca fecha_actual: las columnas de snapshot son historia congelada y no
+ * Solo toca fecha_actual: las columnas de trimestre son historia cerrada y no
  * se reescriben desde la rejilla. La desviación no se guarda, se deriva al leer
  * (ver deviationVsLevantamientoDays), así que no hay nada que recalcular aquí.
  */

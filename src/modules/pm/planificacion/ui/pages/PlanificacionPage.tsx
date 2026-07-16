@@ -38,7 +38,7 @@ export default async function PlanificacionPage() {
       <header className="rounded-lg border border-subtle/50 bg-card p-4 shadow-sm">
         <h1 className="text-xl font-semibold text-text-primary">PM — Planificación</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Edita la previsión de cada hito y congela el trimestre que reportas. Lo
+          Edita la previsión de cada hito y añade el trimestre que reportas. Lo
           que guardes aquí es lo que muestra el Overview.
         </p>
         {!hasWriteAccess ? (

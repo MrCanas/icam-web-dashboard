@@ -209,7 +209,7 @@ export function PlanificacionHitoRow({
             }`}
             title={
               txt
-                ? `${s.snapshot_code}: ${txt} (congelado, solo lectura)${
+                ? `${s.snapshot_code}: ${txt} (añadido, solo lectura)${
                     retirado ? " · retirado del Overview en este proyecto" : ""
                   }`
                 : `${s.snapshot_code}: sin previsión`
