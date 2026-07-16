@@ -4,17 +4,26 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { PLATFORM_NAV } from "@/registry/platform-nav";
-import { MODULES, MODULES_LIST, MODULE_TO_ZONE } from "@/registry/modules";
+import { MODULES_LIST, MODULE_TO_ZONE } from "@/registry/modules";
 import type { ModuleRoute } from "@/registry/types";
+import type { UserContext } from "@/lib/auth/currentUser";
 import { useCurrentUser } from "@/lib/auth/useCurrentUser";
-import { hasZoneAccess } from "@/lib/auth/permissions";
-import type { ZoneKey } from "@/registry/modules";
+import { visibleRoutesForZone } from "@/lib/auth/permissions";
+import { ZONE_ORDER, type ZoneKey } from "@/registry/modules";
 
-function secondaryForPath(pathname: string): ModuleRoute[] {
-  const module = MODULES_LIST.find((mod) => pathname.startsWith(mod.pathPrefix));
-  if (module) return module.routes;
-  if (pathname.startsWith(PLATFORM_NAV.pathPrefix)) return PLATFORM_NAV.routes;
-  return MODULES.portfolio.routes;
+function zoneForPath(pathname: string): ZoneKey {
+  const mod = MODULES_LIST.find((m) => pathname.startsWith(m.pathPrefix));
+  if (mod) {
+    const zoneKey = MODULE_TO_ZONE[mod.key] as ZoneKey | undefined;
+    if (zoneKey) return zoneKey;
+  }
+  if (pathname.startsWith(PLATFORM_NAV.pathPrefix)) return "data";
+  return "financiero";
+}
+
+/** Subsección de la zona actual, ya filtrada por los permisos del usuario. */
+function secondaryForPath(user: UserContext, pathname: string): ModuleRoute[] {
+  return visibleRoutesForZone(user, zoneForPath(pathname));
 }
 
 function isRouteActive(pathname: string, route: ModuleRoute): boolean {
@@ -30,7 +39,7 @@ interface DashboardNavProps {
 export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNavProps) {
   const pathname = usePathname();
   const { user } = useCurrentUser();
-  const secondary = secondaryForPath(pathname);
+  const secondary = user ? secondaryForPath(user, pathname) : [];
   const isVertical = layout === "vertical";
 
   const primaryTabs = useMemo(() => {
@@ -38,21 +47,27 @@ export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNav
 
     const tabs: { href: string; label: string; prefix: string }[] = [];
 
-    for (const mod of MODULES_LIST) {
-      const zoneKey = MODULE_TO_ZONE[mod.key] as ZoneKey | undefined;
-      if (!zoneKey || !hasZoneAccess(user, zoneKey)) continue;
+    for (const zoneKey of ZONE_ORDER) {
+      // Una zona con todas sus páginas denegadas no debe aparecer, y el destino
+      // es la primera página VISIBLE: `defaultPath` puede estar denegado.
+      const visible = visibleRoutesForZone(user, zoneKey);
+      if (visible.length === 0) continue;
+
+      if (zoneKey === "data") {
+        tabs.push({
+          href: visible[0]!.path,
+          label: PLATFORM_NAV.label,
+          prefix: PLATFORM_NAV.pathPrefix,
+        });
+        continue;
+      }
+
+      const mod = MODULES_LIST.find((m) => MODULE_TO_ZONE[m.key] === zoneKey);
+      if (!mod) continue;
       tabs.push({
-        href: mod.defaultPath,
+        href: visible[0]!.path,
         label: mod.label,
         prefix: mod.pathPrefix,
-      });
-    }
-
-    if (hasZoneAccess(user, "data")) {
-      tabs.push({
-        href: PLATFORM_NAV.defaultPath,
-        label: PLATFORM_NAV.label,
-        prefix: PLATFORM_NAV.pathPrefix,
       });
     }
 

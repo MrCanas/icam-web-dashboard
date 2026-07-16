@@ -61,6 +61,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: GENERIC_AUTH_ERROR }, { status: 401 });
   }
 
+  // Cuenta desactivada: mismo error genérico, no revelar que existe.
+  const { data: accountRow, error: accountError } = await admin
+    .from("app_user_account")
+    .select("is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (accountError || accountRow?.is_active === false) {
+    return NextResponse.json({ error: GENERIC_AUTH_ERROR }, { status: 401 });
+  }
+
   let token: string;
   try {
     token = await signSessionToken(userId);

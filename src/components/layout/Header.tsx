@@ -1,9 +1,9 @@
 "use client";
 
 import { DashboardNav } from "@/components/layout/DashboardNav";
+import { HeaderUserMenu } from "@/components/layout/HeaderUserMenu";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export function Header() {
@@ -43,22 +43,9 @@ export function Header() {
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-1 shrink-0">
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             <NotificationBell />
-            <Link
-              href="/dashboard/perfil"
-              className="min-h-11 flex items-center text-white/50 text-xs hover:text-white/80 transition"
-            >
-              Mi perfil
-            </Link>
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="min-h-11 px-2 text-white/50 text-xs text-right leading-tight hover:text-white/80 transition cursor-pointer"
-              >
-                Cerrar sesión
-              </button>
-            </form>
+            <HeaderUserMenu variant="desktop" />
           </div>
         </div>
 
@@ -100,21 +87,10 @@ export function Header() {
               <div className="px-2 pb-2 flex justify-end">
                 <NotificationBell />
               </div>
-              <Link
-                href="/dashboard/perfil"
-                onClick={() => setMenuOpen(false)}
-                className="block w-full min-h-11 text-left text-sm text-white/70 hover:text-white py-2 px-2 rounded-md hover:bg-white/5 transition"
-              >
-                Mi perfil
-              </Link>
-              <form action="/api/auth/logout" method="post">
-                <button
-                  type="submit"
-                  className="w-full min-h-11 text-left text-sm text-white/70 hover:text-white py-2 px-2 rounded-md hover:bg-white/5 transition"
-                >
-                  Cerrar sesión
-                </button>
-              </form>
+              <HeaderUserMenu
+                variant="drawer"
+                onNavigate={() => setMenuOpen(false)}
+              />
             </div>
           </div>
         </div>

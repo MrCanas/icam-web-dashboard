@@ -38,6 +38,7 @@
     "portfolio:sync-maestro": "tsx scripts/portfolio/sync-local-maestro.ts",
     "auth:seed-hardcoded": "tsx scripts/auth/seed-hardcoded-users.ts",
     "auth:grant": "tsx scripts/auth/grant-zone-role.ts",
+    "auth:platform-admin": "tsx scripts/auth/set-platform-admin.ts",
     "auth:test-login": "tsx scripts/auth/test-login.ts"
   },
   "dependencies": {

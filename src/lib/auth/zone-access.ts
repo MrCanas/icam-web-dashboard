@@ -1,25 +1,35 @@
 import type { UserContext } from "@/lib/auth/currentUser";
-import { hasZoneAccess } from "@/lib/auth/permissions";
+import {
+  canAccessRouteKey,
+  hasZoneAccess,
+  isPlatformAdmin,
+  visibleRoutesForZone,
+} from "@/lib/auth/permissions";
 import {
   MODULE_TO_ZONE,
-  MODULES,
   ZONE_ORDER,
   ZONE_TO_MODULE,
   type ZoneKey,
 } from "@/registry/modules";
-import { PLATFORM_NAV } from "@/registry/platform-nav";
+import { routeKeyForPathname } from "@/registry/routes";
 
 export { MODULE_TO_ZONE, ZONE_TO_MODULE, type ZoneKey };
 export { hasZoneAccess };
 
-/** Ruta por defecto de la primera zona accesible (orden app_zone). */
+/** Gestión de usuarios: fuera del RBAC por zona, solo admins de plataforma. */
+export const ADMIN_PATH_PREFIX = "/dashboard/admin";
+
+/**
+ * Primera página realmente visible (orden app_zone).
+ *
+ * Devuelve la primera ruta VISIBLE de la zona, no su `defaultPath`: si el
+ * usuario tiene denegada la página por defecto de la zona, devolverla crearía
+ * un bucle de redirect con DashboardZoneGuard.
+ */
 export function firstAccessiblePath(user: UserContext): string | null {
   for (const zoneKey of ZONE_ORDER) {
-    if (!hasZoneAccess(user, zoneKey)) continue;
-    if (zoneKey === "financiero") return MODULES.portfolio.defaultPath;
-    if (zoneKey === "pm") return MODULES.pm.defaultPath;
-    if (zoneKey === "adquisiciones") return MODULES.monday.defaultPath;
-    if (zoneKey === "data") return PLATFORM_NAV.defaultPath;
+    const visible = visibleRoutesForZone(user, zoneKey);
+    if (visible.length > 0) return visible[0]!.path;
   }
   return null;
 }
@@ -34,9 +44,17 @@ export function pathnameToZone(pathname: string): ZoneKey | null {
 }
 
 export function userCanAccessPath(user: UserContext, pathname: string): boolean {
+  if (pathname.startsWith(ADMIN_PATH_PREFIX)) {
+    return isPlatformAdmin(user);
+  }
+
   const zone = pathnameToZone(pathname);
   if (!zone) return true;
-  return hasZoneAccess(user, zone);
+  if (!hasZoneAccess(user, zone)) return false;
+
+  // Rutas fuera del registry (p. ej. /dashboard/mapa) heredan el permiso de zona.
+  const routeKey = routeKeyForPathname(pathname);
+  return routeKey ? canAccessRouteKey(user, routeKey) : true;
 }
 
 export function moduleKeyForZone(zoneKey: ZoneKey): string | null {
