@@ -26,6 +26,22 @@ export interface PmHito {
   desviacion_vs_levantamiento_dias: number | null;
   /** FK al catálogo global (migración 020). Null si falta pasar el backfill. */
   catalogo_id?: string | null;
+  /**
+   * Baja lógica POR PROYECTO (migración 022): cada fila de pm_hitos ya es un par
+   * activo×hito, así que archivar aquí no toca al resto de proyectos. El hito
+   * desaparece de rejilla, Gantt y detalle; sus fechas se conservan.
+   */
+  archivado_at?: string | null;
+}
+
+/**
+ * Excepción de publicación: qué trimestres retira un proyecto del Overview.
+ * Solo se guardan los `publicado = false`; sin fila = publicado (migración 022).
+ */
+export interface PmActivoSnapshot {
+  activo_id: string;
+  snapshot_code: string;
+  publicado: boolean;
 }
 
 /** Entrada del catálogo global de hitos (migración 020). */
@@ -49,7 +65,10 @@ export interface PmHitoCatalogo {
 export interface PmSnapshot {
   snapshot_code: string;
   label: string | null;
-  /** El check por columna: publica el snapshot en Overview y detalle. */
+  /**
+   * OBSOLETA desde la 022: publicar es por proyecto (ver PmActivoSnapshot). Se
+   * conserva porque la columna sigue en la tabla, pero nadie la lee.
+   */
   visible_en_dashboard: boolean;
   orden: number;
   congelado_at: string | null;

@@ -1,23 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import type { PmPortfolioRow } from "@/modules/pm/data/pmRepository";
 import type { PmHitoCatalogo, PmSnapshot } from "@/modules/pm/types";
 import { shiftHitosFechas } from "@/modules/pm/planificacion/actions/crud-hito";
-import { boardMinWidthPx, snapshotLabel } from "@/modules/pm/planificacion/logic/planificacion-display";
+import {
+  boardMinWidthPx,
+  columnasDisponibles,
+  columnasPorDefecto,
+  COLUMNAS_FIJAS,
+  snapshotLabel,
+  type Anchos,
+  type ColumnaFijaKey,
+} from "@/modules/pm/planificacion/logic/planificacion-display";
 
 import { CongelarSnapshotDialog } from "./CongelarSnapshotDialog";
 import { PlanificacionColumnHeader } from "./PlanificacionColumnHeader";
 import { PlanificacionHitoRow } from "./PlanificacionHitoRow";
 
-const STORAGE_KEY = "pm.planificacion.columnasOcultas";
+/**
+ * Preferencias locales de cada usuario, no datos compartidos.
+ *
+ * Las columnas ocultas van POR PROYECTO: los trimestres con datos difieren de un
+ * activo a otro, así que una lista global no significaría lo mismo en cada uno.
+ * Los anchos sí son globales: las columnas fijas son las mismas en todos.
+ */
+const KEY_COLUMNAS = (activoId: string) => `pm.planificacion.columnas.${activoId}`;
+const KEY_ANCHOS = "pm.planificacion.anchos";
 
 interface PlanificacionBoardProps {
   rows: PmPortfolioRow[];
   catalogo: PmHitoCatalogo[];
   snapshots: PmSnapshot[];
+  /** `${activoId}|${code}` retirados del Overview por la PMO. */
+  retirados: string[];
   hasWriteAccess: boolean;
 }
 
@@ -25,6 +43,7 @@ export function PlanificacionBoard({
   rows,
   catalogo,
   snapshots,
+  retirados,
   hasWriteAccess,
 }: PlanificacionBoardProps) {
   const router = useRouter();
@@ -33,38 +52,19 @@ export function PlanificacionBoard({
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [meses, setMeses] = useState(3);
   const [soloTablaMadre, setSoloTablaMadre] = useState(false);
+  const [verArchivados, setVerArchivados] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  // Ocultar columnas: preferencia LOCAL de quien edita, no toca a nadie más.
-  // Distinto del check "publicar" de la cabecera, que sí es dato compartido.
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-  const [cargado, setCargado] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setOcultas(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      // localStorage no disponible: se trabaja con todas las columnas visibles.
-    }
-    setCargado(true);
-  }, []);
+  const retiradosSet = useMemo(() => new Set(retirados), [retirados]);
 
-  useEffect(() => {
-    if (!cargado) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...ocultas]));
-    } catch {
-      // Sin persistencia, pero la sesión sigue funcionando.
-    }
-  }, [ocultas, cargado]);
+  const row = rows.find((r) => r.activo.id === activoId) ?? rows[0];
 
-  const mostrarToast = (msg: string) => {
+  const mostrarToast = useCallback((msg: string) => {
     setToast(msg);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(null), 4000);
-  };
+  }, []);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const catalogoPorId = useMemo(() => {
@@ -79,29 +79,137 @@ export function PlanificacionBoard({
     return m;
   }, [catalogo]);
 
-  const snapshotsVisibles = useMemo(
-    () => snapshots.filter((s) => !ocultas.has(s.snapshot_code)),
-    [snapshots, ocultas],
+  const catalogoDe = (catalogoId: string | null | undefined, nombre: string) =>
+    catalogoId ? catalogoPorId.get(catalogoId) : catalogoPorNombre.get(nombre);
+
+  // --- Columnas: por defecto Levantamiento + el último trimestre CON datos ----
+  const disponibles = useMemo(
+    () => (row ? columnasDisponibles(snapshots, row.hitos) : []),
+    [snapshots, row],
+  );
+  const porDefecto = useMemo(
+    () => (row ? columnasPorDefecto(snapshots, row.hitos) : []),
+    [snapshots, row],
   );
 
-  const row = rows.find((r) => r.activo.id === activoId) ?? rows[0];
+  const [visibles, setVisibles] = useState<Set<string> | null>(null);
+  const [fijasOcultas, setFijasOcultas] = useState<Set<string>>(new Set());
+  const [anchos, setAnchos] = useState<Anchos>({});
+  const [cargado, setCargado] = useState(false);
 
-  const hitos = useMemo(() => {
-    if (!row) return [];
-    const lista = [...row.hitos].sort((a, b) => a.orden_hito - b.orden_hito);
-    if (!soloTablaMadre) return lista;
-    return lista.filter((h) => {
-      const cat = h.catalogo_id
-        ? catalogoPorId.get(h.catalogo_id)
-        : catalogoPorNombre.get(h.hito);
-      return cat?.tabla_madre_existe === true;
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(KEY_ANCHOS);
+      if (raw) setAnchos(JSON.parse(raw) as Anchos);
+    } catch {
+      // Sin persistencia se trabaja con los anchos por defecto.
+    }
+    setCargado(true);
+  }, []);
+
+  // Al cambiar de proyecto se recarga SU preferencia: si nunca tocó las columnas
+  // (null) manda el cálculo por defecto, que depende de sus datos.
+  useEffect(() => {
+    if (!activoId) return;
+    setSeleccion(new Set());
+    setVerArchivados(false);
+    try {
+      const raw = window.localStorage.getItem(KEY_COLUMNAS(activoId));
+      if (raw) {
+        const p = JSON.parse(raw) as { snapshots?: string[]; fijasOcultas?: string[] };
+        setVisibles(p.snapshots ? new Set(p.snapshots) : null);
+        setFijasOcultas(new Set(p.fijasOcultas ?? []));
+        return;
+      }
+    } catch {
+      // Preferencia corrupta: se ignora y se usa el defecto.
+    }
+    setVisibles(null);
+    setFijasOcultas(new Set());
+  }, [activoId]);
+
+  const guardarColumnas = useCallback(
+    (snaps: Set<string> | null, fijas: Set<string>) => {
+      if (!activoId) return;
+      try {
+        window.localStorage.setItem(
+          KEY_COLUMNAS(activoId),
+          JSON.stringify({
+            snapshots: snaps ? [...snaps] : undefined,
+            fijasOcultas: [...fijas],
+          }),
+        );
+      } catch {
+        // Sin persistencia, pero la sesión sigue.
+      }
+    },
+    [activoId],
+  );
+
+  const onAncho = useCallback((key: string, px: number) => {
+    setAnchos((a) => {
+      const next = { ...a };
+      if (px <= 0) delete next[key]; // doble clic → volver al defecto
+      else next[key] = px;
+      try {
+        window.localStorage.setItem(KEY_ANCHOS, JSON.stringify(next));
+      } catch {
+        // idem
+      }
+      return next;
     });
-  }, [row, soloTablaMadre, catalogoPorId, catalogoPorNombre]);
+  }, []);
 
-  const catalogoDe = (hitoId: string, catalogoId: string | null | undefined, nombre: string) => {
-    void hitoId;
-    return catalogoId ? catalogoPorId.get(catalogoId) : catalogoPorNombre.get(nombre);
+  const snapshotsVisibles = useMemo(() => {
+    const activos = visibles ?? new Set(porDefecto);
+    return disponibles.filter((s) => activos.has(s.snapshot_code));
+  }, [disponibles, visibles, porDefecto]);
+
+  const fijasVisibles = useMemo(
+    () =>
+      COLUMNAS_FIJAS.filter((c) => !fijasOcultas.has(c.key)).map(
+        (c) => c.key,
+      ) as ColumnaFijaKey[],
+    [fijasOcultas],
+  );
+
+  const toggleSnapshotCol = (code: string) => {
+    const base = visibles ?? new Set(porDefecto);
+    const n = new Set(base);
+    if (n.has(code)) n.delete(code);
+    else n.add(code);
+    setVisibles(n);
+    guardarColumnas(n, fijasOcultas);
   };
+
+  const toggleFija = (key: string) => {
+    const n = new Set(fijasOcultas);
+    if (n.has(key)) n.delete(key);
+    else n.add(key);
+    setFijasOcultas(n);
+    guardarColumnas(visibles, n);
+  };
+
+  // --- Hitos: activos arriba, archivados en su apartado ----------------------
+  const { activos: hitosActivos, archivados } = useMemo(() => {
+    const vacio = { activos: [] as typeof hitos, archivados: [] as typeof hitos };
+    const hitos = row?.hitos ?? [];
+    if (!row) return vacio;
+
+    const orden = [...hitos].sort((a, b) => a.orden_hito - b.orden_hito);
+    const filtrar = (lista: typeof hitos) =>
+      soloTablaMadre
+        ? lista.filter(
+            (h) => catalogoDe(h.catalogo_id, h.hito)?.tabla_madre_existe === true,
+          )
+        : lista;
+
+    return {
+      activos: filtrar(orden.filter((h) => !h.archivado_at)),
+      archivados: orden.filter((h) => h.archivado_at),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row, soloTablaMadre, catalogoPorId, catalogoPorNombre]);
 
   const toggleSeleccion = (id: string) => {
     setSeleccion((s) => {
@@ -112,10 +220,11 @@ export function PlanificacionBoard({
     });
   };
 
-  const todosSeleccionados = hitos.length > 0 && hitos.every((h) => seleccion.has(h.id));
+  const todosSeleccionados =
+    hitosActivos.length > 0 && hitosActivos.every((h) => seleccion.has(h.id));
 
   const toggleTodos = () => {
-    setSeleccion(todosSeleccionados ? new Set() : new Set(hitos.map((h) => h.id)));
+    setSeleccion(todosSeleccionados ? new Set() : new Set(hitosActivos.map((h) => h.id)));
   };
 
   const desplazar = () => {
@@ -146,7 +255,12 @@ export function PlanificacionBoard({
     );
   }
 
-  const minWidth = boardMinWidthPx(snapshotsVisibles.length);
+  const minWidth = boardMinWidthPx(
+    fijasVisibles,
+    snapshotsVisibles.map((s) => s.snapshot_code),
+    anchos,
+  );
+  const snapsActivos = visibles ?? new Set(porDefecto);
 
   return (
     <div className="space-y-3">
@@ -154,16 +268,14 @@ export function PlanificacionBoard({
         <label className="text-xs font-medium text-text-muted">Proyecto</label>
         <select
           value={row.activo.id}
-          onChange={(e) => {
-            setActivoId(e.target.value);
-            setSeleccion(new Set());
-          }}
+          onChange={(e) => setActivoId(e.target.value)}
           className="rounded border border-subtle bg-page px-2 py-1 text-sm text-text-body focus:outline-none focus:ring-1 focus:ring-icam-900/20"
         >
           {rows.map((r) => (
             <option key={r.activo.id} value={r.activo.id}>
               {r.activo.id_activo}
               {r.activo.nombre_display ? ` — ${r.activo.nombre_display}` : ""}
+              {r.activo.archivado_at ? " (archivado)" : ""}
             </option>
           ))}
         </select>
@@ -183,38 +295,61 @@ export function PlanificacionBoard({
 
           <details className="relative">
             <summary className="cursor-pointer list-none rounded border border-subtle px-2 py-1 text-xs text-text-body hover:bg-page">
-              Columnas ({snapshotsVisibles.length}/{snapshots.length})
+              Columnas ({fijasVisibles.length + snapshotsVisibles.length})
             </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-subtle/60 bg-card p-2 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-subtle/60 bg-card p-2 shadow-lg">
               <p className="mb-1.5 text-[10px] leading-snug text-text-muted">
-                Solo afecta a tu vista. Para quitar un trimestre del Overview usa
-                el check «publicar» de su columna.
+                Solo afecta a tu vista y a este proyecto. Para retirar un trimestre
+                del Overview usa el check «publicar» de su columna.
               </p>
-              {snapshots.map((s) => (
+
+              {COLUMNAS_FIJAS.map((c) => (
                 <label
-                  key={s.snapshot_code}
-                  className="flex cursor-pointer items-center gap-1.5 py-0.5 text-xs text-text-body"
+                  key={c.key}
+                  className={`flex items-center gap-1.5 py-0.5 text-xs ${
+                    c.ocultable ? "cursor-pointer text-text-body" : "cursor-default text-text-muted"
+                  }`}
+                  title={c.ocultable ? undefined : "Esta columna no se puede ocultar"}
                 >
                   <input
                     type="checkbox"
-                    checked={!ocultas.has(s.snapshot_code)}
-                    className="h-3.5 w-3.5 accent-icam-900"
-                    onChange={() =>
-                      setOcultas((o) => {
-                        const n = new Set(o);
-                        if (n.has(s.snapshot_code)) n.delete(s.snapshot_code);
-                        else n.add(s.snapshot_code);
-                        return n;
-                      })
-                    }
+                    checked={!fijasOcultas.has(c.key)}
+                    disabled={!c.ocultable}
+                    className="h-3.5 w-3.5 accent-icam-900 disabled:opacity-40"
+                    onChange={() => toggleFija(c.key)}
                   />
-                  {snapshotLabel(s)}
+                  {c.label}
                 </label>
               ))}
+
+              {disponibles.length ? (
+                <div className="mt-1.5 border-t border-subtle/40 pt-1.5">
+                  {disponibles.map((s) => (
+                    <label
+                      key={s.snapshot_code}
+                      className="flex cursor-pointer items-center gap-1.5 py-0.5 text-xs text-text-body"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={snapsActivos.has(s.snapshot_code)}
+                        className="h-3.5 w-3.5 accent-icam-900"
+                        onChange={() => toggleSnapshotCol(s.snapshot_code)}
+                      />
+                      {snapshotLabel(s)}
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1.5 border-t border-subtle/40 pt-1.5 text-[10px] text-text-muted">
+                  Este proyecto no tiene ningún trimestre congelado todavía.
+                </p>
+              )}
             </div>
           </details>
 
-          {hasWriteAccess ? <CongelarSnapshotDialog onDone={mostrarToast} /> : null}
+          {hasWriteAccess ? (
+            <CongelarSnapshotDialog rows={rows} onDone={mostrarToast} />
+          ) : null}
         </div>
       </div>
 
@@ -254,33 +389,80 @@ export function PlanificacionBoard({
       <div className="overflow-x-auto rounded-lg border border-subtle/50 bg-card">
         <div style={{ minWidth }}>
           <PlanificacionColumnHeader
+            activoId={row.activo.id}
+            fijasVisibles={fijasVisibles}
             snapshots={snapshotsVisibles}
+            retirados={retiradosSet}
+            anchos={anchos}
             hasWriteAccess={hasWriteAccess}
             todosSeleccionados={todosSeleccionados}
             onToggleTodos={toggleTodos}
+            onAncho={onAncho}
             onError={mostrarToast}
           />
-          {hitos.map((h) => (
+
+          {hitosActivos.map((h) => (
             <PlanificacionHitoRow
               key={h.id}
               hito={h}
-              catalogo={catalogoDe(h.id, h.catalogo_id, h.hito)}
+              catalogo={catalogoDe(h.catalogo_id, h.hito)}
+              fijasVisibles={fijasVisibles}
               snapshots={snapshotsVisibles}
+              anchos={anchos}
+              retirados={retiradosSet}
               hasWriteAccess={hasWriteAccess}
               seleccionado={seleccion.has(h.id)}
               onToggleSeleccion={toggleSeleccion}
               onError={mostrarToast}
+              onArchivado={mostrarToast}
             />
           ))}
-          {hitos.length === 0 ? (
+
+          {hitosActivos.length === 0 ? (
             <p className="p-6 text-center text-sm text-text-muted">
               {soloTablaMadre
-                ? "Ningún hito de este proyecto está mapeado a la Tabla madre."
-                : "Este proyecto no tiene hitos."}
+                ? "Ningún hito activo de este proyecto está mapeado a la Tabla madre."
+                : "Este proyecto no tiene hitos activos."}
             </p>
+          ) : null}
+
+          {archivados.length > 0 ? (
+            <div className="border-t-2 border-subtle">
+              <button
+                type="button"
+                onClick={() => setVerArchivados((v) => !v)}
+                className="flex w-full items-center gap-2 bg-subtle/30 px-3 py-2 text-left text-xs font-semibold text-text-muted hover:bg-subtle/50"
+              >
+                <span className="text-[10px]">{verArchivados ? "▾" : "▸"}</span>
+                Archivados ({archivados.length})
+                <span className="font-normal">
+                  · no aplican a este proyecto; fuera del Gantt y del detalle
+                </span>
+              </button>
+              {verArchivados
+                ? archivados.map((h) => (
+                    <PlanificacionHitoRow
+                      key={h.id}
+                      hito={h}
+                      catalogo={catalogoDe(h.catalogo_id, h.hito)}
+                      fijasVisibles={fijasVisibles}
+                      snapshots={snapshotsVisibles}
+                      anchos={anchos}
+                      retirados={retiradosSet}
+                      hasWriteAccess={hasWriteAccess}
+                      seleccionado={false}
+                      onToggleSeleccion={() => {}}
+                      onError={mostrarToast}
+                      onArchivado={mostrarToast}
+                    />
+                  ))
+                : null}
+            </div>
           ) : null}
         </div>
       </div>
+
+      {!cargado ? null : null}
 
       {toast ? (
         <div

@@ -3,9 +3,7 @@ import { test } from "node:test";
 
 import type { PmSnapshot } from "@/modules/pm/types";
 import {
-  boardMinWidthPx,
   formatFechaCorta,
-  planificacionGridTemplate,
   snapshotLabel,
   trimestreActual,
 } from "../planificacion-display";
@@ -24,30 +22,8 @@ const snap = (over: Partial<PmSnapshot> = {}): PmSnapshot => ({
   ...over,
 });
 
-// === Plantilla de la rejilla ==================================================
-// La plantilla se define una vez y la usan cabecera y filas: si divergen, las
-// columnas se desalinean. Por eso se testea el contrato, no el pixel.
-
-test("la plantilla añade una columna por snapshot visible", () => {
-  const base = planificacionGridTemplate(0).split(" ").length;
-  assert.equal(planificacionGridTemplate(3).split(" ").length, base + 3);
-});
-
-test("sin snapshots la plantilla sigue siendo válida", () => {
-  const t = planificacionGridTemplate(0);
-  assert.ok(t.length > 0);
-  assert.ok(!t.includes("undefined"), "no debe colarse un undefined en el CSS");
-});
-
-test("cabecera y fila producen la MISMA plantilla para el mismo nº de columnas", () => {
-  // Es la garantía de que no se desalinean: ambas llaman a esta función.
-  assert.equal(planificacionGridTemplate(5), planificacionGridTemplate(5));
-});
-
-test("el ancho mínimo crece con cada snapshot", () => {
-  assert.ok(boardMinWidthPx(5) > boardMinWidthPx(0));
-  assert.equal(boardMinWidthPx(5) - boardMinWidthPx(4), 104, "una columna de snapshot");
-});
+// La plantilla de la rejilla, los anchos y las columnas por proyecto se cubren
+// en columnas-por-proyecto.test.ts, donde vive esa lógica desde la 022.
 
 // === Etiquetas ================================================================
 

@@ -1,8 +1,12 @@
 import type { UserContext } from "@/lib/auth/currentUser";
 import { getPmReadSupabase } from "@/modules/pm/data/readClient";
-import { fetchPmPortfolio, type PmPortfolioRow } from "@/modules/pm/data/pmRepository";
+import {
+  fetchPmPortfolio,
+  type PmPortfolioRow,
+} from "@/modules/pm/data/pmRepository";
 import type {
   PmActivoProyectoMap,
+  PmActivoSnapshot,
   PmHitoCatalogo,
   PmSnapshot,
 } from "@/modules/pm/types";
@@ -11,6 +15,8 @@ export interface PlanificacionBoardData {
   rows: PmPortfolioRow[];
   catalogo: PmHitoCatalogo[];
   snapshots: PmSnapshot[];
+  /** Excepciones de publicación: `${activoId}|${code}` que la PMO ha retirado. */
+  retirados: string[];
   error: string | null;
 }
 
@@ -18,41 +24,63 @@ export interface PlanificacionBoardData {
  * Todo lo que necesita la rejilla. Reutiliza fetchPmPortfolio a propósito: la
  * rejilla trabaja sobre las MISMAS tablas que el Overview, así que no hay
  * migración de datos ni riesgo de que las dos vistas discrepen.
+ *
+ * Pide TODO (archivados incluidos, sin filtrar por publicado) porque es la
+ * pantalla donde se decide qué se archiva y qué se publica: necesita ver lo que
+ * el resto de la app no ve.
  */
 export async function fetchPlanificacionBoard(
   ctx: UserContext,
 ): Promise<PlanificacionBoardData> {
   const supabase = await getPmReadSupabase(ctx);
 
-  const [portfolio, { data: catalogo, error: eCat }, { data: snaps, error: eSnap }] =
-    await Promise.all([
-      fetchPmPortfolio(ctx),
-      supabase.from("pm_hito_catalogo").select("*").order("orden_default"),
-      supabase.from("pm_snapshots").select("*").order("orden"),
-    ]);
+  const [
+    portfolio,
+    { data: catalogo, error: eCat },
+    { data: snaps, error: eSnap },
+    { data: pubs, error: ePub },
+  ] = await Promise.all([
+    fetchPmPortfolio(ctx, {
+      incluirActivosArchivados: true,
+      incluirHitosArchivados: true,
+      soloPublicados: false,
+    }),
+    supabase.from("pm_hito_catalogo").select("*").order("orden_default"),
+    supabase.from("pm_snapshots").select("*").order("orden"),
+    supabase.from("pm_activo_snapshot").select("*").eq("publicado", false),
+  ]);
 
-  const error = portfolio.error ?? eCat?.message ?? eSnap?.message ?? null;
+  const error =
+    portfolio.error ?? eCat?.message ?? eSnap?.message ?? ePub?.message ?? null;
   if (error) {
-    return { rows: [], catalogo: [], snapshots: [], error };
+    return { rows: [], catalogo: [], snapshots: [], retirados: [], error };
   }
 
   return {
     rows: portfolio.rows,
     catalogo: (catalogo ?? []) as PmHitoCatalogo[],
     snapshots: (snaps ?? []) as PmSnapshot[],
+    retirados: ((pubs ?? []) as PmActivoSnapshot[]).map(
+      (p) => `${p.activo_id}|${p.snapshot_code}`,
+    ),
     error: null,
   };
 }
 
-/** Solo los snapshots publicados, en el orden del registro. Lo que ve el dashboard. */
-export async function fetchVisibleSnapshots(
+/**
+ * Metadatos de los snapshots registrados (etiqueta, orden).
+ *
+ * Ya NO filtra por visible_en_dashboard: publicar es por proyecto desde la 022 y
+ * lo resuelve fetchPmPortfolio recortando `h.snapshots`. Aquí solo se necesita
+ * el orden y la etiqueta.
+ */
+export async function fetchSnapshotsRegistrados(
   ctx: UserContext,
 ): Promise<{ snapshots: PmSnapshot[]; error: string | null }> {
   const supabase = await getPmReadSupabase(ctx);
   const { data, error } = await supabase
     .from("pm_snapshots")
     .select("*")
-    .eq("visible_en_dashboard", true)
     .order("orden");
 
   if (error) return { snapshots: [], error: error.message };
@@ -95,7 +123,12 @@ export async function fetchProyectosPageData(
 
   const [portfolio, { data: fin, error: eFin }, { data: map, error: eMap }] =
     await Promise.all([
-      fetchPmPortfolio(ctx),
+      // Incluye archivados: es la pantalla donde se archivan y se restauran.
+      fetchPmPortfolio(ctx, {
+        incluirActivosArchivados: true,
+        incluirHitosArchivados: true,
+        soloPublicados: false,
+      }),
       supabase
         .from("proyectos")
         .select("proyecto, situacion, tipo_proyecto")

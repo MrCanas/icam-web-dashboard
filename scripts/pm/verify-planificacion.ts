@@ -171,7 +171,80 @@ async function main(): Promise<void> {
       await client.query("ROLLBACK");
     }
 
-    console.log("\n5. Media de desviación por proyecto (lo que muestra el KPI)");
+    console.log("\n5. Archivar y publicar no borran fechas (en transacción, con rollback)");
+    await client.query("BEGIN");
+    try {
+      const antes = (
+        await client.query<{ n: number }>(`SELECT count(*)::int n FROM pm_snapshot_fechas`)
+      ).rows[0].n;
+
+      // Archivar un hito con histórico: sus fechas deben sobrevivir.
+      const victima = (
+        await client.query<{ id: string; n: number }>(
+          `SELECT h.id, count(s.id)::int n FROM pm_hitos h
+             JOIN pm_snapshot_fechas s ON s.hito_id = h.id
+            GROUP BY h.id HAVING count(s.id) > 0 LIMIT 1`,
+        )
+      ).rows[0];
+      await client.query(`UPDATE pm_hitos SET archivado_at = now() WHERE id = $1`, [victima.id]);
+      const trasArchivar = (
+        await client.query<{ n: number }>(
+          `SELECT count(*)::int n FROM pm_snapshot_fechas WHERE hito_id = $1`,
+          [victima.id],
+        )
+      ).rows[0].n;
+      check(
+        trasArchivar === victima.n,
+        "archivar un hito conserva sus fechas de snapshot",
+        `${victima.n} → ${trasArchivar}`,
+      );
+
+      // Retirar un trimestre de un proyecto: tampoco toca ninguna fecha.
+      const activo = (
+        await client.query<{ id: string }>(`SELECT id FROM pm_activos LIMIT 1`)
+      ).rows[0];
+      await client.query(
+        `INSERT INTO pm_activo_snapshot (activo_id, snapshot_code, publicado)
+         VALUES ($1, 'levantamiento', false)`,
+        [activo.id],
+      );
+      const despues = (
+        await client.query<{ n: number }>(`SELECT count(*)::int n FROM pm_snapshot_fechas`)
+      ).rows[0].n;
+      check(antes === despues, "retirar un trimestre no borra fechas", `${antes} → ${despues}`);
+
+      // Congelar selectivo: solo el proyecto elegido.
+      await client.query(`DELETE FROM pm_snapshot_fechas WHERE snapshot_code = '2099_Q1'`);
+      await client.query(
+        `INSERT INTO pm_snapshots (snapshot_code, orden) VALUES ('2099_Q1', 998)
+         ON CONFLICT DO NOTHING`,
+      );
+      await client.query(`SELECT congelar_pm_snapshot('2099_Q1', ARRAY[$1::uuid])`, [
+        activo.id,
+      ]);
+      const afectados = (
+        await client.query<{ n: number }>(
+          `SELECT count(DISTINCT h.activo_id)::int n FROM pm_snapshot_fechas s
+             JOIN pm_hitos h ON h.id = s.hito_id
+            WHERE s.snapshot_code = '2099_Q1'`,
+        )
+      ).rows[0].n;
+      check(afectados === 1, "congelar selectivo solo toca el proyecto elegido", `${afectados} proyecto(s)`);
+
+      // Y no congela el hito archivado.
+      const archivadoCongelado = (
+        await client.query<{ n: number }>(
+          `SELECT count(*)::int n FROM pm_snapshot_fechas
+            WHERE snapshot_code = '2099_Q1' AND hito_id = $1`,
+          [victima.id],
+        )
+      ).rows[0].n;
+      check(archivadoCongelado === 0, "congelar ignora los hitos archivados");
+    } finally {
+      await client.query("ROLLBACK");
+    }
+
+    console.log("\n6. Media de desviación por proyecto (lo que muestra el KPI)");
     const porActivo = new Map<string, PmHitoEnriched[]>();
     for (const [i, h] of hitos.entries()) {
       const id = raw[i].id_activo;

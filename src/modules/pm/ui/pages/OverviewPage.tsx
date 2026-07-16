@@ -10,7 +10,6 @@ import {
   trafficLightForActiv,
 } from "@/modules/pm/logic/pm-kpis";
 import { fetchPmPortfolio } from "@/modules/pm/data/pmRepository";
-import { fetchVisibleSnapshots } from "@/modules/pm/planificacion/data/planificacionRepository";
 import { deviationDaysToMonths } from "@/modules/pm/logic/pm-viz";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 
@@ -36,18 +35,10 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
       </section>
     );
   }
-  const [{ rows, snapshotCodes, error }, { snapshots: publicados }] = await Promise.all([
-    fetchPmPortfolio(ctx),
-    fetchVisibleSnapshots(ctx),
-  ]);
-
-  // Solo los snapshots que la PMO ha marcado como publicables en Planificación.
-  // Si el registro está vacío (migración 020 sin aplicar), se muestran todos:
-  // el Overview no debe quedarse en blanco por una migración pendiente.
-  const codigosVisibles =
-    publicados.length > 0
-      ? snapshotCodes.filter((c) => publicados.some((p) => p.snapshot_code === c))
-      : snapshotCodes;
+  // Sin opciones: el repositorio ya deja fuera los activos y los hitos
+  // archivados y recorta los trimestres que cada proyecto no publica, así que
+  // `snapshotCodes` es la unión de lo publicado y los KPIs cuadran solos.
+  const { rows, snapshotCodes, error } = await fetchPmPortfolio(ctx);
 
   if (error) {
     return (
@@ -99,7 +90,7 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
       <section className="bg-card rounded-lg border border-subtle/50 p-4 space-y-4">
         <PmSnapshotSelector
           current={snapshot}
-          extraCodes={codigosVisibles}
+          extraCodes={snapshotCodes}
           hrefForSnapshot={(code) =>
             `/dashboard/pm/overview?snapshot=${encodeURIComponent(code)}`
           }

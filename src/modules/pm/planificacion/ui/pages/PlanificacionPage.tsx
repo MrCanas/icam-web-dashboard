@@ -15,7 +15,7 @@ export default async function PlanificacionPage() {
     );
   }
 
-  const { rows, catalogo, snapshots, error } = await fetchPlanificacionBoard(ctx);
+  const { rows, catalogo, snapshots, retirados, error } = await fetchPlanificacionBoard(ctx);
 
   if (error) {
     return (
@@ -60,6 +60,7 @@ export default async function PlanificacionPage() {
         rows={rows}
         catalogo={catalogo}
         snapshots={snapshots}
+        retirados={retirados}
         hasWriteAccess={hasWriteAccess}
       />
     </div>
