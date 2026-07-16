@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { createServiceRoleClient } from "@/lib/db/admin";
 import { verifySessionToken } from "@/lib/auth/jwt";
+import { isKnownRouteKey } from "@/registry/routes";
 
 export interface UserZoneRole {
   zone_key: string;
@@ -14,6 +15,10 @@ export interface UserContext {
   email: string;
   name: string;
   zones: UserZoneRole[];
+  /** Superadmin del portal: única vía para gestionar usuarios. No concede zonas. */
+  isPlatformAdmin: boolean;
+  /** Denylist de páginas (ModuleRoute.key). Ver src/registry/routes.ts. */
+  deniedRouteKeys: string[];
 }
 
 const AUTH_COOKIE = "icam-auth";
@@ -67,12 +72,15 @@ export async function getCurrentUserFromRequest(
 
   try {
     return await loadUserContext(userId);
-  } catch {
+  } catch (err) {
+    console.error("[auth] loadUserContext failed", err);
     return null;
   }
 }
 
-async function loadUserContext(userId: string): Promise<UserContext | null> {
+export async function loadUserContext(
+  userId: string,
+): Promise<UserContext | null> {
   const admin = createServiceRoleClient();
 
   const { data: authData, error: authError } =
@@ -88,14 +96,37 @@ async function loadUserContext(userId: string): Promise<UserContext | null> {
     return null;
   }
 
-  const { data: zoneRows, error: zoneError } = await admin
-    .from("app_user_zone_role")
-    .select("zone_key, role")
-    .eq("user_id", userId)
-    .order("zone_key", { ascending: true });
+  const [zoneResult, accountResult, denyResult] = await Promise.all([
+    admin
+      .from("app_user_zone_role")
+      .select("zone_key, role")
+      .eq("user_id", userId)
+      .order("zone_key", { ascending: true }),
+    admin
+      .from("app_user_account")
+      .select("is_platform_admin, is_active")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    admin
+      .from("app_user_route_deny")
+      .select("route_key")
+      .eq("user_id", userId),
+  ]);
 
-  if (zoneError) {
-    throw new Error(`app_user_zone_role: ${zoneError.message}`);
+  if (zoneResult.error) {
+    throw new Error(`app_user_zone_role: ${zoneResult.error.message}`);
+  }
+  if (accountResult.error) {
+    throw new Error(`app_user_account: ${accountResult.error.message}`);
+  }
+  if (denyResult.error) {
+    throw new Error(`app_user_route_deny: ${denyResult.error.message}`);
+  }
+
+  // Fila ausente = cuenta normal activa (usuarios anteriores a la gestión de usuarios).
+  const account = accountResult.data;
+  if (account && account.is_active === false) {
+    return null;
   }
 
   return {
@@ -105,10 +136,14 @@ async function loadUserContext(userId: string): Promise<UserContext | null> {
       email,
       authUser.user_metadata as Record<string, unknown> | undefined,
     ),
-    zones: (zoneRows ?? []).map((row) => ({
+    zones: (zoneResult.data ?? []).map((row) => ({
       zone_key: row.zone_key as string,
       role: row.role as string,
     })),
+    isPlatformAdmin: account?.is_platform_admin === true,
+    deniedRouteKeys: (denyResult.data ?? [])
+      .map((row) => row.route_key as string)
+      .filter(isKnownRouteKey),
   };
 }
 
@@ -121,7 +156,8 @@ export async function getCurrentUser(): Promise<UserContext | null> {
 
   try {
     return await loadUserContext(userId);
-  } catch {
+  } catch (err) {
+    console.error("[auth] loadUserContext failed", err);
     return null;
   }
 }

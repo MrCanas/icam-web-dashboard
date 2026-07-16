@@ -29,6 +29,8 @@ const SYSTEM_CTX: UserContext = {
   email: "portfolio-cron@imparcapital.com",
   name: "Cron Portfolio Sync",
   zones: [],
+  isPlatformAdmin: false,
+  deniedRouteKeys: [],
 };
 
 /** ¿Es ahora mismo miércoles a las 10:00 en Europe/Madrid? */
