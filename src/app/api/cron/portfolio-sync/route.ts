@@ -22,7 +22,8 @@ export const maxDuration = 60;
  *   1) Sesión ICAM con rol admin de la zona `financiero`, o
  *   2) cron desatendido con `Authorization: Bearer <CRON_SECRET>` (Vercel Cron lo
  *      envía automáticamente cuando CRON_SECRET está en el entorno).
- * `?force=true` (solo sesión admin) salta el gate horario para pruebas manuales.
+ * `?force=true` salta el gate horario para sincronizar a demanda; vale con cualquiera de
+ * las dos vías de autorización (el botón de la pestaña Datos usa la sesión de admin).
  */
 const SYSTEM_CTX: UserContext = {
   id: "00000000-0000-0000-0000-000000000000",
@@ -58,12 +59,21 @@ async function run(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
   }
 
-  const force = request.nextUrl.searchParams.get("force") === "true" && isAdmin;
+  // `request.url` es la URL cruda: `request.nextUrl` puede llegar normalizado y perder la
+  // query, que es justo lo que dejaba `?force=true` sin efecto en producción.
+  const sawForce =
+    new URL(request.url).searchParams.get("force") === "true" ||
+    request.nextUrl.searchParams.get("force") === "true";
+
+  const force = sawForce && (isAdmin || bearerOk);
   if (!force && !isMadridWednesday10()) {
     return NextResponse.json({
       ok: true,
       skipped: true,
       reason: "Fuera de la ventana (miércoles 10:00 Europe/Madrid).",
+      // Por qué no se forzó, para que el salto sea diagnosticable desde el cliente.
+      sawForce,
+      isAdmin,
     });
   }
 
