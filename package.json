@@ -36,7 +36,7 @@
     "actas:test-migration-resolve": "tsx --test scripts/actas/lib/__tests__/migration-resolve.test.ts",
     "pm:backfill-planificacion": "tsx scripts/pm/backfill-planificacion.ts",
     "pm:verify-planificacion": "tsx scripts/pm/verify-planificacion.ts",
-    "pm:test": "tsx --test \"src/modules/pm/**/__tests__/*.test.ts\"",
+    "pm:test": "tsx --test \"src/modules/pm/**/__tests__/*.test.ts\" \"src/modules/portfolio/logic/__tests__/*.test.ts\"",
     "portfolio:check-sharepoint": "tsx scripts/portfolio/check-sharepoint.ts",
     "portfolio:sync-maestro": "tsx scripts/portfolio/sync-local-maestro.ts",
     "auth:seed-hardcoded": "tsx scripts/auth/seed-hardcoded-users.ts",
