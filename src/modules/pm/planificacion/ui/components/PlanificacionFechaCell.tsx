@@ -32,6 +32,11 @@ interface PlanificacionFechaCellProps {
   title?: string;
   onFechaChange: (fecha: string | null) => void;
   onError: (message: string) => void;
+  /**
+   * Pegado en columna: la celda con foco es el ancla y el Board reparte el
+   * texto hacia abajo. Si no se pasa, Ctrl+V no hace nada en la celda.
+   */
+  onPasteColumna?: (texto: string) => void;
 }
 
 function toDate(iso: string | null): Date | undefined {
@@ -62,6 +67,7 @@ export function PlanificacionFechaCell({
   title,
   onFechaChange,
   onError,
+  onPasteColumna,
 }: PlanificacionFechaCellProps) {
   const dialogId = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -157,6 +163,14 @@ export function PlanificacionFechaCell({
           setOpen((v) => !v);
         }}
         onMouseDown={(e) => e.stopPropagation()}
+        onPaste={(e) => {
+          if (!onPasteColumna) return;
+          const texto = e.clipboardData.getData("text");
+          if (!texto.trim()) return;
+          e.preventDefault();
+          setOpen(false);
+          onPasteColumna(texto);
+        }}
       >
         {etiqueta ?? (
           <>

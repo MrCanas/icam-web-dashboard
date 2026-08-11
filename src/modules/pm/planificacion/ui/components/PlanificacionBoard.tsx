@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import type { PmPortfolioRow } from "@/modules/pm/data/pmRepository";
 import type { PmHitoCatalogo, PmSnapshot } from "@/modules/pm/types";
 import { shiftHitosFechas } from "@/modules/pm/planificacion/actions/crud-hito";
+import { bulkUpdateFechas } from "@/modules/pm/planificacion/actions/bulk-update-fechas";
+import {
+  mapPasteAFilas,
+  parseClipboardFechas,
+} from "@/modules/pm/planificacion/logic/planificacion-paste";
 import {
   boardMinWidthPx,
   columnasDisponibles,
@@ -19,6 +24,10 @@ import {
 import { AnadirTrimestreDialog } from "./AnadirTrimestreDialog";
 import { PlanificacionColumnHeader } from "./PlanificacionColumnHeader";
 import { PlanificacionHitoRow } from "./PlanificacionHitoRow";
+import type { FechaCellTarget } from "./PlanificacionFechaCell";
+
+/** Fechas pegadas aún no confirmadas por el servidor, por hito. */
+type PasteOverride = { prevision?: string | null; snapshots?: Record<string, string | null> };
 
 /**
  * Preferencias locales de cada usuario, no datos compartidos.
@@ -54,7 +63,14 @@ export function PlanificacionBoard({
   const [soloTablaMadre, setSoloTablaMadre] = useState(false);
   const [verArchivados, setVerArchivados] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [overrides, setOverrides] = useState<Map<string, PasteOverride> | null>(null);
+  const [pendingPaste, startPaste] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // El override optimista vive hasta que el refresh del pegado termina (la
+  // transición acaba con los datos nuevos ya en pantalla). Ajuste durante el
+  // render, sin efecto, como la resincronización de PlanificacionHitoRow.
+  if (overrides && !pendingPaste) setOverrides(null);
 
   const retiradosSet = useMemo(() => new Set(retirados), [retirados]);
 
@@ -225,6 +241,73 @@ export function PlanificacionBoard({
 
   const toggleTodos = () => {
     setSeleccion(todosSeleccionados ? new Set() : new Set(hitosActivos.map((h) => h.id)));
+  };
+
+  // --- Pegado en columna: la celda con foco es el ancla ----------------------
+  const hitosActivosRender = useMemo(() => {
+    if (!overrides) return hitosActivos;
+    return hitosActivos.map((h) => {
+      const o = overrides.get(h.id);
+      if (!o) return h;
+      return {
+        ...h,
+        fecha_actual: o.prevision !== undefined ? o.prevision : h.fecha_actual,
+        snapshots: o.snapshots ? { ...h.snapshots, ...o.snapshots } : h.snapshots,
+      };
+    });
+  }, [hitosActivos, overrides]);
+
+  const pegarColumna = (hitoIdAncla: string, target: FechaCellTarget, texto: string) => {
+    const parsed = parseClipboardFechas(texto);
+    if (parsed.errores.length > 0) {
+      const e = parsed.errores[0];
+      mostrarToast(`No se ha pegado nada — línea ${e.linea}: ${e.motivo}`);
+      return;
+    }
+    if (parsed.fechas.length === 0) return;
+
+    const items = mapPasteAFilas(
+      hitoIdAncla,
+      hitosActivos.map((h) => h.id),
+      parsed.fechas,
+    );
+    if (items.length === 0) return;
+
+    // Optimista: se pinta ya y el servidor confirma con el refresh.
+    const siguientes = new Map<string, PasteOverride>();
+    for (const it of items) {
+      if (target.tipo === "prevision") {
+        siguientes.set(it.hitoId, { prevision: it.fecha });
+      } else {
+        siguientes.set(it.hitoId, { snapshots: { [target.snapshotCode]: it.fecha } });
+      }
+    }
+    setOverrides(siguientes);
+
+    const avisos: string[] = [];
+    if (parsed.multiColumna) avisos.push("solo se ha usado la primera columna");
+    if (parsed.truncado) avisos.push("recortado por el límite de líneas");
+
+    startPaste(async () => {
+      const r = await bulkUpdateFechas({
+        target:
+          target.tipo === "snapshot"
+            ? { tipo: "snapshot", snapshotCode: target.snapshotCode }
+            : { tipo: "prevision" },
+        items,
+      });
+      if (!r.ok) {
+        setOverrides(null); // rollback
+        mostrarToast(r.error);
+        return;
+      }
+      const destino = target.tipo === "snapshot" ? target.label : "Previsión";
+      mostrarToast(
+        `${r.actualizados} ${r.actualizados === 1 ? "fecha pegada" : "fechas pegadas"} en ${destino}.` +
+          (avisos.length ? ` (${avisos.join("; ")})` : ""),
+      );
+      router.refresh();
+    });
   };
 
   const desplazar = () => {
@@ -401,7 +484,7 @@ export function PlanificacionBoard({
             onError={mostrarToast}
           />
 
-          {hitosActivos.map((h) => (
+          {hitosActivosRender.map((h) => (
             <PlanificacionHitoRow
               key={h.id}
               hito={h}
@@ -415,6 +498,7 @@ export function PlanificacionBoard({
               onToggleSeleccion={toggleSeleccion}
               onError={mostrarToast}
               onArchivado={mostrarToast}
+              onPasteColumna={hasWriteAccess ? pegarColumna : undefined}
             />
           ))}
 

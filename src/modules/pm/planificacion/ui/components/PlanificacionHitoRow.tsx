@@ -20,7 +20,7 @@ import {
   type EstadoMapeoTablaMadre,
 } from "@/modules/pm/planificacion/logic/tabla-madre-columnas";
 
-import { PlanificacionFechaCell } from "./PlanificacionFechaCell";
+import { PlanificacionFechaCell, type FechaCellTarget } from "./PlanificacionFechaCell";
 
 const BADGE: Record<EstadoMapeoTablaMadre, string> = {
   // Verde: el Financiero ya ve este hito en su hoja.
@@ -42,6 +42,8 @@ interface PlanificacionHitoRowProps {
   onToggleSeleccion: (hitoId: string) => void;
   onError: (message: string) => void;
   onArchivado: (mensaje: string) => void;
+  /** Pegado en columna desde esta fila como ancla. Solo con permiso de escritura. */
+  onPasteColumna?: (hitoId: string, target: FechaCellTarget, texto: string) => void;
 }
 
 export function PlanificacionHitoRow({
@@ -56,6 +58,7 @@ export function PlanificacionHitoRow({
   onToggleSeleccion,
   onError,
   onArchivado,
+  onPasteColumna,
 }: PlanificacionHitoRowProps) {
   const router = useRouter();
   // El estado optimista vive aquí, en la fila: las celdas son controladas y solo
@@ -167,6 +170,11 @@ export function PlanificacionHitoRow({
             readOnly={!hasWriteAccess}
             onFechaChange={setFecha}
             onError={onError}
+            onPasteColumna={
+              onPasteColumna
+                ? (texto) => onPasteColumna(hito.id, { tipo: "prevision" }, texto)
+                : undefined
+            }
           />
         );
     }
@@ -236,6 +244,16 @@ export function PlanificacionHitoRow({
               setSnapshotsLocal((prev) => ({ ...prev, [s.snapshot_code]: nueva }))
             }
             onError={onError}
+            onPasteColumna={
+              onPasteColumna && !archivado
+                ? (texto) =>
+                    onPasteColumna(
+                      hito.id,
+                      { tipo: "snapshot", snapshotCode: s.snapshot_code, label },
+                      texto,
+                    )
+                : undefined
+            }
           />
         );
       })}
