@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { toggleSnapshotPublicado } from "@/modules/pm/planificacion/actions/toggle-snapshot-publicado";
+import { ReportarFechasDialog } from "./ReportarFechasDialog";
 import {
   motivoGateTexto,
   type GatePublicacion,
@@ -148,6 +149,15 @@ export function PlanificacionColumnHeader({
                     ? `${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"}`
                     : "validado"}
                 </span>
+                {hasWriteAccess ? (
+                  <ReportarFechasDialog
+                    activoId={activoId}
+                    snapshotCode={s.snapshot_code}
+                    label={snapshotLabel(s)}
+                    listo={pendientes === 0}
+                    onError={onError}
+                  />
+                ) : null}
               </div>
             </Redimensionable>
           );
