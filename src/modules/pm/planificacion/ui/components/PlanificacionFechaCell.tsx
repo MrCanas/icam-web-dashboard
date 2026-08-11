@@ -7,16 +7,29 @@ import { es } from "react-day-picker/locale";
 import "react-day-picker/style.css";
 
 import { updateHitoFecha } from "@/modules/pm/planificacion/actions/update-hito-fecha";
+import { updateSnapshotFecha } from "@/modules/pm/planificacion/actions/update-snapshot-fecha";
 import { formatFechaCorta } from "@/modules/pm/planificacion/logic/planificacion-display";
 
 import "@/modules/pm/actas/ui/components/operativo/actas-timeline-daypicker.css";
 
 const POPOVER_WIDTH = 300;
 
+/**
+ * Qué edita esta celda: la previsión viva (`pm_hitos.fecha_actual`) o la fecha
+ * reportada de un trimestre ya añadido (`pm_snapshot_fechas`).
+ */
+export type FechaCellTarget =
+  | { tipo: "prevision" }
+  | { tipo: "snapshot"; snapshotCode: string; label: string };
+
 interface PlanificacionFechaCellProps {
   hitoId: string;
   fecha: string | null;
+  target: FechaCellTarget;
   readOnly?: boolean;
+  /** Atenúa el texto (trimestre retirado del Overview en este proyecto). */
+  muted?: boolean;
+  title?: string;
   onFechaChange: (fecha: string | null) => void;
   onError: (message: string) => void;
 }
@@ -34,7 +47,8 @@ function toIso(d: Date): string {
 }
 
 /**
- * Celda de previsión vigente (`fecha_actual`), editable con calendario en portal.
+ * Celda de fecha editable con calendario en portal: la previsión vigente o una
+ * celda de trimestre añadido, según `target`.
  *
  * Controlada: el estado optimista vive en la fila padre y aquí solo se notifica,
  * igual que ActasProgressCell. El rollback lo hace esta celda al fallar la acción.
@@ -42,7 +56,10 @@ function toIso(d: Date): string {
 export function PlanificacionFechaCell({
   hitoId,
   fecha,
+  target,
   readOnly = false,
+  muted = false,
+  title,
   onFechaChange,
   onError,
 }: PlanificacionFechaCellProps) {
@@ -97,7 +114,10 @@ export function PlanificacionFechaCell({
     setOpen(false);
     onFechaChange(nueva); // optimista
     setPending(true);
-    const result = await updateHitoFecha({ hitoId, fecha: nueva });
+    const result =
+      target.tipo === "snapshot"
+        ? await updateSnapshotFecha({ hitoId, snapshotCode: target.snapshotCode, fecha: nueva })
+        : await updateHitoFecha({ hitoId, fecha: nueva });
     setPending(false);
     if (!result.ok) {
       onFechaChange(previa); // rollback
@@ -108,10 +128,15 @@ export function PlanificacionFechaCell({
   };
 
   const etiqueta = formatFechaCorta(fecha);
+  const textoColor = muted ? "text-text-muted/60" : "text-text-body";
+  const descripcion =
+    target.tipo === "snapshot"
+      ? `Fecha reportada en ${target.label} — reescribe el histórico de este trimestre`
+      : "Previsión vigente del hito";
 
   if (readOnly) {
     return (
-      <span className="truncate text-xs tabular-nums text-text-body">
+      <span className={`truncate text-xs tabular-nums ${textoColor}`} title={title}>
         {etiqueta ?? <span className="text-text-muted">—</span>}
       </span>
     );
@@ -125,7 +150,8 @@ export function PlanificacionFechaCell({
         aria-haspopup="dialog"
         aria-expanded={open}
         disabled={pending}
-        className="group/fecha min-w-0 truncate rounded px-1 py-0.5 text-left text-xs tabular-nums text-text-body hover:bg-page disabled:opacity-60"
+        title={title}
+        className={`group/fecha min-w-0 truncate rounded px-1 py-0.5 text-left text-xs tabular-nums ${textoColor} hover:bg-page disabled:opacity-60`}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -146,14 +172,18 @@ export function PlanificacionFechaCell({
               ref={popRef}
               id={dialogId}
               role="dialog"
-              aria-label="Editar previsión"
+              aria-label={target.tipo === "snapshot" ? "Editar fecha del trimestre" : "Editar previsión"}
               className="fixed z-[70] w-[300px] rounded-lg border border-subtle/60 bg-card p-3 shadow-lg"
               style={{ top: position.top, left: position.left }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <p className="mb-2 text-[11px] leading-snug text-text-muted">
-                Previsión vigente del hito
+              <p
+                className={`mb-2 text-[11px] leading-snug ${
+                  target.tipo === "snapshot" ? "text-amber-700" : "text-text-muted"
+                }`}
+              >
+                {descripcion}
               </p>
               <div className="actas-timeline-picker">
                 <DayPicker

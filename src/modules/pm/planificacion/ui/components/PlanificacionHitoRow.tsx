@@ -10,6 +10,7 @@ import {
   formatFechaCorta,
   GRID_BASE_CLASS,
   planificacionGridTemplate,
+  snapshotLabel,
   type Anchos,
   type ColumnaFijaKey,
 } from "@/modules/pm/planificacion/logic/planificacion-display";
@@ -60,7 +61,20 @@ export function PlanificacionHitoRow({
   // El estado optimista vive aquí, en la fila: las celdas son controladas y solo
   // notifican. Mismo reparto que ActasElementRow.
   const [fecha, setFecha] = useState<string | null>(hito.fecha_actual);
+  const [snapshotsLocal, setSnapshotsLocal] = useState<Record<string, string | null>>(
+    hito.snapshots,
+  );
   const [pending, startTransition] = useTransition();
+
+  // Resincronizar cuando el servidor manda datos nuevos (router.refresh o pegado
+  // en bloque): ajuste de estado durante el render, sin efecto, para no
+  // encadenar renders (react.dev/learn/you-might-not-need-an-effect).
+  const [hitoPrevio, setHitoPrevio] = useState(hito);
+  if (hitoPrevio.fecha_actual !== hito.fecha_actual || hitoPrevio.snapshots !== hito.snapshots) {
+    setHitoPrevio(hito);
+    setFecha(hito.fecha_actual);
+    setSnapshotsLocal(hito.snapshots);
+  }
 
   const archivado = Boolean(hito.archivado_at);
 
@@ -149,6 +163,7 @@ export function PlanificacionHitoRow({
             key={key}
             hitoId={hito.id}
             fecha={fecha}
+            target={{ tipo: "prevision" }}
             readOnly={!hasWriteAccess}
             onFechaChange={setFecha}
             onError={onError}
@@ -198,25 +213,30 @@ export function PlanificacionHitoRow({
       {fijasVisibles.map(celdaFija)}
 
       {snapshots.map((s) => {
-        const iso = hito.snapshots[s.snapshot_code] ?? null;
+        const iso = snapshotsLocal[s.snapshot_code] ?? null;
         const txt = formatFechaCorta(iso);
         const retirado = retirados.has(`${hito.activo_id}|${s.snapshot_code}`);
+        const label = snapshotLabel(s);
         return (
-          <span
+          <PlanificacionFechaCell
             key={s.snapshot_code}
-            className={`truncate text-xs tabular-nums ${
-              retirado || archivado ? "text-text-muted/60" : "text-text-body"
-            }`}
+            hitoId={hito.id}
+            fecha={iso}
+            target={{ tipo: "snapshot", snapshotCode: s.snapshot_code, label }}
+            readOnly={!hasWriteAccess || archivado}
+            muted={retirado || archivado}
             title={
               txt
-                ? `${s.snapshot_code}: ${txt} (añadido, solo lectura)${
+                ? `${label}: ${txt}${
                     retirado ? " · retirado del Overview en este proyecto" : ""
                   }`
-                : `${s.snapshot_code}: sin previsión`
+                : `${label}: sin fecha reportada`
             }
-          >
-            {txt ?? <span className="text-text-muted">—</span>}
-          </span>
+            onFechaChange={(nueva) =>
+              setSnapshotsLocal((prev) => ({ ...prev, [s.snapshot_code]: nueva }))
+            }
+            onError={onError}
+          />
         );
       })}
 
