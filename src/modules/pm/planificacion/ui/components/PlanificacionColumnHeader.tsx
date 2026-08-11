@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import type { PmSnapshot } from "@/modules/pm/types";
 import { toggleSnapshotPublicado } from "@/modules/pm/planificacion/actions/toggle-snapshot-publicado";
 import {
   motivoGateTexto,
@@ -11,12 +10,14 @@ import {
 } from "@/modules/pm/planificacion/logic/publicacion-gate";
 import {
   anchoMinimoDe,
+  colKeyDe,
   COLUMNAS_FIJAS,
   GRID_BASE_CLASS,
   planificacionGridTemplate,
   snapshotLabel,
   type Anchos,
   type ColumnaFijaKey,
+  type ColumnaSnapshotArea,
 } from "@/modules/pm/planificacion/logic/planificacion-display";
 
 const TH = "text-[10px] font-semibold uppercase tracking-wide text-text-muted";
@@ -24,10 +25,12 @@ const TH = "text-[10px] font-semibold uppercase tracking-wide text-text-muted";
 interface PlanificacionColumnHeaderProps {
   activoId: string;
   fijasVisibles: ColumnaFijaKey[];
-  snapshots: PmSnapshot[];
+  columnas: ColumnaSnapshotArea[];
   retirados: Set<string>;
   /** Gate del maestro por snapshot_code: si no permite, el check queda bloqueado. */
   gates: Record<string, GatePublicacion>;
+  /** Discrepancias pendientes por snapshot_code (para el contador «Maestro»). */
+  pendientesPorCode: Record<string, number>;
   proyectoFinanciero: string | null;
   anchos: Anchos;
   hasWriteAccess: boolean;
@@ -50,9 +53,10 @@ interface PlanificacionColumnHeaderProps {
 export function PlanificacionColumnHeader({
   activoId,
   fijasVisibles,
-  snapshots,
+  columnas,
   retirados,
   gates,
+  pendientesPorCode,
   proyectoFinanciero,
   anchos,
   hasWriteAccess,
@@ -96,7 +100,7 @@ export function PlanificacionColumnHeader({
       style={{
         gridTemplateColumns: planificacionGridTemplate(
           fijasVisibles,
-          snapshots.map((s) => s.snapshot_code),
+          columnas.map(colKeyDe),
           anchos,
         ),
       }}
@@ -119,7 +123,35 @@ export function PlanificacionColumnHeader({
         );
       })}
 
-      {snapshots.map((s) => {
+      {columnas.map((col) => {
+        const s = col.snap;
+        if (col.tipo === "maestro") {
+          const pendientes = pendientesPorCode[s.snapshot_code] ?? 0;
+          return (
+            <Redimensionable
+              key={colKeyDe(col)}
+              colKey={colKeyDe(col)}
+              anchos={anchos}
+              onAncho={onAncho}
+            >
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span
+                  className={`${TH} truncate text-icam-900/70`}
+                  title={`Fechas reportadas por el Financiero en el maestro (${proyectoFinanciero ?? ""} · ${s.snapshot_code})`}
+                >
+                  Maestro {snapshotLabel(s)}
+                </span>
+                <span
+                  className={`text-[9px] ${pendientes > 0 ? "font-medium text-amber-700" : "text-text-muted"}`}
+                >
+                  {pendientes > 0
+                    ? `${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"}`
+                    : "validado"}
+                </span>
+              </div>
+            </Redimensionable>
+          );
+        }
         const esta = publicado(s.snapshot_code);
         const gate = gates[s.snapshot_code];
         // El gate solo bloquea PUBLICAR: retirar siempre está permitido.

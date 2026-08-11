@@ -4,16 +4,22 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import type { PmHitoEnriched } from "@/modules/pm/data/pmRepository";
-import type { PmHitoCatalogo, PmSnapshot } from "@/modules/pm/types";
+import type { PmHitoCatalogo } from "@/modules/pm/types";
 import { archivarHito } from "@/modules/pm/planificacion/actions/archivar-hito";
 import {
+  colKeyDe,
   formatFechaCorta,
   GRID_BASE_CLASS,
   planificacionGridTemplate,
   snapshotLabel,
   type Anchos,
   type ColumnaFijaKey,
+  type ColumnaSnapshotArea,
 } from "@/modules/pm/planificacion/logic/planificacion-display";
+import {
+  estadoDiscrepancia,
+  type ResolucionFoto,
+} from "@/modules/pm/planificacion/logic/discrepancias";
 import {
   ETIQUETA_MAPEO,
   estadoMapeo,
@@ -21,6 +27,7 @@ import {
 } from "@/modules/pm/planificacion/logic/tabla-madre-columnas";
 
 import { PlanificacionFechaCell, type FechaCellTarget } from "./PlanificacionFechaCell";
+import { PlanificacionMaestroCell } from "./PlanificacionMaestroCell";
 
 const BADGE: Record<EstadoMapeoTablaMadre, string> = {
   // Verde: el Financiero ya ve este hito en su hoja.
@@ -34,7 +41,11 @@ interface PlanificacionHitoRowProps {
   hito: PmHitoEnriched;
   catalogo: PmHitoCatalogo | undefined;
   fijasVisibles: ColumnaFijaKey[];
-  snapshots: PmSnapshot[];
+  columnas: ColumnaSnapshotArea[];
+  /** code → (columna del maestro en minúsculas → fecha), del activo abierto. */
+  fechasMaestroPorCode: Map<string, Map<string, string | null>>;
+  /** `${hitoId}|${code}` → foto de la resolución. */
+  resoluciones: Map<string, ResolucionFoto>;
   anchos: Anchos;
   retirados: Set<string>;
   hasWriteAccess: boolean;
@@ -42,6 +53,7 @@ interface PlanificacionHitoRowProps {
   onToggleSeleccion: (hitoId: string) => void;
   onError: (message: string) => void;
   onArchivado: (mensaje: string) => void;
+  onToast: (mensaje: string) => void;
   /** Pegado en columna desde esta fila como ancla. Solo con permiso de escritura. */
   onPasteColumna?: (hitoId: string, target: FechaCellTarget, texto: string) => void;
 }
@@ -50,7 +62,9 @@ export function PlanificacionHitoRow({
   hito,
   catalogo,
   fijasVisibles,
-  snapshots,
+  columnas,
+  fechasMaestroPorCode,
+  resoluciones,
   anchos,
   retirados,
   hasWriteAccess,
@@ -58,6 +72,7 @@ export function PlanificacionHitoRow({
   onToggleSeleccion,
   onError,
   onArchivado,
+  onToast,
   onPasteColumna,
 }: PlanificacionHitoRowProps) {
   const router = useRouter();
@@ -188,7 +203,7 @@ export function PlanificacionHitoRow({
       style={{
         gridTemplateColumns: planificacionGridTemplate(
           fijasVisibles,
-          snapshots.map((s) => s.snapshot_code),
+          columnas.map(colKeyDe),
           anchos,
         ),
       }}
@@ -220,7 +235,39 @@ export function PlanificacionHitoRow({
 
       {fijasVisibles.map(celdaFija)}
 
-      {snapshots.map((s) => {
+      {columnas.map((col) => {
+        const s = col.snap;
+        if (col.tipo === "maestro") {
+          const linea = fechasMaestroPorCode.get(s.snapshot_code);
+          const columnaMaestro = catalogo?.tabla_madre_columna?.trim().toLowerCase();
+          const fechaMaestro =
+            linea && columnaMaestro && linea.has(columnaMaestro)
+              ? (linea.get(columnaMaestro) ?? null)
+              : undefined;
+          const fechaOficial = snapshotsLocal[s.snapshot_code] ?? null;
+          const estado = estadoDiscrepancia({
+            fechaOficial,
+            fechaMaestro,
+            resolucion: resoluciones.get(`${hito.id}|${s.snapshot_code}`) ?? null,
+          });
+          return (
+            <PlanificacionMaestroCell
+              key={colKeyDe(col)}
+              hitoId={hito.id}
+              snapshotCode={s.snapshot_code}
+              label={snapshotLabel(s)}
+              fechaMaestro={fechaMaestro}
+              fechaOficial={fechaOficial}
+              estado={estado}
+              readOnly={!hasWriteAccess || archivado}
+              onFechaOficial={(nueva) =>
+                setSnapshotsLocal((prev) => ({ ...prev, [s.snapshot_code]: nueva }))
+              }
+              onToast={onToast}
+              onError={onError}
+            />
+          );
+        }
         const iso = snapshotsLocal[s.snapshot_code] ?? null;
         const txt = formatFechaCorta(iso);
         const retirado = retirados.has(`${hito.activo_id}|${s.snapshot_code}`);

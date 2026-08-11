@@ -81,6 +81,29 @@ export async function anadirTrimestre(
 
   if (error) return { ok: false, error: error.message };
 
+  // Sobrescribir pisa las fechas oficiales, así que las resoluciones de la
+  // validación contra el maestro dejan de describir nada: se borran para que
+  // las discrepancias se revaliden con el reporte nuevo.
+  if (yaAnadido) {
+    let borrado = client
+      .from("pm_snapshot_validacion")
+      .delete()
+      .eq("snapshot_code", code.value);
+    if (ids.length > 0) {
+      const { data: hitosAfectados, error: eHitos } = await client
+        .from("pm_hitos")
+        .select("id")
+        .in("activo_id", ids);
+      if (eHitos) return { ok: false, error: eHitos.message };
+      borrado = borrado.in(
+        "hito_id",
+        (hitosAfectados ?? []).map((h) => h.id),
+      );
+    }
+    const { error: eBorrado } = await borrado;
+    if (eBorrado) return { ok: false, error: eBorrado.message };
+  }
+
   return {
     ok: true,
     snapshotCode: code.value,

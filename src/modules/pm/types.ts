@@ -87,6 +87,31 @@ export interface PmSnapshotFecha {
   fecha: string | null;
 }
 
+/**
+ * Resolución de una discrepancia PM ↔ maestro (migración 026). Guarda la foto
+ * de ambos lados al resolver: si cualquiera cambia después, la resolución deja
+ * de estar vigente y la discrepancia reaparece.
+ */
+export interface PmSnapshotValidacion {
+  hito_id: string;
+  snapshot_code: string;
+  fuente: "pm" | "maestro";
+  fecha_elegida: string | null;
+  fecha_pm: string | null;
+  fecha_maestro: string | null;
+  resuelto_por: string | null;
+  resuelto_at: string;
+}
+
+/** Fecha de hito reportada en una línea del maestro (migración 024). */
+export interface MaestroHitoFechaRow {
+  proyecto: string;
+  trimestre_code: string;
+  columna: string;
+  fecha: string | null;
+  flag: boolean | null;
+}
+
 /** Códigos conocidos + cualquier YYYY_Qn futuro */
 export type PmSnapshotCode =
   | "fecha_actual"

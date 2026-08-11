@@ -86,6 +86,21 @@ export const ANCHO_SNAPSHOT_DEFECTO = 104;
 export const ANCHO_SNAPSHOT_MIN = 72;
 const ANCHO_SELECCION = 28;
 
+/**
+ * Columna del área de snapshots: la del trimestre en sí o, pegada a ella, la
+ * del reporte del maestro financiero para ese trimestre (solo existe si el
+ * Financiero ya reportó la línea de este proyecto).
+ */
+export interface ColumnaSnapshotArea {
+  tipo: "snapshot" | "maestro";
+  snap: PmSnapshot;
+}
+
+/** Clave de columna para anchos y plantilla: el code, o `maestro:` + code. */
+export function colKeyDe(col: ColumnaSnapshotArea): string {
+  return col.tipo === "maestro" ? `maestro:${col.snap.snapshot_code}` : col.snap.snapshot_code;
+}
+
 /** Ancho por columna, en px. La clave es `key` de fija o el `snapshot_code`. */
 export type Anchos = Record<string, number>;
 

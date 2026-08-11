@@ -16,13 +16,21 @@ import {
   type GatePublicacion,
 } from "@/modules/pm/planificacion/logic/publicacion-gate";
 import {
+  contarPendientes,
+  type ResolucionFoto,
+} from "@/modules/pm/planificacion/logic/discrepancias";
+import type { MaestroHitoFechaRow, PmSnapshotValidacion } from "@/modules/pm/types";
+import {
   boardMinWidthPx,
+  colKeyDe,
   columnasDisponibles,
   columnasPorDefecto,
   COLUMNAS_FIJAS,
+  LEVANTAMIENTO,
   snapshotLabel,
   type Anchos,
   type ColumnaFijaKey,
+  type ColumnaSnapshotArea,
 } from "@/modules/pm/planificacion/logic/planificacion-display";
 
 import { AnadirTrimestreDialog } from "./AnadirTrimestreDialog";
@@ -53,6 +61,10 @@ interface PlanificacionBoardProps {
   mapeo: Record<string, string>;
   /** Líneas reportadas en el maestro: `${proyecto}|${trimestre_code}`. */
   lineasMaestro: string[];
+  /** Fechas de hito de las líneas del maestro. */
+  fechasMaestro: MaestroHitoFechaRow[];
+  /** Resoluciones de discrepancias (migración 026). */
+  resoluciones: PmSnapshotValidacion[];
   hasWriteAccess: boolean;
 }
 
@@ -63,6 +75,8 @@ export function PlanificacionBoard({
   retirados,
   mapeo,
   lineasMaestro,
+  fechasMaestro,
+  resoluciones,
   hasWriteAccess,
 }: PlanificacionBoardProps) {
   const router = useRouter();
@@ -191,25 +205,100 @@ export function PlanificacionBoard({
     return disponibles.filter((s) => activos.has(s.snapshot_code));
   }, [disponibles, visibles, porDefecto]);
 
-  // --- Gate de publicación por trimestre visible del activo abierto ----------
+  // --- Maestro y gate de publicación para el activo abierto ------------------
   const proyectoFinanciero = row ? (mapeo[row.activo.id] ?? null) : null;
+  const lineasSet = useMemo(() => new Set(lineasMaestro), [lineasMaestro]);
+
+  // Columnas del área de snapshots: cada trimestre visible y, si el Financiero
+  // ya reportó su línea, la columna «Maestro» pegada a él.
+  const columnasArea = useMemo<ColumnaSnapshotArea[]>(() => {
+    const out: ColumnaSnapshotArea[] = [];
+    for (const s of snapshotsVisibles) {
+      out.push({ tipo: "snapshot", snap: s });
+      if (
+        proyectoFinanciero &&
+        s.snapshot_code !== LEVANTAMIENTO &&
+        lineasSet.has(`${proyectoFinanciero}|${s.snapshot_code}`)
+      ) {
+        out.push({ tipo: "maestro", snap: s });
+      }
+    }
+    return out;
+  }, [snapshotsVisibles, proyectoFinanciero, lineasSet]);
+
+  // Fechas del maestro del proyecto financiero abierto: code → (columna → fecha).
+  const fechasMaestroPorCode = useMemo(() => {
+    const out = new Map<string, Map<string, string | null>>();
+    if (!proyectoFinanciero) return out;
+    for (const f of fechasMaestro) {
+      if (f.proyecto !== proyectoFinanciero) continue;
+      let porColumna = out.get(f.trimestre_code);
+      if (!porColumna) {
+        porColumna = new Map();
+        out.set(f.trimestre_code, porColumna);
+      }
+      porColumna.set(f.columna.trim().toLowerCase(), f.fecha);
+    }
+    return out;
+  }, [fechasMaestro, proyectoFinanciero]);
+
+  const resolucionesPorClave = useMemo(() => {
+    const out = new Map<string, ResolucionFoto>();
+    for (const r of resoluciones) {
+      out.set(`${r.hito_id}|${r.snapshot_code}`, {
+        fecha_elegida: r.fecha_elegida,
+        fecha_maestro: r.fecha_maestro,
+      });
+    }
+    return out;
+  }, [resoluciones]);
+
+  // Pendientes por trimestre del activo abierto: sobre TODOS sus hitos no
+  // archivados, no solo los filtrados en la vista — el gate no depende de cómo
+  // esté filtrada la rejilla.
+  const pendientesPorCode = useMemo(() => {
+    const out: Record<string, number> = {};
+    if (!row) return out;
+    const hitosNoArchivados = row.hitos.filter((h) => !h.archivado_at);
+    for (const col of columnasArea) {
+      if (col.tipo !== "maestro") continue;
+      const code = col.snap.snapshot_code;
+      const linea = fechasMaestroPorCode.get(code);
+      if (!linea) continue;
+      const resMap = new Map<string, ResolucionFoto>();
+      for (const h of hitosNoArchivados) {
+        const r = resolucionesPorClave.get(`${h.id}|${code}`);
+        if (r) resMap.set(h.id, r);
+      }
+      out[code] = contarPendientes(
+        hitosNoArchivados.map((h) => ({
+          id: h.id,
+          catalogoColumna:
+            catalogoDe(h.catalogo_id, h.hito)?.tabla_madre_columna ?? null,
+          fechaOficial: h.snapshots[code] ?? null,
+        })),
+        [...linea.entries()].map(([columna, fecha]) => ({ columna, fecha })),
+        resMap,
+      );
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row, columnasArea, fechasMaestroPorCode, resolucionesPorClave, catalogoPorId, catalogoPorNombre]);
+
   const gates = useMemo(() => {
-    const lineas = new Set(lineasMaestro);
     const out: Record<string, GatePublicacion> = {};
     for (const s of snapshotsVisibles) {
       out[s.snapshot_code] = evaluarGatePublicacion({
         snapshotCode: s.snapshot_code,
         proyectoFinanciero,
         lineaMaestroExiste: proyectoFinanciero
-          ? lineas.has(`${proyectoFinanciero}|${s.snapshot_code}`)
+          ? lineasSet.has(`${proyectoFinanciero}|${s.snapshot_code}`)
           : false,
-        // Las discrepancias llegan con la validación (migración 026); de
-        // momento el gate solo mira mapeo y línea del maestro.
-        discrepanciasPendientes: 0,
+        discrepanciasPendientes: pendientesPorCode[s.snapshot_code] ?? 0,
       });
     }
     return out;
-  }, [snapshotsVisibles, proyectoFinanciero, lineasMaestro]);
+  }, [snapshotsVisibles, proyectoFinanciero, lineasSet, pendientesPorCode]);
 
   const fijasVisibles = useMemo(
     () =>
@@ -368,11 +457,7 @@ export function PlanificacionBoard({
     );
   }
 
-  const minWidth = boardMinWidthPx(
-    fijasVisibles,
-    snapshotsVisibles.map((s) => s.snapshot_code),
-    anchos,
-  );
+  const minWidth = boardMinWidthPx(fijasVisibles, columnasArea.map(colKeyDe), anchos);
   const snapsActivos = visibles ?? new Set(porDefecto);
 
   return (
@@ -504,9 +589,10 @@ export function PlanificacionBoard({
           <PlanificacionColumnHeader
             activoId={row.activo.id}
             fijasVisibles={fijasVisibles}
-            snapshots={snapshotsVisibles}
+            columnas={columnasArea}
             retirados={retiradosSet}
             gates={gates}
+            pendientesPorCode={pendientesPorCode}
             proyectoFinanciero={proyectoFinanciero}
             anchos={anchos}
             hasWriteAccess={hasWriteAccess}
@@ -522,7 +608,9 @@ export function PlanificacionBoard({
               hito={h}
               catalogo={catalogoDe(h.catalogo_id, h.hito)}
               fijasVisibles={fijasVisibles}
-              snapshots={snapshotsVisibles}
+              columnas={columnasArea}
+              fechasMaestroPorCode={fechasMaestroPorCode}
+              resoluciones={resolucionesPorClave}
               anchos={anchos}
               retirados={retiradosSet}
               hasWriteAccess={hasWriteAccess}
@@ -530,6 +618,7 @@ export function PlanificacionBoard({
               onToggleSeleccion={toggleSeleccion}
               onError={mostrarToast}
               onArchivado={mostrarToast}
+              onToast={mostrarToast}
               onPasteColumna={hasWriteAccess ? pegarColumna : undefined}
             />
           ))}
@@ -562,7 +651,9 @@ export function PlanificacionBoard({
                       hito={h}
                       catalogo={catalogoDe(h.catalogo_id, h.hito)}
                       fijasVisibles={fijasVisibles}
-                      snapshots={snapshotsVisibles}
+                      columnas={columnasArea}
+                      fechasMaestroPorCode={fechasMaestroPorCode}
+                      resoluciones={resolucionesPorClave}
                       anchos={anchos}
                       retirados={retiradosSet}
                       hasWriteAccess={hasWriteAccess}
@@ -570,6 +661,7 @@ export function PlanificacionBoard({
                       onToggleSeleccion={() => {}}
                       onError={mostrarToast}
                       onArchivado={mostrarToast}
+                      onToast={mostrarToast}
                     />
                   ))
                 : null}

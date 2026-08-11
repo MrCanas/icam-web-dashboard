@@ -1,6 +1,7 @@
 "use server";
 
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
+import { contarDiscrepanciasPendientes } from "@/modules/pm/planificacion/data/discrepanciasServer";
 import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-validation";
 import {
   evaluarGatePublicacion,
@@ -60,6 +61,7 @@ export async function toggleSnapshotPublicado(
       const proyectoFinanciero = map?.proyecto_financiero_key ?? null;
 
       let lineaMaestroExiste = false;
+      let discrepanciasPendientes = 0;
       if (proyectoFinanciero) {
         const { data: linea, error: lineaError } = await client
           .from("maestro_lineas_trimestre")
@@ -69,13 +71,24 @@ export async function toggleSnapshotPublicado(
           .maybeSingle();
         if (lineaError) return { ok: false, error: lineaError.message };
         lineaMaestroExiste = Boolean(linea);
+
+        if (lineaMaestroExiste) {
+          const pend = await contarDiscrepanciasPendientes(
+            client,
+            activoId.value,
+            code,
+            proyectoFinanciero,
+          );
+          if (pend.error) return { ok: false, error: pend.error };
+          discrepanciasPendientes = pend.pendientes;
+        }
       }
 
       const gate = evaluarGatePublicacion({
         snapshotCode: code,
         proyectoFinanciero,
         lineaMaestroExiste,
-        discrepanciasPendientes: 0,
+        discrepanciasPendientes,
       });
       if (!gate.permitido) {
         return {
@@ -83,6 +96,7 @@ export async function toggleSnapshotPublicado(
           error: motivoGateTexto(gate.motivo, {
             proyectoFinanciero,
             etiquetaTrimestre: code,
+            pendientes: discrepanciasPendientes,
           }),
         };
       }

@@ -5,10 +5,12 @@ import {
   type PmPortfolioRow,
 } from "@/modules/pm/data/pmRepository";
 import type {
+  MaestroHitoFechaRow,
   PmActivoProyectoMap,
   PmActivoSnapshot,
   PmHitoCatalogo,
   PmSnapshot,
+  PmSnapshotValidacion,
 } from "@/modules/pm/types";
 
 export interface PlanificacionBoardData {
@@ -21,6 +23,10 @@ export interface PlanificacionBoardData {
   mapeo: Record<string, string>;
   /** Líneas reportadas en el maestro: `${proyecto}|${trimestre_code}`. */
   lineasMaestro: string[];
+  /** Fechas de hito de las líneas del maestro (columna «Maestro» y validación). */
+  fechasMaestro: MaestroHitoFechaRow[];
+  /** Resoluciones de discrepancias (migración 026). */
+  resoluciones: PmSnapshotValidacion[];
   error: string | null;
 }
 
@@ -45,6 +51,8 @@ export async function fetchPlanificacionBoard(
     { data: pubs, error: ePub },
     { data: map, error: eMap },
     { data: lineas, error: eLineas },
+    { data: fechasMaestro, error: eFechasM },
+    { data: resoluciones, error: eRes },
   ] = await Promise.all([
     fetchPmPortfolio(ctx, {
       incluirActivosArchivados: true,
@@ -56,6 +64,10 @@ export async function fetchPlanificacionBoard(
     supabase.from("pm_activo_snapshot").select("*").eq("publicado", false),
     supabase.from("pm_activo_proyecto_map").select("*"),
     supabase.from("maestro_lineas_trimestre").select("proyecto, trimestre_code"),
+    supabase
+      .from("maestro_hito_fechas")
+      .select("proyecto, trimestre_code, columna, fecha, flag"),
+    supabase.from("pm_snapshot_validacion").select("*"),
   ]);
 
   const error =
@@ -65,6 +77,8 @@ export async function fetchPlanificacionBoard(
     ePub?.message ??
     eMap?.message ??
     eLineas?.message ??
+    eFechasM?.message ??
+    eRes?.message ??
     null;
   if (error) {
     return {
@@ -74,6 +88,8 @@ export async function fetchPlanificacionBoard(
       retirados: [],
       mapeo: {},
       lineasMaestro: [],
+      fechasMaestro: [],
+      resoluciones: [],
       error,
     };
   }
@@ -94,6 +110,8 @@ export async function fetchPlanificacionBoard(
     lineasMaestro: ((lineas ?? []) as { proyecto: string; trimestre_code: string }[]).map(
       (l) => `${l.proyecto}|${l.trimestre_code}`,
     ),
+    fechasMaestro: (fechasMaestro ?? []) as MaestroHitoFechaRow[],
+    resoluciones: (resoluciones ?? []) as PmSnapshotValidacion[],
     error: null,
   };
 }
