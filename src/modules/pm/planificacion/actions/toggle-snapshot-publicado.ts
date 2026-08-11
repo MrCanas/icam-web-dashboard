@@ -2,6 +2,10 @@
 
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
 import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-validation";
+import {
+  evaluarGatePublicacion,
+  motivoGateTexto,
+} from "@/modules/pm/planificacion/logic/publicacion-gate";
 
 export type ToggleSnapshotPublicadoInput = {
   activoId: string;
@@ -26,6 +30,11 @@ export type ToggleSnapshotPublicadoResult =
  *
  * No borra ninguna fecha: el trimestre sigue en la rejilla, solo deja de salir
  * en el Overview de ese proyecto.
+ *
+ * Publicar pasa por el gate del maestro (migración 025): sin mapeo a proyecto
+ * financiero o sin línea reportada en maestro_lineas_trimestre no se publica.
+ * Retirar siempre está permitido. La UI deshabilita el check por cortesía, pero
+ * la decisión de verdad es esta.
  */
 export async function toggleSnapshotPublicado(
   input: ToggleSnapshotPublicadoInput,
@@ -41,6 +50,44 @@ export async function toggleSnapshotPublicado(
   const { client } = auth;
 
   if (input.publicado) {
+    if (code !== "levantamiento") {
+      const { data: map, error: mapError } = await client
+        .from("pm_activo_proyecto_map")
+        .select("proyecto_financiero_key")
+        .eq("pm_activo_id", activoId.value)
+        .maybeSingle();
+      if (mapError) return { ok: false, error: mapError.message };
+      const proyectoFinanciero = map?.proyecto_financiero_key ?? null;
+
+      let lineaMaestroExiste = false;
+      if (proyectoFinanciero) {
+        const { data: linea, error: lineaError } = await client
+          .from("maestro_lineas_trimestre")
+          .select("trimestre_code")
+          .eq("proyecto", proyectoFinanciero)
+          .eq("trimestre_code", code)
+          .maybeSingle();
+        if (lineaError) return { ok: false, error: lineaError.message };
+        lineaMaestroExiste = Boolean(linea);
+      }
+
+      const gate = evaluarGatePublicacion({
+        snapshotCode: code,
+        proyectoFinanciero,
+        lineaMaestroExiste,
+        discrepanciasPendientes: 0,
+      });
+      if (!gate.permitido) {
+        return {
+          ok: false,
+          error: motivoGateTexto(gate.motivo, {
+            proyectoFinanciero,
+            etiquetaTrimestre: code,
+          }),
+        };
+      }
+    }
+
     const { error } = await client
       .from("pm_activo_snapshot")
       .delete()

@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import type { PmSnapshot } from "@/modules/pm/types";
 import { toggleSnapshotPublicado } from "@/modules/pm/planificacion/actions/toggle-snapshot-publicado";
 import {
+  motivoGateTexto,
+  type GatePublicacion,
+} from "@/modules/pm/planificacion/logic/publicacion-gate";
+import {
   anchoMinimoDe,
   COLUMNAS_FIJAS,
   GRID_BASE_CLASS,
@@ -22,6 +26,9 @@ interface PlanificacionColumnHeaderProps {
   fijasVisibles: ColumnaFijaKey[];
   snapshots: PmSnapshot[];
   retirados: Set<string>;
+  /** Gate del maestro por snapshot_code: si no permite, el check queda bloqueado. */
+  gates: Record<string, GatePublicacion>;
+  proyectoFinanciero: string | null;
   anchos: Anchos;
   hasWriteAccess: boolean;
   todosSeleccionados: boolean;
@@ -45,6 +52,8 @@ export function PlanificacionColumnHeader({
   fijasVisibles,
   snapshots,
   retirados,
+  gates,
+  proyectoFinanciero,
   anchos,
   hasWriteAccess,
   todosSeleccionados,
@@ -110,39 +119,55 @@ export function PlanificacionColumnHeader({
         );
       })}
 
-      {snapshots.map((s) => (
-        <Redimensionable
-          key={s.snapshot_code}
-          colKey={s.snapshot_code}
-          anchos={anchos}
-          onAncho={onAncho}
-        >
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className={`${TH} truncate`} title={s.snapshot_code}>
-              {snapshotLabel(s)}
-            </span>
-            <label
-              className={`flex cursor-pointer items-center gap-1 text-[9px] ${
-                publicado(s.snapshot_code) ? "text-icam-900" : "text-text-muted"
-              } ${hasWriteAccess ? "" : "cursor-default opacity-60"}`}
-              title={
-                publicado(s.snapshot_code)
-                  ? "Este proyecto publica el trimestre en el Overview. Desmárcalo para retirarlo solo aquí (no borra fechas)."
-                  : "Retirado del Overview en este proyecto. Las fechas siguen guardadas."
-              }
-            >
-              <input
-                type="checkbox"
-                checked={publicado(s.snapshot_code)}
-                disabled={!hasWriteAccess || pending}
-                className="h-2.5 w-2.5 accent-icam-900"
-                onChange={() => togglePublicar(s.snapshot_code)}
-              />
-              publicar
-            </label>
-          </div>
-        </Redimensionable>
-      ))}
+      {snapshots.map((s) => {
+        const esta = publicado(s.snapshot_code);
+        const gate = gates[s.snapshot_code];
+        // El gate solo bloquea PUBLICAR: retirar siempre está permitido.
+        const bloqueado = !esta && gate !== undefined && !gate.permitido;
+        const titulo = bloqueado
+          ? motivoGateTexto(gate.permitido === false ? gate.motivo : "sin_linea_maestro", {
+              proyectoFinanciero,
+              etiquetaTrimestre: snapshotLabel(s),
+            })
+          : esta
+            ? "Este proyecto publica el trimestre en el Overview. Desmárcalo para retirarlo solo aquí (no borra fechas)."
+            : "Retirado del Overview en este proyecto. Las fechas siguen guardadas.";
+        return (
+          <Redimensionable
+            key={s.snapshot_code}
+            colKey={s.snapshot_code}
+            anchos={anchos}
+            onAncho={onAncho}
+          >
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className={`${TH} truncate`} title={s.snapshot_code}>
+                {snapshotLabel(s)}
+              </span>
+              <label
+                className={`flex items-center gap-1 text-[9px] ${
+                  esta ? "text-icam-900" : bloqueado ? "text-amber-700" : "text-text-muted"
+                } ${hasWriteAccess && !bloqueado ? "cursor-pointer" : "cursor-default opacity-60"}`}
+                title={titulo}
+              >
+                <input
+                  type="checkbox"
+                  checked={esta}
+                  disabled={!hasWriteAccess || pending || bloqueado}
+                  className="h-2.5 w-2.5 accent-icam-900"
+                  onChange={() => togglePublicar(s.snapshot_code)}
+                />
+                {!bloqueado
+                  ? "publicar"
+                  : gate.permitido === false && gate.motivo === "sin_mapeo"
+                    ? "sin mapear"
+                    : gate.permitido === false && gate.motivo === "discrepancias_pendientes"
+                      ? "por validar"
+                      : "esperando maestro"}
+              </label>
+            </div>
+          </Redimensionable>
+        );
+      })}
     </div>
   );
 }

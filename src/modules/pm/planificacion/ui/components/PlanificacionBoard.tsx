@@ -12,6 +12,10 @@ import {
   parseClipboardFechas,
 } from "@/modules/pm/planificacion/logic/planificacion-paste";
 import {
+  evaluarGatePublicacion,
+  type GatePublicacion,
+} from "@/modules/pm/planificacion/logic/publicacion-gate";
+import {
   boardMinWidthPx,
   columnasDisponibles,
   columnasPorDefecto,
@@ -45,6 +49,10 @@ interface PlanificacionBoardProps {
   snapshots: PmSnapshot[];
   /** `${activoId}|${code}` retirados del Overview por la PMO. */
   retirados: string[];
+  /** pm_activo_id → proyecto_financiero_key (gate de publicación). */
+  mapeo: Record<string, string>;
+  /** Líneas reportadas en el maestro: `${proyecto}|${trimestre_code}`. */
+  lineasMaestro: string[];
   hasWriteAccess: boolean;
 }
 
@@ -53,6 +61,8 @@ export function PlanificacionBoard({
   catalogo,
   snapshots,
   retirados,
+  mapeo,
+  lineasMaestro,
   hasWriteAccess,
 }: PlanificacionBoardProps) {
   const router = useRouter();
@@ -180,6 +190,26 @@ export function PlanificacionBoard({
     const activos = visibles ?? new Set(porDefecto);
     return disponibles.filter((s) => activos.has(s.snapshot_code));
   }, [disponibles, visibles, porDefecto]);
+
+  // --- Gate de publicación por trimestre visible del activo abierto ----------
+  const proyectoFinanciero = row ? (mapeo[row.activo.id] ?? null) : null;
+  const gates = useMemo(() => {
+    const lineas = new Set(lineasMaestro);
+    const out: Record<string, GatePublicacion> = {};
+    for (const s of snapshotsVisibles) {
+      out[s.snapshot_code] = evaluarGatePublicacion({
+        snapshotCode: s.snapshot_code,
+        proyectoFinanciero,
+        lineaMaestroExiste: proyectoFinanciero
+          ? lineas.has(`${proyectoFinanciero}|${s.snapshot_code}`)
+          : false,
+        // Las discrepancias llegan con la validación (migración 026); de
+        // momento el gate solo mira mapeo y línea del maestro.
+        discrepanciasPendientes: 0,
+      });
+    }
+    return out;
+  }, [snapshotsVisibles, proyectoFinanciero, lineasMaestro]);
 
   const fijasVisibles = useMemo(
     () =>
@@ -476,6 +506,8 @@ export function PlanificacionBoard({
             fijasVisibles={fijasVisibles}
             snapshots={snapshotsVisibles}
             retirados={retiradosSet}
+            gates={gates}
+            proyectoFinanciero={proyectoFinanciero}
             anchos={anchos}
             hasWriteAccess={hasWriteAccess}
             todosSeleccionados={todosSeleccionados}

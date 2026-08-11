@@ -17,6 +17,10 @@ export interface PlanificacionBoardData {
   snapshots: PmSnapshot[];
   /** Excepciones de publicación: `${activoId}|${code}` que la PMO ha retirado. */
   retirados: string[];
+  /** pm_activo_id → proyecto_financiero_key (para el gate de publicación). */
+  mapeo: Record<string, string>;
+  /** Líneas reportadas en el maestro: `${proyecto}|${trimestre_code}`. */
+  lineasMaestro: string[];
   error: string | null;
 }
 
@@ -39,6 +43,8 @@ export async function fetchPlanificacionBoard(
     { data: catalogo, error: eCat },
     { data: snaps, error: eSnap },
     { data: pubs, error: ePub },
+    { data: map, error: eMap },
+    { data: lineas, error: eLineas },
   ] = await Promise.all([
     fetchPmPortfolio(ctx, {
       incluirActivosArchivados: true,
@@ -48,12 +54,33 @@ export async function fetchPlanificacionBoard(
     supabase.from("pm_hito_catalogo").select("*").order("orden_default"),
     supabase.from("pm_snapshots").select("*").order("orden"),
     supabase.from("pm_activo_snapshot").select("*").eq("publicado", false),
+    supabase.from("pm_activo_proyecto_map").select("*"),
+    supabase.from("maestro_lineas_trimestre").select("proyecto, trimestre_code"),
   ]);
 
   const error =
-    portfolio.error ?? eCat?.message ?? eSnap?.message ?? ePub?.message ?? null;
+    portfolio.error ??
+    eCat?.message ??
+    eSnap?.message ??
+    ePub?.message ??
+    eMap?.message ??
+    eLineas?.message ??
+    null;
   if (error) {
-    return { rows: [], catalogo: [], snapshots: [], retirados: [], error };
+    return {
+      rows: [],
+      catalogo: [],
+      snapshots: [],
+      retirados: [],
+      mapeo: {},
+      lineasMaestro: [],
+      error,
+    };
+  }
+
+  const mapeo: Record<string, string> = {};
+  for (const m of (map ?? []) as PmActivoProyectoMap[]) {
+    mapeo[m.pm_activo_id] = m.proyecto_financiero_key;
   }
 
   return {
@@ -62,6 +89,10 @@ export async function fetchPlanificacionBoard(
     snapshots: (snaps ?? []) as PmSnapshot[],
     retirados: ((pubs ?? []) as PmActivoSnapshot[]).map(
       (p) => `${p.activo_id}|${p.snapshot_code}`,
+    ),
+    mapeo,
+    lineasMaestro: ((lineas ?? []) as { proyecto: string; trimestre_code: string }[]).map(
+      (l) => `${l.proyecto}|${l.trimestre_code}`,
     ),
     error: null,
   };
