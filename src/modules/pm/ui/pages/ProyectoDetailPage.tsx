@@ -50,8 +50,8 @@ export default async function PmProyectoDetailPage({ params, searchParams }: Pag
   return (
     <div className="space-y-8 min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/dashboard/pm/overview" className="text-sm text-icam-900 underline">
-          ← Overview
+        <Link href="/dashboard/pm/detalle" className="text-sm text-icam-900 underline">
+          ← Todos los proyectos
         </Link>
         <h1 className="text-xl font-semibold text-text-primary">{row.activo.id_activo}</h1>
         <span className="text-xs px-2 py-1 rounded-full bg-subtle text-text-muted">

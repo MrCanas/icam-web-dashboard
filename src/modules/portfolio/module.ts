@@ -2,7 +2,7 @@ import type { ModuleDefinition } from "@/registry/types";
 
 export const portfolioModule: ModuleDefinition = {
   key: "portfolio",
-  label: "Financiero",
+  label: "Dashboard",
   icon: "building",
   pathPrefix: "/dashboard/portfolio",
   defaultPath: "/dashboard/portfolio",
@@ -36,6 +36,12 @@ export const portfolioModule: ModuleDefinition = {
       path: "/dashboard/portfolio/tendencias",
       label: "Tendencias",
       match: (p) => p.startsWith("/dashboard/portfolio/tendencias"),
+    },
+    {
+      key: "portfolio.pm_overview",
+      path: "/dashboard/portfolio/pm-overview",
+      label: "Overview PM",
+      match: (p) => p.startsWith("/dashboard/portfolio/pm-overview"),
     },
   ],
   actions: [

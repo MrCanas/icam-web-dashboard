@@ -6,8 +6,8 @@ import { routesForZone } from "@/registry/routes";
 import type { UserPermissionsInput } from "@/modules/admin/types";
 
 const ZONE_LABELS: Record<ZoneKey, string> = {
-  financiero: "Financiero",
-  pm: "PM",
+  financiero: "Dashboard",
+  pm: "Proyectos",
   adquisiciones: "Adquisiciones",
   data: "Data",
 };

@@ -69,6 +69,59 @@ export async function fetchActasProjects(
   return { projects, error: null };
 }
 
+/**
+ * project.code del proyecto de Actas vinculado a un activo PM (por
+ * project.pm_activo_id), o null si el activo no tiene actas. El vínculo es
+ * opcional: los códigos de ambos dominios NO tienen por qué coincidir.
+ */
+export async function fetchActasCodeForPmActivo(
+  ctx: UserContext,
+  idActivo: string,
+): Promise<string | null> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: activo } = await supabase
+    .from("pm_activos")
+    .select("id")
+    .eq("id_activo", idActivo)
+    .maybeSingle();
+  if (!activo) return null;
+
+  const { data: project } = await supabase
+    .from("project")
+    .select("code")
+    .eq("pm_activo_id", activo.id)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return project?.code ?? null;
+}
+
+/** Inverso: pm_activos.id_activo del activo vinculado a un proyecto de Actas. */
+export async function fetchPmActivoIdForActasProject(
+  ctx: UserContext,
+  projectCode: string,
+): Promise<string | null> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: project } = await supabase
+    .from("project")
+    .select("pm_activo_id")
+    .eq("code", projectCode)
+    .maybeSingle();
+  if (!project?.pm_activo_id) return null;
+
+  const { data: activo } = await supabase
+    .from("pm_activos")
+    .select("id_activo")
+    .eq("id", project.pm_activo_id)
+    .maybeSingle();
+
+  return activo?.id_activo ?? null;
+}
+
 export interface FetchActasArchivedProjectsResult {
   projects: ActasArchivedProjectListItem[];
   error: string | null;

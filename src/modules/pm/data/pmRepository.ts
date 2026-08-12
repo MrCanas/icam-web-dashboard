@@ -152,6 +152,46 @@ export async function fetchPmPortfolio(
   return { rows, snapshotCodes: [...codes].sort(), error: null };
 }
 
+export interface PmProjectNavItem {
+  /** pm_activos.id_activo — segmento de /dashboard/pm/proyecto/[id]. */
+  idActivo: string;
+  nombre: string | null;
+  /**
+   * project.code del proyecto de Actas vinculado (project.pm_activo_id), o
+   * null si el activo no tiene actas. Sirve para resaltar el proyecto en la
+   * nav también cuando se navega por /dashboard/pm/actas/<code>.
+   */
+  actasCode: string | null;
+}
+
+/**
+ * Lista ligera de proyectos activos para la fila secundaria de la nav.
+ * En error devuelve []: la nav degrada a solo las entradas estáticas.
+ */
+export async function fetchPmProjectNavItems(
+  ctx: UserContext,
+): Promise<PmProjectNavItem[]> {
+  const supabase = await getPmReadSupabase(ctx);
+  const { data, error } = await supabase
+    .from("pm_activos")
+    .select("id_activo, nombre_display, project(code, archived_at)")
+    .is("archivado_at", null)
+    .order("id_activo");
+  if (error || !data) return [];
+
+  return data.map((row) => {
+    // El embed inverso por project.pm_activo_id llega como array (FK no única).
+    const linked = (Array.isArray(row.project) ? row.project : [row.project])
+      .filter(Boolean)
+      .find((p) => !p.archived_at);
+    return {
+      idActivo: row.id_activo as string,
+      nombre: (row.nombre_display as string | null) ?? null,
+      actasCode: linked?.code ?? null,
+    };
+  });
+}
+
 export async function fetchPmActivoBySlug(
   ctx: UserContext,
   idActivo: string,

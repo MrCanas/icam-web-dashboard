@@ -92,7 +92,7 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
           current={snapshot}
           extraCodes={snapshotCodes}
           hrefForSnapshot={(code) =>
-            `/dashboard/pm/overview?snapshot=${encodeURIComponent(code)}`
+            `/dashboard/portfolio/pm-overview?snapshot=${encodeURIComponent(code)}`
           }
         />
         <PmGanttOverview portfolio={rows} snapshot={snapshot} />

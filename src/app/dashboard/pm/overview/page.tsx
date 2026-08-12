@@ -1,11 +1,15 @@
-import type { ComponentProps } from "react";
+import { redirect } from "next/navigation";
 
-import { requireRouteAccess } from "@/lib/auth/require-route-access";
-import PmOverviewPage from "@/modules/pm/ui/pages/OverviewPage";
-
-export default async function Page(
-  props: ComponentProps<typeof PmOverviewPage>,
-) {
-  await requireRouteAccess("pm.overview");
-  return <PmOverviewPage {...props} />;
+/** URL antigua del Overview de PM: ahora vive en la zona Dashboard. */
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ snapshot?: string }>;
+}) {
+  const { snapshot } = await searchParams;
+  redirect(
+    snapshot
+      ? `/dashboard/portfolio/pm-overview?snapshot=${encodeURIComponent(snapshot)}`
+      : "/dashboard/portfolio/pm-overview",
+  );
 }

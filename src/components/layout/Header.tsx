@@ -3,10 +3,16 @@
 import { DashboardNav } from "@/components/layout/DashboardNav";
 import { HeaderUserMenu } from "@/components/layout/HeaderUserMenu";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import type { PmProjectNavItem } from "@/modules/pm/data/pmRepository";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-export function Header() {
+interface HeaderProps {
+  /** Proyectos activos para la fila secundaria de la zona pm. */
+  pmProjects?: PmProjectNavItem[];
+}
+
+export function Header({ pmProjects = [] }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -50,7 +56,7 @@ export function Header() {
         </div>
 
         <div className="hidden lg:block px-3 sm:px-6 lg:px-8 pb-3 pt-1">
-          <DashboardNav layout="horizontal" />
+          <DashboardNav layout="horizontal" pmProjects={pmProjects} />
         </div>
       </header>
 
@@ -81,7 +87,11 @@ export function Header() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-2 py-2">
-              <DashboardNav layout="vertical" onNavigate={() => setMenuOpen(false)} />
+              <DashboardNav
+                layout="vertical"
+                pmProjects={pmProjects}
+                onNavigate={() => setMenuOpen(false)}
+              />
             </div>
             <div className="p-3 border-t border-white/10 shrink-0 space-y-1">
               <div className="px-2 pb-2 flex justify-end">

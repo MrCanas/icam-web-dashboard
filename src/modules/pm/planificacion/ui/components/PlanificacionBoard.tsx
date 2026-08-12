@@ -69,6 +69,12 @@ interface PlanificacionBoardProps {
   /** false = migraciones 024-026 sin aplicar: gate inactivo, sin columnas Maestro. */
   maestroDisponible: boolean;
   hasWriteAccess: boolean;
+  /**
+   * Fija el board a un proyecto (pm_activos.id) y sustituye el selector por un
+   * literal. Lo usa la vista anidada /dashboard/pm/proyecto/[id]/planificacion,
+   * donde el proyecto ya viene dado por la navegación.
+   */
+  activoFijoId?: string;
 }
 
 export function PlanificacionBoard({
@@ -82,9 +88,12 @@ export function PlanificacionBoard({
   resoluciones,
   maestroDisponible,
   hasWriteAccess,
+  activoFijoId,
 }: PlanificacionBoardProps) {
   const router = useRouter();
-  const [activoId, setActivoId] = useState<string>(rows[0]?.activo.id ?? "");
+  const [activoId, setActivoId] = useState<string>(
+    activoFijoId ?? rows[0]?.activo.id ?? "",
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [meses, setMeses] = useState(3);
@@ -474,19 +483,27 @@ export function PlanificacionBoard({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-subtle/50 bg-card p-3">
         <label className="text-xs font-medium text-text-muted">Proyecto</label>
-        <select
-          value={row.activo.id}
-          onChange={(e) => setActivoId(e.target.value)}
-          className="rounded border border-subtle bg-page px-2 py-1 text-sm text-text-body focus:outline-none focus:ring-1 focus:ring-icam-900/20"
-        >
-          {rows.map((r) => (
-            <option key={r.activo.id} value={r.activo.id}>
-              {r.activo.id_activo}
-              {r.activo.nombre_display ? ` — ${r.activo.nombre_display}` : ""}
-              {r.activo.archivado_at ? " (archivado)" : ""}
-            </option>
-          ))}
-        </select>
+        {activoFijoId ? (
+          <span className="text-sm font-medium text-text-body">
+            {row.activo.id_activo}
+            {row.activo.nombre_display ? ` — ${row.activo.nombre_display}` : ""}
+            {row.activo.archivado_at ? " (archivado)" : ""}
+          </span>
+        ) : (
+          <select
+            value={row.activo.id}
+            onChange={(e) => setActivoId(e.target.value)}
+            className="rounded border border-subtle bg-page px-2 py-1 text-sm text-text-body focus:outline-none focus:ring-1 focus:ring-icam-900/20"
+          >
+            {rows.map((r) => (
+              <option key={r.activo.id} value={r.activo.id}>
+                {r.activo.id_activo}
+                {r.activo.nombre_display ? ` — ${r.activo.nombre_display}` : ""}
+                {r.activo.archivado_at ? " (archivado)" : ""}
+              </option>
+            ))}
+          </select>
+        )}
 
         <span className="text-xs text-text-muted">{row.activo.tipo_uso_activo}</span>
 

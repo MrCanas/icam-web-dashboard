@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { PLATFORM_NAV } from "@/registry/platform-nav";
-import { MODULES_LIST, MODULE_TO_ZONE } from "@/registry/modules";
+import { MODULES_LIST, MODULE_TO_ZONE, NAV_HIDDEN_ZONES } from "@/registry/modules";
 import type { ModuleRoute } from "@/registry/types";
 import type { UserContext } from "@/lib/auth/currentUser";
+import type { PmProjectNavItem } from "@/modules/pm/data/pmRepository";
 import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import { visibleRoutesForZone } from "@/lib/auth/permissions";
 import { ZONE_ORDER, type ZoneKey } from "@/registry/modules";
@@ -21,26 +22,106 @@ function zoneForPath(pathname: string): ZoneKey {
   return "financiero";
 }
 
-/** Subsección de la zona actual, ya filtrada por los permisos del usuario. */
-function secondaryForPath(user: UserContext, pathname: string): ModuleRoute[] {
-  return visibleRoutesForZone(user, zoneForPath(pathname));
-}
-
 function isRouteActive(pathname: string, route: ModuleRoute): boolean {
   if (route.match) return route.match(pathname);
   return pathname === route.path || pathname.startsWith(`${route.path}/`);
 }
 
+interface SecondaryItem {
+  key: string;
+  href: string;
+  label: string;
+  /** Tooltip (nombre completo del proyecto). */
+  title?: string;
+  active: boolean;
+  /** Pinta un separador antes de este item (proyectos ⇢ páginas transversales). */
+  separatorBefore?: boolean;
+}
+
+/**
+ * Fila secundaria de la zona actual. En la zona pm la lista de páginas se
+ * sustituye por: [Todos los proyectos] + [un item por proyecto activo] +
+ * [separador] + [páginas transversales (Planificación, Mapeo maestro, Actas)].
+ */
+function secondaryItemsForPath(
+  user: UserContext,
+  pathname: string,
+  pmProjects: PmProjectNavItem[],
+): SecondaryItem[] {
+  const zone = zoneForPath(pathname);
+  const routes = visibleRoutesForZone(user, zone);
+
+  const asItem = (route: ModuleRoute, active: boolean): SecondaryItem => ({
+    key: route.key,
+    href: route.path,
+    label: route.label,
+    active,
+  });
+
+  const detalle = zone === "pm" ? routes.find((r) => r.key === "pm.detalle") : undefined;
+  if (!detalle || pmProjects.length === 0) {
+    return routes.map((r) => asItem(r, isRouteActive(pathname, r)));
+  }
+
+  const items: SecondaryItem[] = [
+    // El `match` del registry es amplio (cubre proyecto/[id] para permisos);
+    // visualmente "Todos los proyectos" solo se marca en el grid.
+    asItem(detalle, pathname === detalle.path),
+  ];
+
+  for (const p of pmProjects) {
+    const href = `/dashboard/pm/proyecto/${encodeURIComponent(p.idActivo)}`;
+    const active =
+      pathname === href ||
+      pathname.startsWith(`${href}/`) ||
+      (p.actasCode != null &&
+        pathname.startsWith(`/dashboard/pm/actas/${encodeURIComponent(p.actasCode)}`));
+    items.push({
+      key: `pm.proyecto.${p.idActivo}`,
+      href,
+      label: p.idActivo,
+      title: p.nombre ?? undefined,
+      active,
+    });
+  }
+
+  // Si un proyecto ya reclama el pathname (p. ej. su Planificación anidada o
+  // sus Actas), las entradas transversales no se marcan también.
+  const projectClaimed = items.some((i) => i.active);
+
+  let first = true;
+  for (const route of routes) {
+    if (route.key === "pm.detalle") continue;
+    items.push({
+      ...asItem(route, isRouteActive(pathname, route) && !projectClaimed),
+      separatorBefore: first,
+    });
+    first = false;
+  }
+
+  return items;
+}
+
 interface DashboardNavProps {
   layout?: "horizontal" | "vertical";
   onNavigate?: () => void;
+  /** Proyectos activos (zona pm); la fila secundaria los pinta como pestañas. */
+  pmProjects?: PmProjectNavItem[];
 }
 
-export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNavProps) {
+export function DashboardNav({
+  layout = "horizontal",
+  onNavigate,
+  pmProjects = [],
+}: DashboardNavProps) {
   const pathname = usePathname();
   const { user } = useCurrentUser();
-  const secondary = user ? secondaryForPath(user, pathname) : [];
   const isVertical = layout === "vertical";
+
+  const secondary = useMemo(
+    () => (user ? secondaryItemsForPath(user, pathname, pmProjects) : []),
+    [user, pathname, pmProjects],
+  );
 
   const primaryTabs = useMemo(() => {
     if (!user) return [];
@@ -48,6 +129,9 @@ export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNav
     const tabs: { href: string; label: string; prefix: string }[] = [];
 
     for (const zoneKey of ZONE_ORDER) {
+      // Ocultas de la nav (p. ej. Adquisiciones): siguen accesibles por URL.
+      if (NAV_HIDDEN_ZONES.includes(zoneKey)) continue;
+
       // Una zona con todas sus páginas denegadas no debe aparecer, y el destino
       // es la primera página VISIBLE: `defaultPath` puede estar denegado.
       const visible = visibleRoutesForZone(user, zoneKey);
@@ -114,46 +198,56 @@ export function DashboardNav({ layout = "horizontal", onNavigate }: DashboardNav
     </nav>
   );
 
-  const secondaryRow = (
-    <nav
-      className={
-        isVertical ? "flex flex-col gap-0" : "flex flex-wrap items-center justify-center gap-x-5 gap-y-1"
-      }
-      aria-label="Subsección"
-    >
-      {secondary.map((tab) => {
-        const active = isRouteActive(pathname, tab);
-        if (isVertical) {
-          return (
-            <Link
-              key={tab.path}
-              href={tab.path}
-              onClick={onNavigate}
-              className={`min-h-11 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
-                active
-                  ? "text-white border-icam-gold bg-white/5"
-                  : "text-white/70 border-transparent hover:text-white hover:bg-white/5"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          );
-        }
-        return (
+  const secondaryRow = isVertical ? (
+    <nav className="flex flex-col gap-0" aria-label="Subsección">
+      {secondary.map((tab) => (
+        <Fragment key={tab.key}>
+          {tab.separatorBefore ? (
+            <div className="border-t border-white/10 my-1" aria-hidden="true" />
+          ) : null}
           <Link
-            key={tab.path}
-            href={tab.path}
-            className={`pb-2 text-sm transition ${
-              active
-                ? "text-white border-b-[3px] border-icam-gold"
-                : "text-white/60 hover:text-white/90"
+            href={tab.href}
+            title={tab.title}
+            onClick={onNavigate}
+            className={`min-h-11 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
+              tab.active
+                ? "text-white border-icam-gold bg-white/5"
+                : "text-white/70 border-transparent hover:text-white hover:bg-white/5"
             }`}
           >
             {tab.label}
           </Link>
-        );
-      })}
+        </Fragment>
+      ))}
     </nav>
+  ) : (
+    // `w-max mx-auto` centra la fila cuando cabe y permite scroll cuando no
+    // (justify-center + overflow dejaría inaccesibles los items del inicio).
+    <div className="overflow-x-auto">
+      <nav
+        className="flex w-max mx-auto flex-nowrap items-center gap-x-5"
+        aria-label="Subsección"
+      >
+        {secondary.map((tab) => (
+          <Fragment key={tab.key}>
+            {tab.separatorBefore ? (
+              <span className="h-4 w-px bg-white/20 shrink-0" aria-hidden="true" />
+            ) : null}
+            <Link
+              href={tab.href}
+              title={tab.title}
+              className={`pb-2 text-sm whitespace-nowrap transition ${
+                tab.active
+                  ? "text-white border-b-[3px] border-icam-gold"
+                  : "text-white/60 hover:text-white/90"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          </Fragment>
+        ))}
+      </nav>
+    </div>
   );
 
   if (isVertical) {

@@ -4,8 +4,8 @@ import { ZONE_ORDER, type ZoneKey } from "@/registry/modules";
 import type { AdminUserRow } from "@/modules/admin/types";
 
 const ZONE_LABELS: Record<ZoneKey, string> = {
-  financiero: "Financiero",
-  pm: "PM",
+  financiero: "Dashboard",
+  pm: "Proyectos",
   adquisiciones: "Adquisiciones",
   data: "Data",
 };
