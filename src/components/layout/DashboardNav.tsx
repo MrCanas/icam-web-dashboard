@@ -50,6 +50,9 @@ function secondaryItemsForPath(
 ): SecondaryItem[] {
   const zone = zoneForPath(pathname);
   const routes = visibleRoutesForZone(user, zone);
+  // Permisos (routes) y nav (navRoutes) van separados: una ruta oculta sigue
+  // gobernando el acceso — p. ej. pm.detalle gate-a la fila de proyectos.
+  const navRoutes = routes.filter((r) => !r.hiddenInNav);
 
   const asItem = (route: ModuleRoute, active: boolean): SecondaryItem => ({
     key: route.key,
@@ -60,14 +63,15 @@ function secondaryItemsForPath(
 
   const detalle = zone === "pm" ? routes.find((r) => r.key === "pm.detalle") : undefined;
   if (!detalle || pmProjects.length === 0) {
-    return routes.map((r) => asItem(r, isRouteActive(pathname, r)));
+    return navRoutes.map((r) => asItem(r, isRouteActive(pathname, r)));
   }
 
-  const items: SecondaryItem[] = [
+  const items: SecondaryItem[] = [];
+  if (!detalle.hiddenInNav) {
     // El `match` del registry es amplio (cubre proyecto/[id] para permisos);
     // visualmente "Todos los proyectos" solo se marca en el grid.
-    asItem(detalle, pathname === detalle.path),
-  ];
+    items.push(asItem(detalle, pathname === detalle.path));
+  }
 
   for (const p of pmProjects) {
     const href = `/dashboard/pm/proyecto/${encodeURIComponent(p.idActivo)}`;
@@ -90,11 +94,11 @@ function secondaryItemsForPath(
   const projectClaimed = items.some((i) => i.active);
 
   let first = true;
-  for (const route of routes) {
+  for (const route of navRoutes) {
     if (route.key === "pm.detalle") continue;
     items.push({
       ...asItem(route, isRouteActive(pathname, route) && !projectClaimed),
-      separatorBefore: first,
+      separatorBefore: first && items.length > 0,
     });
     first = false;
   }
@@ -148,15 +152,25 @@ export function DashboardNav({
 
       const mod = MODULES_LIST.find((m) => MODULE_TO_ZONE[m.key] === zoneKey);
       if (!mod) continue;
+
+      // Proyectos aterriza en el primer proyecto: el grid (pm.detalle) está
+      // oculto de la nav. Requiere pm.detalle visible, que gate-a proyecto/*.
+      const firstProject =
+        zoneKey === "pm" &&
+        pmProjects.length > 0 &&
+        visible.some((r) => r.key === "pm.detalle")
+          ? `/dashboard/pm/proyecto/${encodeURIComponent(pmProjects[0]!.idActivo)}`
+          : null;
+
       tabs.push({
-        href: visible[0]!.path,
+        href: firstProject ?? visible.find((r) => !r.hiddenInNav)?.path ?? visible[0]!.path,
         label: mod.label,
         prefix: mod.pathPrefix,
       });
     }
 
     return tabs;
-  }, [user]);
+  }, [user, pmProjects]);
 
   const primaryRow = (
     <nav

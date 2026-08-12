@@ -13,6 +13,9 @@ export const pmModule: ModuleDefinition = {
       key: "pm.detalle",
       path: "/dashboard/pm/detalle",
       label: "Todos los proyectos",
+      // Fuera de la nav (el grid es redundante con la fila de proyectos),
+      // pero su key gobierna el permiso de proyecto/[id] y de la fila misma.
+      hiddenInNav: true,
       // proyecto/[id] es el Resumen Ejecutivo; sus subpáginas de
       // planificación/actas resuelven a sus propias keys de permiso.
       match: (p) =>
@@ -37,6 +40,9 @@ export const pmModule: ModuleDefinition = {
       key: "pm.actas",
       path: "/dashboard/pm/actas",
       label: "Actas",
+      // Las actas se abren desde la subpestaña de cada proyecto; el hub con
+      // sidebar (alta, duplicar, archivar, reordenar) queda solo por URL.
+      hiddenInNav: true,
       match: (p) =>
         p === "/dashboard/pm/actas" ||
         p.startsWith("/dashboard/pm/actas/") ||
