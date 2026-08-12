@@ -7,6 +7,26 @@
  * la server action (que revalida: la UI es cortesía, el servidor manda).
  */
 
+import { parseQuarterCode } from "@/modules/pm/logic/pm-viz";
+
+/**
+ * Primer trimestre que pasa por el flujo de validación contra el maestro.
+ *
+ * TODO lo anterior es historia consolidada y NO cambia nunca: sigue publicado,
+ * editable y sin columna «Maestro», aunque el maestro traiga líneas antiguas o
+ * el trimestre se añada tarde. Decidido por la PMO el 2026-08-12: el primer
+ * trimestre que se reporta con el flujo nuevo es Q2 2026.
+ */
+export const PRIMER_TRIMESTRE_VALIDADO = "2026_Q2";
+
+/** ¿Este trimestre está sujeto al flujo de validación? */
+export function sujetoAValidacion(snapshotCode: string): boolean {
+  const q = parseQuarterCode(snapshotCode);
+  if (!q) return false; // levantamiento y códigos raros: fuera del flujo
+  const corte = parseQuarterCode(PRIMER_TRIMESTRE_VALIDADO)!;
+  return q.y * 4 + q.q >= corte.y * 4 + corte.q;
+}
+
 export type MotivoGate = "sin_mapeo" | "sin_linea_maestro" | "discrepancias_pendientes";
 
 export type GatePublicacion =
@@ -20,9 +40,10 @@ export function evaluarGatePublicacion(input: {
   lineaMaestroExiste: boolean;
   discrepanciasPendientes: number;
 }): GatePublicacion {
-  // El levantamiento es la foto inicial del proyecto, anterior al ciclo de
-  // reporte trimestral: no tiene línea en el maestro que esperar.
-  if (input.snapshotCode === "levantamiento") return { permitido: true };
+  // Fuera del flujo: el levantamiento (foto inicial, sin línea en el maestro)
+  // y todo lo anterior al corte PRIMER_TRIMESTRE_VALIDADO, que es historia
+  // consolidada y se publica como siempre.
+  if (!sujetoAValidacion(input.snapshotCode)) return { permitido: true };
   if (!input.proyectoFinanciero) return { permitido: false, motivo: "sin_mapeo" };
   if (!input.lineaMaestroExiste) return { permitido: false, motivo: "sin_linea_maestro" };
   if (input.discrepanciasPendientes > 0) {

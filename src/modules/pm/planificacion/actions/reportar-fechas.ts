@@ -9,6 +9,10 @@ import {
 } from "@/modules/pm/planificacion/logic/planificacion-validation";
 import { TABLA_MADRE_COLUMNAS_HITO } from "@/modules/pm/planificacion/logic/tabla-madre-columnas";
 import {
+  PRIMER_TRIMESTRE_VALIDADO,
+  sujetoAValidacion,
+} from "@/modules/pm/planificacion/logic/publicacion-gate";
+import {
   reportarFechasAlMaestro,
   type ReporteFechaCelda,
 } from "@/modules/portfolio/data/maestroWriteback";
@@ -48,6 +52,13 @@ export async function reportarFechas(
 
   const code = validateSnapshotCode(input.snapshotCode);
   if (!code.ok) return { ok: false, error: code.error };
+
+  if (!sujetoAValidacion(code.value)) {
+    return {
+      ok: false,
+      error: `Los trimestres anteriores a ${PRIMER_TRIMESTRE_VALIDADO} no se reportan desde aquí.`,
+    };
+  }
 
   const auth = await requirePmWriteSupabase();
   if (!auth.ok) return { ok: false, error: auth.error };

@@ -7,6 +7,7 @@ import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-val
 import {
   evaluarGatePublicacion,
   motivoGateTexto,
+  sujetoAValidacion,
 } from "@/modules/pm/planificacion/logic/publicacion-gate";
 
 export type ToggleSnapshotPublicadoInput = {
@@ -52,7 +53,10 @@ export async function toggleSnapshotPublicado(
   const { client } = auth;
 
   if (input.publicado) {
-    if (code !== "levantamiento") {
+    // Solo los trimestres sujetos al flujo de validación (desde el corte
+    // PRIMER_TRIMESTRE_VALIDADO) pasan por el gate: el levantamiento y la
+    // historia anterior se publican como siempre.
+    if (sujetoAValidacion(code)) {
       // ¿Existe la infraestructura del gate (migración 024)? Si no, publicar
       // funciona como siempre: el flujo de validación aplica a partir de que
       // las migraciones estén aplicadas, no retroactivamente.

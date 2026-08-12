@@ -13,6 +13,7 @@ import {
 } from "@/modules/pm/planificacion/logic/planificacion-paste";
 import {
   evaluarGatePublicacion,
+  sujetoAValidacion,
   type GatePublicacion,
 } from "@/modules/pm/planificacion/logic/publicacion-gate";
 import {
@@ -26,7 +27,6 @@ import {
   columnasDisponibles,
   columnasPorDefecto,
   COLUMNAS_FIJAS,
-  LEVANTAMIENTO,
   snapshotLabel,
   type Anchos,
   type ColumnaFijaKey,
@@ -34,6 +34,7 @@ import {
 } from "@/modules/pm/planificacion/logic/planificacion-display";
 
 import { AnadirTrimestreDialog } from "./AnadirTrimestreDialog";
+import { PegarFechasDialog } from "./PegarFechasDialog";
 import { PlanificacionColumnHeader } from "./PlanificacionColumnHeader";
 import { PlanificacionHitoRow } from "./PlanificacionHitoRow";
 import type { FechaCellTarget } from "./PlanificacionFechaCell";
@@ -218,9 +219,11 @@ export function PlanificacionBoard({
     const out: ColumnaSnapshotArea[] = [];
     for (const s of snapshotsVisibles) {
       out.push({ tipo: "snapshot", snap: s });
+      // Solo los trimestres sujetos al flujo (desde el corte) comparan con el
+      // maestro: los anteriores son historia consolidada y no se tocan.
       if (
         proyectoFinanciero &&
-        s.snapshot_code !== LEVANTAMIENTO &&
+        sujetoAValidacion(s.snapshot_code) &&
         lineasSet.has(`${proyectoFinanciero}|${s.snapshot_code}`)
       ) {
         out.push({ tipo: "maestro", snap: s });
@@ -551,6 +554,24 @@ export function PlanificacionBoard({
               )}
             </div>
           </details>
+
+          {hasWriteAccess ? (
+            <PegarFechasDialog
+              hitos={hitosActivos.map((h) => ({ id: h.id, nombre: h.hito }))}
+              destinos={[
+                { target: { tipo: "prevision" }, etiqueta: "Previsión (fecha vigente)" },
+                ...snapshotsVisibles.map((s) => ({
+                  target: {
+                    tipo: "snapshot" as const,
+                    snapshotCode: s.snapshot_code,
+                    label: snapshotLabel(s),
+                  },
+                  etiqueta: snapshotLabel(s),
+                })),
+              ]}
+              onAplicar={pegarColumna}
+            />
+          ) : null}
 
           {hasWriteAccess ? (
             <AnadirTrimestreDialog rows={rows} onDone={mostrarToast} />

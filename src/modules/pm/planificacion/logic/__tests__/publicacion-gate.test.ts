@@ -1,7 +1,39 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { evaluarGatePublicacion, motivoGateTexto } from "../publicacion-gate";
+import {
+  evaluarGatePublicacion,
+  motivoGateTexto,
+  PRIMER_TRIMESTRE_VALIDADO,
+  sujetoAValidacion,
+} from "../publicacion-gate";
+
+test("el corte del flujo es Q2 2026", () => {
+  // Decidido por la PMO: todo lo anterior es historia consolidada y no cambia.
+  assert.equal(PRIMER_TRIMESTRE_VALIDADO, "2026_Q2");
+  assert.equal(sujetoAValidacion("2026_Q2"), true);
+  assert.equal(sujetoAValidacion("2026_Q3"), true);
+  assert.equal(sujetoAValidacion("2027_Q1"), true);
+  assert.equal(sujetoAValidacion("2026_Q1"), false);
+  assert.equal(sujetoAValidacion("2025_Q4"), false);
+  assert.equal(sujetoAValidacion("2018_Q3"), false);
+  assert.equal(sujetoAValidacion("levantamiento"), false);
+});
+
+test("los trimestres anteriores al corte están exentos del gate", () => {
+  for (const code of ["2026_Q1", "2025_Q4", "2018_Q3"]) {
+    assert.deepEqual(
+      evaluarGatePublicacion({
+        snapshotCode: code,
+        proyectoFinanciero: null,
+        lineaMaestroExiste: false,
+        discrepanciasPendientes: 3,
+      }),
+      { permitido: true },
+      `«${code}» debería publicarse como siempre`,
+    );
+  }
+});
 
 test("el levantamiento está exento del gate", () => {
   // Es la foto inicial del proyecto, anterior al ciclo de reporte trimestral.

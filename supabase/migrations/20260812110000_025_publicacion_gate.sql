@@ -50,25 +50,31 @@ BEGIN
 
   GET DIAGNOSTICS v_n = ROW_COUNT;
 
-  -- Nace sin publicar: la excepción se siembra aquí, en la misma transacción.
+  -- Nace sin publicar SOLO a partir del corte del flujo de validación
+  -- (2026_Q2, orden 106 = (2026-2000)*4+2). Los trimestres anteriores son
+  -- historia consolidada: si se añaden o re-añaden tarde, se publican solos
+  -- como siempre — nada de lo que ya existe cambia de comportamiento.
+  --
   -- DO NOTHING a propósito: re-añadir con «sobrescribir» un trimestre que la PM
   -- ya validó y publicó (su fila de excepción se borró al publicar) sí vuelve a
   -- despublicarlo (no hay fila → se inserta), pero si la fila existe con
   -- publicado=true o false se respeta el estado que decidió la PM.
-  INSERT INTO pm_activo_snapshot (activo_id, snapshot_code, publicado)
-  SELECT DISTINCT h.activo_id, v_code, false
-    FROM pm_hitos h
-   WHERE h.fecha_actual IS NOT NULL
-     AND h.archivado_at IS NULL
-     AND (p_activo_ids IS NULL OR h.activo_id = ANY(p_activo_ids))
-  ON CONFLICT (activo_id, snapshot_code) DO NOTHING;
+  IF pm_snapshot_orden(v_code) >= pm_snapshot_orden('2026_Q2') THEN
+    INSERT INTO pm_activo_snapshot (activo_id, snapshot_code, publicado)
+    SELECT DISTINCT h.activo_id, v_code, false
+      FROM pm_hitos h
+     WHERE h.fecha_actual IS NOT NULL
+       AND h.archivado_at IS NULL
+       AND (p_activo_ids IS NULL OR h.activo_id = ANY(p_activo_ids))
+    ON CONFLICT (activo_id, snapshot_code) DO NOTHING;
+  END IF;
 
   RETURN v_n;
 END;
 $$;
 
 COMMENT ON FUNCTION public.anadir_pm_snapshot(text, uuid[]) IS
-  'Añade un trimestre al histórico copiando pm_hitos.fecha_actual y lo deja SIN publicar (siembra publicado=false). p_activo_ids NULL = todo el portfolio. Ignora hitos archivados. Idempotente. Devuelve nº de fechas.';
+  'Añade un trimestre al histórico copiando pm_hitos.fecha_actual. Desde 2026_Q2 lo deja SIN publicar (siembra publicado=false); los anteriores al corte se publican solos como siempre. p_activo_ids NULL = todo el portfolio. Ignora hitos archivados. Idempotente. Devuelve nº de fechas.';
 
 REVOKE ALL ON FUNCTION public.anadir_pm_snapshot(text, uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.anadir_pm_snapshot(text, uuid[]) TO service_role;

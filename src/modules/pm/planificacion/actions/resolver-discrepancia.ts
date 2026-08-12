@@ -6,6 +6,10 @@ import {
   validateSnapshotCode,
   validateUuid,
 } from "@/modules/pm/planificacion/logic/planificacion-validation";
+import {
+  PRIMER_TRIMESTRE_VALIDADO,
+  sujetoAValidacion,
+} from "@/modules/pm/planificacion/logic/publicacion-gate";
 
 export type ResolverDiscrepanciaInput = {
   hitoId: string;
@@ -37,6 +41,14 @@ export async function resolverDiscrepancia(
   // El levantamiento no tiene línea del maestro que validar.
   const code = validateSnapshotCode(input.snapshotCode);
   if (!code.ok) return { ok: false, error: code.error };
+
+  // La historia anterior al corte no se valida ni se reescribe.
+  if (!sujetoAValidacion(code.value)) {
+    return {
+      ok: false,
+      error: `Los trimestres anteriores a ${PRIMER_TRIMESTRE_VALIDADO} son historia consolidada: no pasan por la validación.`,
+    };
+  }
 
   if (input.eleccion !== "pm" && input.eleccion !== "maestro") {
     return { ok: false, error: "Elección desconocida" };
