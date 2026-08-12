@@ -54,3 +54,9 @@ next-env.d.ts
 /tmp/monday-extracts/
 /tmp/monday-transformed/
 tmp/
+
+# Maestro financiero — datos confidenciales (equity, TIR, precios de adquisición).
+# La copia de trabajo vive en la raíz y se sincroniza desde SharePoint; nunca se versiona.
+*.xlsm
+*.xlsx
+!docs/actas/*.xlsx

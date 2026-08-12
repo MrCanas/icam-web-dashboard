@@ -322,28 +322,60 @@ function deviationVsLev(hitoDate: Date | null, lev: Date | null): number | null 
   return Math.round((hitoDate.getTime() - lev.getTime()) / 86400000);
 }
 
+/**
+ * Las dos fechas más recientes del hito, recorriendo trimestres → fecha_actual
+ * de más nuevo a más viejo. `latest` es la previsión vigente; `prev` sirve para
+ * la tendencia.
+ */
+export function latestHitoDates(
+  hito: PmHitoEnriched,
+  allQuarterCodes: string[],
+): { latest: Date | null; prev: Date | null } {
+  const quarters = [...allQuarterCodes].filter((c) => parseQuarterCode(c)).sort(compareQuarterCodes);
+  const sequence = [...quarters, "fecha_actual"];
+
+  const datesRev: Date[] = [];
+  for (let i = sequence.length - 1; i >= 0 && datesRev.length < 2; i--) {
+    const code = sequence[i];
+    const iso = code === "fecha_actual" ? hito.fecha_actual : hito.snapshots[code];
+    const d = normalizePmDate(iso ?? null);
+    if (d) datesRev.push(d);
+  }
+  return { latest: datesRev[0] ?? null, prev: datesRev[1] ?? null };
+}
+
+/**
+ * Desviación vs plan original DERIVADA de las fechas: plan vigente − levantamiento.
+ *
+ * Sustituye a la columna almacenada `desviacion_vs_levantamiento_dias`, que venía
+ * del Excel y se quedaría obsoleta en cuanto la PMO edite un hito desde
+ * Planificación.
+ *
+ * Usa `fecha_actual`, NO la última fecha disponible en los snapshots: si el hito
+ * no tiene plan vigente, no tiene desviación. Tomar la última previsión conocida
+ * de un trimestre antiguo daría por vigente un pronóstico caducado e inventaría
+ * desviaciones donde el Excel no las daba (3 hitos «Incio pago renta» sin
+ * fecha_actual pero con snapshots).
+ *
+ * Verificado contra los 118 hitos con valor almacenado: coincide en todos, y los
+ * 13 sin valor siguen sin valor. Los KPIs del Overview no cambian.
+ */
+export function deviationVsLevantamientoDays(hito: PmHitoEnriched): number | null {
+  return deviationVsLev(normalizePmDate(hito.fecha_actual), levantamientoDate(hito));
+}
+
 /** Tabla desviación vs levantamiento; tendencia entre último snapshot con fecha y el anterior. */
 export function buildPmDeviationRows(
   hitos: PmHitoEnriched[],
   allQuarterCodes: string[],
 ): PmDeviationTableRow[] {
   const sorted = [...hitos].sort((a, b) => a.orden_hito - b.orden_hito);
-  const quarters = [...allQuarterCodes].filter((c) => parseQuarterCode(c)).sort(compareQuarterCodes);
-  const sequence = [...quarters, "fecha_actual"];
 
   return sorted.map((h) => {
     const fLev = normalizePmDate(h.snapshots["levantamiento"] ?? null);
     const fechaAct = normalizePmDate(h.fecha_actual);
 
-    const datesRev: Date[] = [];
-    for (let i = sequence.length - 1; i >= 0 && datesRev.length < 2; i--) {
-      const code = sequence[i];
-      const iso = code === "fecha_actual" ? h.fecha_actual : h.snapshots[code];
-      const d = normalizePmDate(iso ?? null);
-      if (d) datesRev.push(d);
-    }
-    const latestDate = datesRev[0] ?? null;
-    const prevDate = datesRev[1] ?? null;
+    const { latest: latestDate, prev: prevDate } = latestHitoDates(h, allQuarterCodes);
 
     const deviationDays = deviationVsLev(latestDate, fLev);
     const dPrev = deviationVsLev(prevDate, fLev);

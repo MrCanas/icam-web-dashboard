@@ -35,6 +35,9 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
       </section>
     );
   }
+  // Sin opciones: el repositorio ya deja fuera los activos y los hitos
+  // archivados y recorta los trimestres que cada proyecto no publica, así que
+  // `snapshotCodes` es la unión de lo publicado y los KPIs cuadran solos.
   const { rows, snapshotCodes, error } = await fetchPmPortfolio(ctx);
 
   if (error) {

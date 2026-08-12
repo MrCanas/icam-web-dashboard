@@ -1,28 +1,13 @@
 import Link from "next/link";
-import { compareQuarterCodes, formatSnapshotLabel, parseQuarterCode } from "@/modules/pm/logic/pm-viz";
-
-const PRESET_QUARTERS = ["2026_Q1", "2025_Q4", "2025_Q3", "2025_Q2"] as const;
+import { formatSnapshotLabel } from "@/modules/pm/logic/pm-viz";
+import { mergeQuarterCodes } from "@/modules/pm/logic/pm-snapshot-selection";
 
 interface PmSnapshotSelectorProps {
   current: string;
-  /** Códigos desde Supabase (puede incluir levantamiento; se filtra). */
+  /** Códigos ya filtrados por visible_en_dashboard (puede incluir levantamiento; se filtra dentro). */
   extraCodes?: string[];
   /** URL para cada snapshot (permite Overview vs Detalle). */
   hrefForSnapshot: (code: string) => string;
-}
-
-function mergeQuarterCodes(extraCodes: string[]): string[] {
-  const set = new Set<string>();
-  for (const c of PRESET_QUARTERS) {
-    if (parseQuarterCode(c)) set.add(c);
-  }
-  for (const c of extraCodes) {
-    if (c === "levantamiento") continue;
-    if (parseQuarterCode(c)) set.add(c);
-  }
-  const list = [...set];
-  list.sort((a, b) => -compareQuarterCodes(a, b));
-  return list;
 }
 
 export function PmSnapshotSelector({

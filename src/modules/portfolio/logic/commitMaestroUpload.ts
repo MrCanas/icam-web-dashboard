@@ -16,6 +16,10 @@ import {
   replaceProyectos,
 } from "@/modules/portfolio/data/proyectosRepository";
 import { insertUploadLog } from "@/modules/portfolio/data/uploadLogsRepository";
+import {
+  upsertMaestroTrimestres,
+  type MaestroLineaClave,
+} from "@/modules/portfolio/data/maestroTrimestresRepository";
 import { formatReplaceProyectosRpcError } from "@/lib/format-replace-proyectos-error";
 import {
   buildUploadLogDetalle,
@@ -30,6 +34,10 @@ export type CommitMaestroResult =
       comparison: PortfolioDiffResult;
       parsed: MaestroParseResult;
       numProyectos: number;
+      /** Líneas (proyecto × trimestre) vistas por primera vez en esta carga. */
+      lineasTrimestreNuevas: MaestroLineaClave[];
+      /** Fallo no fatal al persistir la dimensión trimestral (el replace ya se hizo). */
+      lineasTrimestreError: string | null;
     }
   | {
       ok: false;
@@ -135,15 +143,31 @@ export async function commitMaestroReplace(
     };
   }
 
+  // Dimensión trimestral (migración 024): NO puede tumbar el pipeline viejo.
+  // El replace ya está hecho; un fallo aquí se registra y se sigue.
+  const trimestres = await upsertMaestroTrimestres(
+    ctx,
+    parsed.lineasTrimestre,
+    archivoNombre,
+  );
+  if (trimestres.error && process.env.NODE_ENV === "development") {
+    console.error("[commitMaestroReplace] maestro_lineas_trimestre", trimestres.error);
+  }
+
   await insertUploadLog(ctx, {
     archivo: archivoNombre,
     num_proyectos: parsed.rows.length,
     estado: "completado",
     duracion_ms,
-    detalle: buildUploadLogDetalle(diff, {
-      warnings: parsed.warnings,
-      stats: parsed.stats,
-    }),
+    detalle: {
+      ...buildUploadLogDetalle(diff, {
+        warnings: parsed.warnings,
+        stats: parsed.stats,
+      }),
+      lineas_trimestre: parsed.lineasTrimestre.length,
+      lineas_trimestre_nuevas: trimestres.nuevas,
+      ...(trimestres.error ? { lineas_trimestre_error: trimestres.error } : {}),
+    },
   });
 
   return {
@@ -152,5 +176,7 @@ export async function commitMaestroReplace(
     comparison: diff,
     parsed,
     numProyectos: parsed.rows.length,
+    lineasTrimestreNuevas: trimestres.nuevas,
+    lineasTrimestreError: trimestres.error,
   };
 }

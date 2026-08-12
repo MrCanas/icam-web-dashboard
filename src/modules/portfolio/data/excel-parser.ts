@@ -1,5 +1,12 @@
 import * as XLSX from "xlsx";
 import type { Proyecto, SituacionProyecto, TipoProyecto } from "@/modules/portfolio/types";
+// Catálogo de los 8 pares flag+fecha DW-EL: vive en PM porque alimenta el mapeo
+// hito↔columna de la PMO, pero describe la Tabla madre — aquí solo se lee.
+import { TABLA_MADRE_COLUMNAS_HITO } from "@/modules/pm/planificacion/logic/tabla-madre-columnas";
+import {
+  limpiarFechaMaestro,
+  normalizeTrimestreCode,
+} from "@/modules/portfolio/logic/maestro-trimestre";
 
 /**
  * Campos que el parser necesita localizar en la hoja "Tabla madre".
@@ -158,6 +165,28 @@ function locateHeaderRow(
 
 export type ProyectoInsert = Omit<Proyecto, "id" | "created_at">;
 
+/** Una celda de hito (fecha + flag) de una línea trimestral del maestro. */
+export interface MaestroHitoFechaCell {
+  /** Cabecera canónica de TABLA_MADRE_COLUMNAS_HITO (p. ej. «Fecha obra»). */
+  columna: string;
+  /** ISO, o null si la celda está vacía (incluido el centinela 1899). */
+  fecha: string | null;
+  /** El booleano acompañante (hito alcanzado); null si ilegible. */
+  flag: boolean | null;
+}
+
+/**
+ * Una línea (proyecto × trimestre) de la Tabla madre, con sus fechas de hito.
+ * Se capturan TODAS las filas con trimestre reconocible, no solo la última:
+ * es la dimensión que replace_proyectos colapsa y que PM necesita.
+ */
+export interface MaestroLineaTrimestre {
+  proyecto: string;
+  /** Normalizado AAAA_Qn (vocabulario de pm_snapshots). */
+  trimestreCode: string;
+  hitos: MaestroHitoFechaCell[];
+}
+
 export interface MaestroParseStats {
   totalProyectos: number;
   activos: number;
@@ -170,6 +199,7 @@ export interface MaestroParseResult {
   rows: ProyectoInsert[];
   warnings: string[];
   stats: MaestroParseStats;
+  lineasTrimestre: MaestroLineaTrimestre[];
 }
 
 function trimStr(v: unknown): string {
@@ -215,6 +245,51 @@ function excelCellToIsoDate(v: unknown): string | null {
   return new Date(parsed).toISOString().slice(0, 10);
 }
 
+function toFlagBool(v: unknown): boolean | null {
+  // En el maestro real son booleanos de Excel (VERDADERO/FALSO); se admite
+  // también 1/0 por si alguna fila vieja los tiene como número.
+  if (typeof v === "boolean") return v;
+  const n = toNum(v);
+  if (n === 1) return true;
+  if (n === 0) return false;
+  const s = trimStr(v).toLowerCase();
+  if (s === "verdadero" || s === "true") return true;
+  if (s === "falso" || s === "false") return false;
+  return null;
+}
+
+interface TrimestreColumnMap {
+  /** Índice de la columna «Trimestre» (H); undefined si el maestro la pierde. */
+  trimestre?: number;
+  hitos: { cabecera: string; fechaCol?: number; flagCol?: number }[];
+}
+
+/**
+ * Localiza en la fila de cabecera la columna «Trimestre» y los 8 pares
+ * flag+fecha de TABLA_MADRE_COLUMNAS_HITO. Igual que locateHeaderRow: por
+ * nombre normalizado, no por posición, para sobrevivir a columnas insertadas.
+ */
+function locateTrimestreColumns(
+  sheet: XLSX.WorkSheet,
+  range: XLSX.Range,
+  headerRowIndex: number,
+): TrimestreColumnMap {
+  const porNombre = new Map<string, number>();
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: headerRowIndex, c })];
+    const norm = normalizeHeader(cell?.v);
+    if (norm && !porNombre.has(norm)) porNombre.set(norm, c);
+  }
+  return {
+    trimestre: porNombre.get("trimestre"),
+    hitos: TABLA_MADRE_COLUMNAS_HITO.map((h) => ({
+      cabecera: h.cabecera,
+      fechaCol: porNombre.get(normalizeHeader(h.cabecera)),
+      flagCol: porNombre.get(normalizeHeader(h.flag)),
+    })),
+  };
+}
+
 function normalizeSituacion(raw: string): SituacionProyecto | null {
   const s = raw.trim().toLowerCase();
   if (s.includes("marcha")) return "En Marcha";
@@ -252,6 +327,7 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
       rows: [],
       warnings: ["La hoja está vacía."],
       stats: emptyStats(),
+      lineasTrimestre: [],
     };
   }
 
@@ -273,9 +349,27 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
     return c === undefined ? undefined : rawRow[c];
   };
 
-  const maxCol = Math.max(range.s.c, ...Object.values(colByField).filter((c): c is number => c !== undefined));
+  const trimCols = locateTrimestreColumns(sheet, range, headerRowIndex);
+  if (trimCols.trimestre === undefined) {
+    warnings.push(
+      'Columna "Trimestre" no encontrada: no se capturan las líneas trimestrales del maestro.',
+    );
+  }
+
+  const maxCol = Math.max(
+    range.s.c,
+    ...Object.values(colByField).filter((c): c is number => c !== undefined),
+    ...(trimCols.trimestre !== undefined ? [trimCols.trimestre] : []),
+    ...trimCols.hitos.flatMap((h) =>
+      [h.fechaCol, h.flagCol].filter((c): c is number => c !== undefined),
+    ),
+  );
 
   const rows: ProyectoInsert[] = [];
+  // Última aparición gana si el maestro trae dos filas del mismo (proyecto,
+  // trimestre): son la misma línea corregida más abajo.
+  const lineasPorClave = new Map<string, MaestroLineaTrimestre>();
+  let lineasDuplicadas = 0;
   let emptyStreak = 0;
 
   for (let r = headerRowIndex + 1; r <= range.e.r; r++) {
@@ -295,6 +389,28 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
       continue;
     }
     emptyStreak = 0;
+
+    // Dimensión trimestral: TODAS las filas con trimestre reconocible, antes
+    // del filtro de última fila. ALL TIME y valores raros devuelven null y la
+    // fila no cuenta como línea trimestral (pero sigue al pipeline normal).
+    if (trimCols.trimestre !== undefined) {
+      const trimestreCode = normalizeTrimestreCode(rawRow[trimCols.trimestre]);
+      if (trimestreCode) {
+        const clave = `${proyecto}|${trimestreCode}`;
+        if (lineasPorClave.has(clave)) lineasDuplicadas += 1;
+        lineasPorClave.set(clave, {
+          proyecto,
+          trimestreCode,
+          hitos: trimCols.hitos
+            .filter((h) => h.fechaCol !== undefined)
+            .map((h) => ({
+              columna: h.cabecera,
+              fecha: limpiarFechaMaestro(excelCellToIsoDate(rawRow[h.fechaCol!])),
+              flag: h.flagCol === undefined ? null : toFlagBool(rawRow[h.flagCol]),
+            })),
+        });
+      }
+    }
 
     if (toEsUltimaFila(cellFor(rawRow, "esUltimaFila")) !== 1) {
       continue;
@@ -350,8 +466,14 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
 
   rows.sort((a, b) => a.proyecto.localeCompare(b.proyecto));
 
+  if (lineasDuplicadas > 0) {
+    warnings.push(
+      `${lineasDuplicadas} línea(s) trimestral(es) duplicada(s) en el maestro (mismo proyecto y trimestre): se conserva la última.`,
+    );
+  }
+
   const stats = computeStats(rows);
-  return { rows, warnings, stats };
+  return { rows, warnings, stats, lineasTrimestre: [...lineasPorClave.values()] };
 }
 
 function emptyStats(): MaestroParseStats {
