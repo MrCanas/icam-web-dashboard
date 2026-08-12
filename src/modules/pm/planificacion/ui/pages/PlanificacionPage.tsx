@@ -24,6 +24,7 @@ export default async function PlanificacionPage() {
     lineasMaestro,
     fechasMaestro,
     resoluciones,
+    maestroDisponible,
     error,
   } = await fetchPlanificacionBoard(ctx);
 
@@ -56,6 +57,12 @@ export default async function PlanificacionPage() {
             Tienes acceso de solo lectura: puedes consultar la planificación pero no editarla.
           </p>
         ) : null}
+        {!maestroDisponible && hasWriteAccess ? (
+          <p className="mt-2 text-xs text-text-muted">
+            La validación contra el maestro financiero está inactiva: faltan las
+            migraciones 024–026. Publicar funciona como siempre.
+          </p>
+        ) : null}
         {sinMapear > 0 ? (
           <p className="mt-2 text-xs text-text-muted">
             {sinMapear} de {catalogo.length} hitos sin mapear a la Tabla madre.{" "}
@@ -75,6 +82,7 @@ export default async function PlanificacionPage() {
         lineasMaestro={lineasMaestro}
         fechasMaestro={fechasMaestro}
         resoluciones={resoluciones}
+        maestroDisponible={maestroDisponible}
         hasWriteAccess={hasWriteAccess}
       />
     </div>

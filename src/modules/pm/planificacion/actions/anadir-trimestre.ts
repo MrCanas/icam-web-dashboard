@@ -1,5 +1,6 @@
 "use server";
 
+import { isMissingTableError } from "@/lib/db/pgErrors";
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
 import {
   validateSnapshotCode,
@@ -101,7 +102,10 @@ export async function anadirTrimestre(
       );
     }
     const { error: eBorrado } = await borrado;
-    if (eBorrado) return { ok: false, error: eBorrado.message };
+    // Sin la migración 026 no hay resoluciones que borrar: no es un error.
+    if (eBorrado && !isMissingTableError(eBorrado)) {
+      return { ok: false, error: eBorrado.message };
+    }
   }
 
   return {

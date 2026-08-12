@@ -1,4 +1,5 @@
 import type { UserContext } from "@/lib/auth/currentUser";
+import { isMissingTableError } from "@/lib/db/pgErrors";
 import { getPmReadSupabase } from "@/modules/pm/data/readClient";
 import {
   fetchPmPortfolio,
@@ -27,6 +28,12 @@ export interface PlanificacionBoardData {
   fechasMaestro: MaestroHitoFechaRow[];
   /** Resoluciones de discrepancias (migración 026). */
   resoluciones: PmSnapshotValidacion[];
+  /**
+   * false = las tablas del maestro (migraciones 024-026) aún no existen. La
+   * rejilla funciona como antes de la validación: gate inactivo, sin columnas
+   * «Maestro». Nunca es motivo de error: el flujo aplica a futuros trimestres.
+   */
+  maestroDisponible: boolean;
   error: string | null;
 }
 
@@ -70,15 +77,21 @@ export async function fetchPlanificacionBoard(
     supabase.from("pm_snapshot_validacion").select("*"),
   ]);
 
+  // Las tablas del maestro y de validación son OPCIONALES: si sus migraciones
+  // (024-026) no están aplicadas, la rejilla carga igual y el gate queda
+  // inactivo. Cualquier otro error suyo sí es fatal.
+  const maestroDisponible =
+    !isMissingTableError(eLineas) &&
+    !isMissingTableError(eFechasM) &&
+    !isMissingTableError(eRes);
+
   const error =
     portfolio.error ??
     eCat?.message ??
     eSnap?.message ??
     ePub?.message ??
     eMap?.message ??
-    eLineas?.message ??
-    eFechasM?.message ??
-    eRes?.message ??
+    [eLineas, eFechasM, eRes].find((e) => e && !isMissingTableError(e))?.message ??
     null;
   if (error) {
     return {
@@ -90,6 +103,7 @@ export async function fetchPlanificacionBoard(
       lineasMaestro: [],
       fechasMaestro: [],
       resoluciones: [],
+      maestroDisponible: false,
       error,
     };
   }
@@ -107,11 +121,14 @@ export async function fetchPlanificacionBoard(
       (p) => `${p.activo_id}|${p.snapshot_code}`,
     ),
     mapeo,
-    lineasMaestro: ((lineas ?? []) as { proyecto: string; trimestre_code: string }[]).map(
-      (l) => `${l.proyecto}|${l.trimestre_code}`,
-    ),
-    fechasMaestro: (fechasMaestro ?? []) as MaestroHitoFechaRow[],
-    resoluciones: (resoluciones ?? []) as PmSnapshotValidacion[],
+    lineasMaestro: maestroDisponible
+      ? ((lineas ?? []) as { proyecto: string; trimestre_code: string }[]).map(
+          (l) => `${l.proyecto}|${l.trimestre_code}`,
+        )
+      : [],
+    fechasMaestro: maestroDisponible ? ((fechasMaestro ?? []) as MaestroHitoFechaRow[]) : [],
+    resoluciones: maestroDisponible ? ((resoluciones ?? []) as PmSnapshotValidacion[]) : [],
+    maestroDisponible,
     error: null,
   };
 }

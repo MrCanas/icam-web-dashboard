@@ -65,6 +65,8 @@ interface PlanificacionBoardProps {
   fechasMaestro: MaestroHitoFechaRow[];
   /** Resoluciones de discrepancias (migración 026). */
   resoluciones: PmSnapshotValidacion[];
+  /** false = migraciones 024-026 sin aplicar: gate inactivo, sin columnas Maestro. */
+  maestroDisponible: boolean;
   hasWriteAccess: boolean;
 }
 
@@ -77,6 +79,7 @@ export function PlanificacionBoard({
   lineasMaestro,
   fechasMaestro,
   resoluciones,
+  maestroDisponible,
   hasWriteAccess,
 }: PlanificacionBoardProps) {
   const router = useRouter();
@@ -288,17 +291,21 @@ export function PlanificacionBoard({
   const gates = useMemo(() => {
     const out: Record<string, GatePublicacion> = {};
     for (const s of snapshotsVisibles) {
-      out[s.snapshot_code] = evaluarGatePublicacion({
-        snapshotCode: s.snapshot_code,
-        proyectoFinanciero,
-        lineaMaestroExiste: proyectoFinanciero
-          ? lineasSet.has(`${proyectoFinanciero}|${s.snapshot_code}`)
-          : false,
-        discrepanciasPendientes: pendientesPorCode[s.snapshot_code] ?? 0,
-      });
+      // Sin las migraciones del maestro el gate no existe: publicar funciona
+      // como siempre. El flujo de validación aplica a partir de que existan.
+      out[s.snapshot_code] = !maestroDisponible
+        ? { permitido: true }
+        : evaluarGatePublicacion({
+            snapshotCode: s.snapshot_code,
+            proyectoFinanciero,
+            lineaMaestroExiste: proyectoFinanciero
+              ? lineasSet.has(`${proyectoFinanciero}|${s.snapshot_code}`)
+              : false,
+            discrepanciasPendientes: pendientesPorCode[s.snapshot_code] ?? 0,
+          });
     }
     return out;
-  }, [snapshotsVisibles, proyectoFinanciero, lineasSet, pendientesPorCode]);
+  }, [snapshotsVisibles, proyectoFinanciero, lineasSet, pendientesPorCode, maestroDisponible]);
 
   const fijasVisibles = useMemo(
     () =>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isMissingTableError } from "@/lib/db/pgErrors";
 import {
   contarPendientes,
   type ResolucionFoto,
@@ -44,7 +45,14 @@ export async function contarDiscrepanciasPendientes(
       .eq("snapshot_code", snapshotCode)
       .in("hito_id", ids),
   ]);
-  const err = cat.error ?? fechasSnap.error ?? linea.error ?? res.error;
+  // La 026 puede no estar aplicada aunque la 024 sí: sin tabla de resoluciones
+  // se cuenta como si no hubiera ninguna. Cualquier otro error sí es fatal.
+  const resolucionesRows = res.error && isMissingTableError(res.error) ? [] : (res.data ?? []);
+  const err =
+    cat.error ??
+    fechasSnap.error ??
+    linea.error ??
+    (res.error && !isMissingTableError(res.error) ? res.error : null);
   if (err) return { pendientes: 0, error: err.message };
 
   const colPorCatalogo = new Map(
@@ -54,7 +62,7 @@ export async function contarDiscrepanciasPendientes(
     (fechasSnap.data ?? []).map((f) => [f.hito_id as string, f.fecha as string | null]),
   );
   const resoluciones = new Map<string, ResolucionFoto>(
-    (res.data ?? []).map((r) => [
+    resolucionesRows.map((r) => [
       r.hito_id as string,
       {
         fecha_elegida: r.fecha_elegida as string | null,

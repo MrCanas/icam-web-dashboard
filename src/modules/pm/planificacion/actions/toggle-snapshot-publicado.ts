@@ -1,5 +1,6 @@
 "use server";
 
+import { isMissingTableError } from "@/lib/db/pgErrors";
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
 import { contarDiscrepanciasPendientes } from "@/modules/pm/planificacion/data/discrepanciasServer";
 import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-validation";
@@ -52,53 +53,67 @@ export async function toggleSnapshotPublicado(
 
   if (input.publicado) {
     if (code !== "levantamiento") {
-      const { data: map, error: mapError } = await client
-        .from("pm_activo_proyecto_map")
-        .select("proyecto_financiero_key")
-        .eq("pm_activo_id", activoId.value)
-        .maybeSingle();
-      if (mapError) return { ok: false, error: mapError.message };
-      const proyectoFinanciero = map?.proyecto_financiero_key ?? null;
-
-      let lineaMaestroExiste = false;
-      let discrepanciasPendientes = 0;
-      if (proyectoFinanciero) {
-        const { data: linea, error: lineaError } = await client
-          .from("maestro_lineas_trimestre")
-          .select("trimestre_code")
-          .eq("proyecto", proyectoFinanciero)
-          .eq("trimestre_code", code)
-          .maybeSingle();
-        if (lineaError) return { ok: false, error: lineaError.message };
-        lineaMaestroExiste = Boolean(linea);
-
-        if (lineaMaestroExiste) {
-          const pend = await contarDiscrepanciasPendientes(
-            client,
-            activoId.value,
-            code,
-            proyectoFinanciero,
-          );
-          if (pend.error) return { ok: false, error: pend.error };
-          discrepanciasPendientes = pend.pendientes;
-        }
+      // ¿Existe la infraestructura del gate (migración 024)? Si no, publicar
+      // funciona como siempre: el flujo de validación aplica a partir de que
+      // las migraciones estén aplicadas, no retroactivamente.
+      const { error: tablaError } = await client
+        .from("maestro_lineas_trimestre")
+        .select("proyecto")
+        .limit(1);
+      if (tablaError && !isMissingTableError(tablaError)) {
+        return { ok: false, error: tablaError.message };
       }
+      const gateActivo = !tablaError;
 
-      const gate = evaluarGatePublicacion({
-        snapshotCode: code,
-        proyectoFinanciero,
-        lineaMaestroExiste,
-        discrepanciasPendientes,
-      });
-      if (!gate.permitido) {
-        return {
-          ok: false,
-          error: motivoGateTexto(gate.motivo, {
-            proyectoFinanciero,
-            etiquetaTrimestre: code,
-            pendientes: discrepanciasPendientes,
-          }),
-        };
+      if (gateActivo) {
+        const { data: map, error: mapError } = await client
+          .from("pm_activo_proyecto_map")
+          .select("proyecto_financiero_key")
+          .eq("pm_activo_id", activoId.value)
+          .maybeSingle();
+        if (mapError) return { ok: false, error: mapError.message };
+        const proyectoFinanciero = map?.proyecto_financiero_key ?? null;
+
+        let lineaMaestroExiste = false;
+        let discrepanciasPendientes = 0;
+        if (proyectoFinanciero) {
+          const { data: linea, error: lineaError } = await client
+            .from("maestro_lineas_trimestre")
+            .select("trimestre_code")
+            .eq("proyecto", proyectoFinanciero)
+            .eq("trimestre_code", code)
+            .maybeSingle();
+          if (lineaError) return { ok: false, error: lineaError.message };
+          lineaMaestroExiste = Boolean(linea);
+
+          if (lineaMaestroExiste) {
+            const pend = await contarDiscrepanciasPendientes(
+              client,
+              activoId.value,
+              code,
+              proyectoFinanciero,
+            );
+            if (pend.error) return { ok: false, error: pend.error };
+            discrepanciasPendientes = pend.pendientes;
+          }
+        }
+
+        const gate = evaluarGatePublicacion({
+          snapshotCode: code,
+          proyectoFinanciero,
+          lineaMaestroExiste,
+          discrepanciasPendientes,
+        });
+        if (!gate.permitido) {
+          return {
+            ok: false,
+            error: motivoGateTexto(gate.motivo, {
+              proyectoFinanciero,
+              etiquetaTrimestre: code,
+              pendientes: discrepanciasPendientes,
+            }),
+          };
+        }
       }
     }
 
