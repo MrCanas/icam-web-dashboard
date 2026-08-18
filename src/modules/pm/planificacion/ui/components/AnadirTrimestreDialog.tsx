@@ -13,6 +13,13 @@ import {
 interface AnadirTrimestreDialogProps {
   rows: PmPortfolioRow[];
   onDone: (mensaje: string) => void;
+  /**
+   * Modo proyecto fijo (vista /proyecto/[id]/planificacion): abrir()
+   * preselecciona solo este activo (pm_activos.id) en lugar de todos, para
+   * no escribir snapshots en el resto del portfolio sin querer. El resto de
+   * proyectos sigue siendo marcable a mano.
+   */
+  soloActivoId?: string;
 }
 
 /**
@@ -23,7 +30,11 @@ interface AnadirTrimestreDialogProps {
  * eligen los proyectos porque no todos se reportan cada trimestre — en los datos
  * históricos DC-15 no tiene ninguna fecha en Q4 2025 ni Q1 2026.
  */
-export function AnadirTrimestreDialog({ rows, onDone }: AnadirTrimestreDialogProps) {
+export function AnadirTrimestreDialog({
+  rows,
+  onDone,
+  soloActivoId,
+}: AnadirTrimestreDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(trimestreActual());
@@ -39,9 +50,17 @@ export function AnadirTrimestreDialog({ rows, onDone }: AnadirTrimestreDialogPro
   const [elegidos, setElegidos] = useState<Set<string>>(new Set());
 
   const abrir = () => {
-    // Todos marcados por defecto: lo normal es reportar el portfolio entero, y
-    // desmarcar es más rápido que marcar nueve.
-    setElegidos(new Set(candidatos.map((r) => r.activo.id)));
+    // En la vista global, todos marcados por defecto: lo normal es reportar el
+    // portfolio entero, y desmarcar es más rápido que marcar nueve. En la
+    // vista por proyecto, solo el proyecto de la pantalla.
+    setElegidos(
+      new Set(
+        (soloActivoId
+          ? candidatos.filter((r) => r.activo.id === soloActivoId)
+          : candidatos
+        ).map((r) => r.activo.id),
+      ),
+    );
     setCode(trimestreActual());
     setError(null);
     setConfirmar(false);

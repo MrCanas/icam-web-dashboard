@@ -57,36 +57,35 @@ export default async function PlanificacionProyectoPage({
   const hasWriteAccess = role === "admin" || role === "editor";
   const sinMapear = catalogo.filter((c) => !c.tabla_madre_columna).length;
 
+  // Sin header-card propio: la nav y las subpestañas del proyecto ya dicen
+  // dónde estás. Solo los avisos, y solo si alguno aplica.
+  const avisos = !hasWriteAccess || !maestroDisponible || sinMapear > 0;
+
   return (
     <div className="min-w-0 space-y-4">
-      <header className="rounded-lg border border-subtle/50 bg-card p-4 shadow-sm">
-        <h1 className="text-xl font-semibold text-text-primary">
-          Planificación — {row.activo.id_activo}
-        </h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Edita la previsión de cada hito y añade el trimestre que reportas. Lo
-          que guardes aquí es lo que muestra el Overview.
-        </p>
-        {!hasWriteAccess ? (
-          <p className="mt-2 text-xs text-amber-700">
-            Tienes acceso de solo lectura: puedes consultar la planificación pero no editarla.
-          </p>
-        ) : null}
-        {!maestroDisponible && hasWriteAccess ? (
-          <p className="mt-2 text-xs text-text-muted">
-            La validación contra el maestro financiero está inactiva: faltan las
-            migraciones 024–026. Publicar funciona como siempre.
-          </p>
-        ) : null}
-        {sinMapear > 0 ? (
-          <p className="mt-2 text-xs text-text-muted">
-            {sinMapear} de {catalogo.length} hitos sin mapear a la Tabla madre.{" "}
-            <Link href="/dashboard/pm/proyectos" className="text-icam-900 underline">
-              Mapearlos
-            </Link>
-          </p>
-        ) : null}
-      </header>
+      {avisos ? (
+        <div className="space-y-1">
+          {!hasWriteAccess ? (
+            <p className="text-xs text-amber-700">
+              Tienes acceso de solo lectura: puedes consultar la planificación pero no editarla.
+            </p>
+          ) : null}
+          {!maestroDisponible && hasWriteAccess ? (
+            <p className="text-xs text-text-muted">
+              La validación contra el maestro financiero está inactiva: faltan las
+              migraciones 024–026. Publicar funciona como siempre.
+            </p>
+          ) : null}
+          {sinMapear > 0 ? (
+            <p className="text-xs text-text-muted">
+              {sinMapear} de {catalogo.length} hitos sin mapear a la Tabla madre.{" "}
+              <Link href="/dashboard/pm/proyectos" className="text-icam-900 underline">
+                Mapearlos
+              </Link>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <PlanificacionBoard
         rows={rows}

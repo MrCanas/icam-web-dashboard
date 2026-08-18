@@ -11,10 +11,19 @@ interface PmProjectTabsProps {
    * /dashboard/pm/proyecto/<id>/actas como fallback.
    */
   actasHref: string;
+  /** false cuando el usuario tiene denegada pm.planificacion. */
+  showPlanificacion?: boolean;
+  /** false cuando el usuario tiene denegada pm.actas. */
+  showActas?: boolean;
 }
 
 /** Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Actas. */
-export function PmProjectTabs({ idActivo, actasHref }: PmProjectTabsProps) {
+export function PmProjectTabs({
+  idActivo,
+  actasHref,
+  showPlanificacion = true,
+  showActas = true,
+}: PmProjectTabsProps) {
   const pathname = usePathname();
   const base = `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}`;
 
@@ -25,19 +34,28 @@ export function PmProjectTabs({ idActivo, actasHref }: PmProjectTabsProps) {
       href: base,
       active: pathname === base,
     },
-    {
-      key: "planificacion",
-      label: "Planificación",
-      href: `${base}/planificacion`,
-      active: pathname === `${base}/planificacion`,
-    },
-    {
-      key: "actas",
-      label: "Actas",
-      href: actasHref,
-      active:
-        pathname.startsWith("/dashboard/pm/actas/") || pathname === `${base}/actas`,
-    },
+    ...(showPlanificacion
+      ? [
+          {
+            key: "planificacion",
+            label: "Planificación",
+            href: `${base}/planificacion`,
+            active: pathname === `${base}/planificacion`,
+          },
+        ]
+      : []),
+    ...(showActas
+      ? [
+          {
+            key: "actas",
+            label: "Actas",
+            href: actasHref,
+            active:
+              pathname.startsWith("/dashboard/pm/actas/") ||
+              pathname === `${base}/actas`,
+          },
+        ]
+      : []),
   ];
 
   return (

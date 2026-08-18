@@ -10,6 +10,7 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import type { PmProjectNavItem } from "@/modules/pm/data/pmRepository";
 import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import { visibleRoutesForZone } from "@/lib/auth/permissions";
+import { pmLandingPath } from "@/modules/pm/logic/pm-landing";
 import { ZONE_ORDER, type ZoneKey } from "@/registry/modules";
 
 function zoneForPath(pathname: string): ZoneKey {
@@ -36,6 +37,8 @@ interface SecondaryItem {
   active: boolean;
   /** Pinta un separador antes de este item (proyectos ⇢ páginas transversales). */
   separatorBefore?: boolean;
+  /** Los items de proyecto reciben tratamiento especial en el drawer móvil. */
+  kind?: "project";
 }
 
 /**
@@ -75,17 +78,24 @@ function secondaryItemsForPath(
 
   for (const p of pmProjects) {
     const href = `/dashboard/pm/proyecto/${encodeURIComponent(p.idActivo)}`;
+    // Igualdad o límite de segmento: con startsWith a secas, CASA7 se
+    // marcaría activo estando en /actas/CASA77.
+    const actasBase =
+      p.actasCode != null
+        ? `/dashboard/pm/actas/${encodeURIComponent(p.actasCode)}`
+        : null;
     const active =
       pathname === href ||
       pathname.startsWith(`${href}/`) ||
-      (p.actasCode != null &&
-        pathname.startsWith(`/dashboard/pm/actas/${encodeURIComponent(p.actasCode)}`));
+      (actasBase != null &&
+        (pathname === actasBase || pathname.startsWith(`${actasBase}/`)));
     items.push({
       key: `pm.proyecto.${p.idActivo}`,
       href,
       label: p.idActivo,
       title: p.nombre ?? undefined,
       active,
+      kind: "project",
     });
   }
 
@@ -153,17 +163,15 @@ export function DashboardNav({
       const mod = MODULES_LIST.find((m) => MODULE_TO_ZONE[m.key] === zoneKey);
       if (!mod) continue;
 
-      // Proyectos aterriza en el primer proyecto: el grid (pm.detalle) está
-      // oculto de la nav. Requiere pm.detalle visible, que gate-a proyecto/*.
-      const firstProject =
-        zoneKey === "pm" &&
-        pmProjects.length > 0 &&
-        visible.some((r) => r.key === "pm.detalle")
-          ? `/dashboard/pm/proyecto/${encodeURIComponent(pmProjects[0]!.idActivo)}`
-          : null;
+      // Proyectos aterriza en el primer proyecto (el grid pm.detalle está
+      // oculto). Misma lógica que el redirect de /dashboard/pm: pmLandingPath.
+      const href =
+        zoneKey === "pm"
+          ? pmLandingPath(user, pmProjects)
+          : visible.find((r) => !r.hiddenInNav)?.path;
 
       tabs.push({
-        href: firstProject ?? visible.find((r) => !r.hiddenInNav)?.path ?? visible[0]!.path,
+        href: href ?? visible[0]!.path,
         label: mod.label,
         prefix: mod.pathPrefix,
       });
@@ -189,6 +197,7 @@ export function DashboardNav({
               key={tab.href}
               href={tab.href}
               onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
               className={`min-h-11 flex items-center px-2 py-2 text-sm font-medium rounded-md transition ${
                 active ? "text-white bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
@@ -201,6 +210,7 @@ export function DashboardNav({
           <Link
             key={tab.href}
             href={tab.href}
+            aria-current={active ? "page" : undefined}
             className={`pb-2 text-sm font-medium transition ${
               active ? "text-white border-b-[3px] border-icam-gold" : "text-white/60 hover:text-white/90"
             }`}
@@ -214,22 +224,38 @@ export function DashboardNav({
 
   const secondaryRow = isVertical ? (
     <nav className="flex flex-col gap-0" aria-label="Subsección">
-      {secondary.map((tab) => (
+      {secondary.map((tab, i) => (
         <Fragment key={tab.key}>
+          {tab.kind === "project" && secondary[i - 1]?.kind !== "project" ? (
+            <p className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+              Proyectos
+            </p>
+          ) : null}
           {tab.separatorBefore ? (
-            <div className="border-t border-white/10 my-1" aria-hidden="true" />
+            <>
+              <div className="mt-2 border-t border-white/10" aria-hidden="true" />
+              <p className="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+                Páginas
+              </p>
+            </>
           ) : null}
           <Link
             href={tab.href}
             title={tab.title}
             onClick={onNavigate}
-            className={`min-h-11 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
+            aria-current={tab.active ? "page" : undefined}
+            className={`min-h-11 min-w-0 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
               tab.active
                 ? "text-white border-icam-gold bg-white/5"
                 : "text-white/70 border-transparent hover:text-white hover:bg-white/5"
             }`}
           >
-            {tab.label}
+            <span className="truncate">
+              {/* En táctil no hay tooltip: el nombre va en el propio label. */}
+              {tab.kind === "project" && tab.title
+                ? `${tab.label} — ${tab.title}`
+                : tab.label}
+            </span>
           </Link>
         </Fragment>
       ))}
@@ -250,6 +276,7 @@ export function DashboardNav({
             <Link
               href={tab.href}
               title={tab.title}
+              aria-current={tab.active ? "page" : undefined}
               className={`pb-2 text-sm whitespace-nowrap transition ${
                 tab.active
                   ? "text-white border-b-[3px] border-icam-gold"

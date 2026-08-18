@@ -1,14 +1,29 @@
+import type { Metadata } from "next";
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { requireRouteAccess } from "@/lib/auth/require-route-access";
-import { fetchActasCodeForPmActivo } from "@/modules/pm/actas/data/actasRepository";
-import { actasHubPath, actasProjectPath } from "@/modules/pm/actas/logic/actas-paths";
+import { fetchActasLinkForPmActivo } from "@/modules/pm/actas/data/actasRepository";
+import {
+  actasArchivedProjectsPath,
+  actasHubPath,
+  actasProjectPath,
+} from "@/modules/pm/actas/logic/actas-paths";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return { title: `${decodeURIComponent(id)} · Actas` };
+}
 
 /**
- * Resolver de la subpestaña Actas de un proyecto PM: redirige a la URL
- * canónica del proyecto de actas vinculado (/dashboard/pm/actas/<code>).
- * Si el activo no tiene actas, muestra el fallback para crearlas desde el hub.
+ * Resolver de la subpestaña Actas de un proyecto PM: con actas vivas redirige
+ * a su URL canónica (/dashboard/pm/actas/<code>); con actas archivadas o sin
+ * actas explica el estado sin sacar del panel.
  */
 export default async function Page({
   params,
@@ -19,9 +34,38 @@ export default async function Page({
   const { id } = await params;
   const idActivo = decodeURIComponent(id);
 
-  const code = await fetchActasCodeForPmActivo(ctx, idActivo);
-  if (code) {
-    redirect(actasProjectPath(code));
+  const link = await fetchActasLinkForPmActivo(ctx, idActivo);
+  if (link && !link.archived) {
+    redirect(actasProjectPath(link.code));
+  }
+
+  if (link?.archived) {
+    return (
+      <section className="rounded-lg border border-subtle/50 bg-card p-6 text-sm text-text-muted">
+        <h2 className="text-base font-semibold text-text-primary">
+          Las actas de {idActivo} están archivadas
+        </h2>
+        <p className="mt-2">
+          El proyecto de actas <span className="font-medium">{link.code}</span>{" "}
+          existe pero fue archivado; puedes consultarlo o restaurarlo desde los
+          archivados.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <Link
+            href={actasArchivedProjectsPath()}
+            className="text-icam-900 underline"
+          >
+            Ver proyectos archivados
+          </Link>
+          <Link
+            href={actasProjectPath(link.code)}
+            className="text-icam-900 underline"
+          >
+            Abrir {link.code}
+          </Link>
+        </div>
+      </section>
+    );
   }
 
   return (

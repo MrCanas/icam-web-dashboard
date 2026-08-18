@@ -54,7 +54,7 @@ export default async function PmOverviewPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-4 min-w-0">
       <header className="bg-card rounded-lg border border-subtle/50 shadow-sm p-4">
-        <h1 className="text-xl font-semibold text-text-primary">PM — Overview</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Overview PM</h1>
         <p className="mt-1 text-sm text-text-muted">
           Seguimiento de hitos por proyecto · snapshot en URL para compartir
         </p>

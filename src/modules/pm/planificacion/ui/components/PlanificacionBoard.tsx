@@ -482,27 +482,31 @@ export function PlanificacionBoard({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-subtle/50 bg-card p-3">
-        <label className="text-xs font-medium text-text-muted">Proyecto</label>
         {activoFijoId ? (
-          <span className="text-sm font-medium text-text-body">
-            {row.activo.id_activo}
-            {row.activo.nombre_display ? ` — ${row.activo.nombre_display}` : ""}
-            {row.activo.archivado_at ? " (archivado)" : ""}
-          </span>
+          // La nav y las subpestañas del proyecto ya identifican el activo;
+          // aquí solo lo que no está en ningún otro sitio de esta vista.
+          row.activo.archivado_at ? (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+              Proyecto archivado
+            </span>
+          ) : null
         ) : (
-          <select
-            value={row.activo.id}
-            onChange={(e) => setActivoId(e.target.value)}
-            className="rounded border border-subtle bg-page px-2 py-1 text-sm text-text-body focus:outline-none focus:ring-1 focus:ring-icam-900/20"
-          >
-            {rows.map((r) => (
-              <option key={r.activo.id} value={r.activo.id}>
-                {r.activo.id_activo}
-                {r.activo.nombre_display ? ` — ${r.activo.nombre_display}` : ""}
-                {r.activo.archivado_at ? " (archivado)" : ""}
-              </option>
-            ))}
-          </select>
+          <>
+            <label className="text-xs font-medium text-text-muted">Proyecto</label>
+            <select
+              value={row.activo.id}
+              onChange={(e) => setActivoId(e.target.value)}
+              className="rounded border border-subtle bg-page px-2 py-1 text-sm text-text-body focus:outline-none focus:ring-1 focus:ring-icam-900/20"
+            >
+              {rows.map((r) => (
+                <option key={r.activo.id} value={r.activo.id}>
+                  {r.activo.id_activo}
+                  {r.activo.nombre_display ? ` — ${r.activo.nombre_display}` : ""}
+                  {r.activo.archivado_at ? " (archivado)" : ""}
+                </option>
+              ))}
+            </select>
+          </>
         )}
 
         <span className="text-xs text-text-muted">{row.activo.tipo_uso_activo}</span>
@@ -591,7 +595,11 @@ export function PlanificacionBoard({
           ) : null}
 
           {hasWriteAccess ? (
-            <AnadirTrimestreDialog rows={rows} onDone={mostrarToast} />
+            <AnadirTrimestreDialog
+              rows={rows}
+              onDone={mostrarToast}
+              soloActivoId={activoFijoId}
+            />
           ) : null}
         </div>
       </div>

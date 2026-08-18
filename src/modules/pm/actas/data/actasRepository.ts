@@ -69,15 +69,22 @@ export async function fetchActasProjects(
   return { projects, error: null };
 }
 
+export interface ActasLinkForPmActivo {
+  code: string;
+  archived: boolean;
+}
+
 /**
- * project.code del proyecto de Actas vinculado a un activo PM (por
- * project.pm_activo_id), o null si el activo no tiene actas. El vínculo es
- * opcional: los códigos de ambos dominios NO tienen por qué coincidir.
+ * Proyecto de Actas vinculado a un activo PM (por project.pm_activo_id),
+ * incluyendo archivados: distinguir «sin actas» de «actas archivadas» evita
+ * invitar a crear un duplicado. Prioriza el proyecto no archivado si conviven
+ * varios. El vínculo es opcional: los códigos de ambos dominios NO tienen por
+ * qué coincidir.
  */
-export async function fetchActasCodeForPmActivo(
+export async function fetchActasLinkForPmActivo(
   ctx: UserContext,
   idActivo: string,
-): Promise<string | null> {
+): Promise<ActasLinkForPmActivo | null> {
   const supabase = await getActasReadSupabase(ctx);
 
   const { data: activo } = await supabase
@@ -87,16 +94,25 @@ export async function fetchActasCodeForPmActivo(
     .maybeSingle();
   if (!activo) return null;
 
-  const { data: project } = await supabase
+  const { data: projects } = await supabase
     .from("project")
-    .select("code")
+    .select("code, archived_at")
     .eq("pm_activo_id", activo.id)
-    .is("archived_at", null)
-    .order("sort_order", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("sort_order", { ascending: true });
+  if (!projects?.length) return null;
 
-  return project?.code ?? null;
+  const vivo = projects.find((p) => !p.archived_at);
+  const elegido = vivo ?? projects[0]!;
+  return { code: elegido.code, archived: !vivo };
+}
+
+/** project.code del proyecto de Actas NO archivado vinculado al activo, o null. */
+export async function fetchActasCodeForPmActivo(
+  ctx: UserContext,
+  idActivo: string,
+): Promise<string | null> {
+  const link = await fetchActasLinkForPmActivo(ctx, idActivo);
+  return link && !link.archived ? link.code : null;
 }
 
 /** Inverso: pm_activos.id_activo del activo vinculado a un proyecto de Actas. */

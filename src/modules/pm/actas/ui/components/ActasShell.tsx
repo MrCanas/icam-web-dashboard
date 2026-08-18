@@ -20,7 +20,7 @@ export function ActasShell({
   return (
     <div className="flex flex-col gap-4 min-h-0">
       <header className="bg-card rounded-lg border border-subtle/50 p-4 shrink-0">
-        <h1 className="text-xl font-semibold text-text-primary">PM — Actas</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Actas</h1>
         <p className="mt-1 text-sm text-text-muted">
           Seguimiento operativo por proyecto
         </p>

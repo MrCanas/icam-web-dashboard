@@ -24,7 +24,7 @@ export default async function PmDetalleIndexPage() {
   return (
     <div className="space-y-4">
       <header className="bg-card rounded-lg border border-subtle/50 p-4">
-        <h1 className="text-xl font-semibold text-text-primary">PM — Detalle proyecto</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Todos los proyectos</h1>
         <p className="mt-1 text-sm text-text-muted">Elige un activo para ver timeline y snapshots</p>
       </header>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
