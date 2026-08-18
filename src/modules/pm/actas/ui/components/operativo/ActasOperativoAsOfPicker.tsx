@@ -8,6 +8,7 @@ import {
   formatAsOfDisplay,
   parseAsOfDateParam,
 } from "@/modules/pm/actas/logic/operativo-asof";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasOperativoAsOfPickerProps {
   projectCode: string;
@@ -16,6 +17,7 @@ interface ActasOperativoAsOfPickerProps {
 export function ActasOperativoAsOfPicker({
   projectCode,
 }: ActasOperativoAsOfPickerProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const searchParams = useSearchParams();
   const inputId = useId();
@@ -38,9 +40,9 @@ export function ActasOperativoAsOfPicker({
   const navigateAsOf = (isoDate: string | null) => {
     setOpen(false);
     if (isoDate) {
-      router.push(actasProjectOperativoPath(projectCode, isoDate));
+      router.push(actasProjectOperativoPath(projectCode, { asOf: isoDate, basePath }));
     } else {
-      router.push(actasProjectOperativoPath(projectCode));
+      router.push(actasProjectOperativoPath(projectCode, { basePath }));
     }
   };
 

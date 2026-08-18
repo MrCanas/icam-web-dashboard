@@ -19,6 +19,7 @@ import {
   type ActasActaUrlState,
 } from "@/modules/pm/actas/logic/acta-url-state";
 import { actaPdfFilename } from "@/modules/pm/actas/pdf/acta-pdf-types";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 import { formatActaRangeDate } from "@/modules/pm/actas/logic/actas-time";
 import type {
   ActasActaRangePreset,
@@ -40,6 +41,7 @@ const RANGE_OPTIONS: { value: ActasActaRangePreset; label: string }[] = [
 ];
 
 export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -58,9 +60,11 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
 
   const syncUrl = useCallback(
     (next: ActasActaUrlState) => {
-      router.replace(buildActaShareUrl(projectCode, next), { scroll: false });
+      router.replace(buildActaShareUrl(projectCode, next, basePath), {
+        scroll: false,
+      });
     },
-    [projectCode, router],
+    [basePath, projectCode, router],
   );
 
   const loadView = useCallback(
@@ -219,8 +223,8 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
     setCopyError(null);
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}${buildActaShareUrl(projectCode, urlState)}`
-        : buildActaShareUrl(projectCode, urlState);
+        ? `${window.location.origin}${buildActaShareUrl(projectCode, urlState, basePath)}`
+        : buildActaShareUrl(projectCode, urlState, basePath);
     try {
       await navigator.clipboard.writeText(url);
       setShareToast(true);

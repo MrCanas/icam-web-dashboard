@@ -121,6 +121,8 @@ function secondaryItemsForPath(
 
   for (const p of pmProjects) {
     const href = `/dashboard/pm/proyecto/${encodeURIComponent(p.idActivo)}`;
+    // Las actas del proyecto cuelgan ya de `href` (…/proyecto/<id>/actas); la
+    // rama por código cubre la URL heredada /dashboard/pm/actas/<code>.
     // Igualdad o límite de segmento: con startsWith a secas, CASA7 se
     // marcaría activo estando en /actas/CASA77.
     const actasBase =

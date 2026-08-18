@@ -13,6 +13,7 @@ import type { ActasLogEntryItem } from "@/modules/pm/actas/types";
 
 import { useActasLogEntryUndo } from "./ActasLogEntryUndoContext";
 import { ActasHistoryEntryItem } from "./ActasHistoryEntryItem";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasElementHistoryPanelProps {
   elementId: string;
@@ -37,6 +38,7 @@ export function ActasElementHistoryPanel({
   asOfDate,
   onLastEntryChange,
 }: ActasElementHistoryPanelProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const { showUndo } = useActasLogEntryUndo();
   const [entries, setEntries] = useState<ActasLogEntryItem[]>([]);
@@ -187,7 +189,7 @@ export function ActasElementHistoryPanel({
 
         {!readOnly ? (
           <Link
-            href={actasProjectElementHistoricoPath(projectCode, elementId)}
+            href={actasProjectElementHistoricoPath(projectCode, elementId, { basePath })}
             className="inline-block text-xs font-medium text-icam-900 hover:text-icam-gold"
           >
             Ver histórico completo →

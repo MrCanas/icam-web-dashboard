@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
 import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
 import {
   assertUniqueCategoryNameInProject,
   normalizeCategoryName,
 } from "@/modules/pm/actas/logic/category-name-validation";
+import { ACTAS_PROJECT_ROUTE_PATTERN } from "@/modules/pm/actas/logic/actas-paths";
 
 export type CreateCategoryInput = {
   projectId: string;
@@ -100,6 +100,7 @@ export async function createCategory(
 
   if (!projectCodeErr && projectRow?.code) {
     revalidatePath(`/dashboard/pm/actas/${projectRow.code as string}`);
+    revalidatePath(ACTAS_PROJECT_ROUTE_PATTERN, "page");
   }
 
   return { ok: true, categoryId: inserted.id as string };

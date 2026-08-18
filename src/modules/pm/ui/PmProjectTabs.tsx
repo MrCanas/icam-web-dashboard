@@ -5,12 +5,6 @@ import { usePathname } from "next/navigation";
 
 interface PmProjectTabsProps {
   idActivo: string;
-  /**
-   * Destino de la pestaña Actas: la URL canónica /dashboard/pm/actas/<code>
-   * si el activo tiene proyecto de actas vinculado, o el resolver anidado
-   * /dashboard/pm/proyecto/<id>/actas como fallback.
-   */
-  actasHref: string;
   /** false cuando el usuario tiene denegada pm.planificacion. */
   showPlanificacion?: boolean;
   /** false cuando el usuario tiene denegada pm.actas. */
@@ -20,7 +14,6 @@ interface PmProjectTabsProps {
 /** Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Actas. */
 export function PmProjectTabs({
   idActivo,
-  actasHref,
   showPlanificacion = true,
   showActas = true,
 }: PmProjectTabsProps) {
@@ -49,10 +42,8 @@ export function PmProjectTabs({
           {
             key: "actas",
             label: "Actas",
-            href: actasHref,
-            active:
-              pathname.startsWith("/dashboard/pm/actas/") ||
-              pathname === `${base}/actas`,
+            href: `${base}/actas`,
+            active: pathname === `${base}/actas`,
           },
         ]
       : []),

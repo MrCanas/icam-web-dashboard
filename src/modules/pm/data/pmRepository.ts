@@ -219,8 +219,9 @@ export interface PmProjectNavItem {
   nombre: string | null;
   /**
    * project.code del proyecto de Actas vinculado (project.pm_activo_id), o
-   * null si el activo no tiene actas. Sirve para resaltar el proyecto en la
-   * nav también cuando se navega por /dashboard/pm/actas/<code>.
+   * null si el activo no tiene actas. Resalta el proyecto en la nav cuando se
+   * entra por la URL heredada /dashboard/pm/actas/<code> (la canónica,
+   * /dashboard/pm/proyecto/<id>/actas, ya cuelga del propio proyecto).
    */
   actasCode: string | null;
 }

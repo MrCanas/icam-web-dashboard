@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { actasProjectTabPath } from "@/modules/pm/actas/logic/actas-paths";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 import { ACTAS_PROJECT_TABS, type ActasProjectTab } from "@/modules/pm/actas/types";
 
 interface ActasProjectTabsProps {
@@ -12,6 +13,7 @@ interface ActasProjectTabsProps {
 
 export function ActasProjectTabs({ projectCode }: ActasProjectTabsProps) {
   const searchParams = useSearchParams();
+  const basePath = useActasBasePath();
   const tabParam = searchParams.get("tab") as ActasProjectTab | null;
   const activeTab: ActasProjectTab =
     tabParam && ACTAS_PROJECT_TABS.some((t) => t.key === tabParam)
@@ -19,7 +21,7 @@ export function ActasProjectTabs({ projectCode }: ActasProjectTabsProps) {
       : "operativo";
 
   // Estilo pill secundario, deliberadamente más discreto que PmProjectTabs:
-  // en /dashboard/pm/actas/<code> conviven ambas barras y deben leerse como
+  // en la página de actas conviven ambas barras y deben leerse como
   // dos niveles distintos (proyecto ⟶ secciones de actas).
   return (
     <nav
@@ -31,7 +33,7 @@ export function ActasProjectTabs({ projectCode }: ActasProjectTabsProps) {
         return (
           <Link
             key={tab.key}
-            href={actasProjectTabPath(projectCode, tab.key)}
+            href={actasProjectTabPath(projectCode, tab.key, { basePath })}
             className={`px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full transition ${
               active
                 ? "bg-icam-900/10 text-icam-900"

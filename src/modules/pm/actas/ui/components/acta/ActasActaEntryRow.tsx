@@ -7,6 +7,7 @@ import { formatActaEntryDateTime } from "@/modules/pm/actas/logic/actas-time";
 import type { ActasLogEntryItem } from "@/modules/pm/actas/types";
 
 import { ActasLogEntryStatusChip } from "../operativo/ActasLogEntryStatusChip";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasActaEntryRowProps {
   entry: ActasLogEntryItem;
@@ -19,6 +20,7 @@ export function ActasActaEntryRow({
   elementId,
   projectCode,
 }: ActasActaEntryRowProps) {
+  const basePath = useActasBasePath();
   const [copied, setCopied] = useState(false);
   const hasStatusChange =
     entry.statusBefore != null && entry.statusAfter != null;
@@ -26,11 +28,10 @@ export function ActasActaEntryRow({
     entry.author?.label ?? (entry.authorId ? "Usuario" : "Sin autor");
 
   const copyPermalink = async () => {
-    const url = actasElementPermalinkUrl(
-      projectCode,
-      elementId,
-      window.location.origin,
-    );
+    const url = actasElementPermalinkUrl(projectCode, elementId, {
+      origin: window.location.origin,
+      basePath,
+    });
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
