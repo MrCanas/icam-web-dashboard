@@ -43,8 +43,10 @@ describe("pmLandingPath", () => {
     );
   });
 
-  it("sin proyectos cae a la primera página visible no oculta", () => {
-    assert.equal(pmLandingPath(usuario(), []), "/dashboard/pm/planificacion");
+  // Con Planificación y Mapeo ya fuera de la nav (viven en Configuración), no
+  // queda ninguna página no oculta: el fallback es el grid de proyectos.
+  it("sin proyectos cae al grid de proyectos", () => {
+    assert.equal(pmLandingPath(usuario(), []), "/dashboard/pm/detalle");
   });
 
   it("si solo quedan páginas ocultas, devuelve la primera visible", () => {

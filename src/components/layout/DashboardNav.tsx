@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PLATFORM_NAV } from "@/registry/platform-nav";
 import { MODULES_LIST, MODULE_TO_ZONE, NAV_HIDDEN_ZONES } from "@/registry/modules";
@@ -42,15 +42,55 @@ interface SecondaryItem {
 }
 
 /**
+ * Páginas de la zona pm que se abren desde el menú de Configuración (rueda al
+ * final de la fila secundaria) en vez de ocupar una pestaña. El orden es el de
+ * este array, no el del registry.
+ */
+const PM_CONFIG_ROUTE_KEYS = ["pm.actas", "pm.planificacion", "pm.proyectos"];
+
+/**
+ * Items del menú de Configuración para la zona actual. Vacío fuera de pm y para
+ * quien no tenga permiso sobre ninguna de esas rutas (entonces no se pinta la
+ * rueda). `projectClaimed` evita marcar activa la entrada del hub cuando quien
+ * reclama el pathname es la subpágina de un proyecto.
+ */
+function configItemsForPath(
+  routes: ModuleRoute[],
+  zone: ZoneKey,
+  pathname: string,
+  projectClaimed: boolean,
+): SecondaryItem[] {
+  if (zone !== "pm") return [];
+
+  const items: SecondaryItem[] = [];
+  for (const key of PM_CONFIG_ROUTE_KEYS) {
+    const route = routes.find((r) => r.key === key);
+    if (!route) continue;
+    items.push({
+      key: route.key,
+      href: route.path,
+      label: route.label,
+      // A propósito no usamos route.match: el suyo abarca también las
+      // subpáginas de proyecto, que ya se marcan en su propia pestaña.
+      active:
+        !projectClaimed &&
+        (pathname === route.path || pathname.startsWith(`${route.path}/`)),
+    });
+  }
+  return items;
+}
+
+/**
  * Fila secundaria de la zona actual. En la zona pm la lista de páginas se
- * sustituye por: [Todos los proyectos] + [un item por proyecto activo] +
- * [separador] + [páginas transversales (Planificación, Mapeo maestro, Actas)].
+ * sustituye por: [Todos los proyectos] + [un item por proyecto activo]; las
+ * páginas transversales (Actas, Planificación, Mapeo maestro) se sirven aparte
+ * en `config`.
  */
 function secondaryItemsForPath(
   user: UserContext,
   pathname: string,
   pmProjects: PmProjectNavItem[],
-): SecondaryItem[] {
+): { items: SecondaryItem[]; config: SecondaryItem[] } {
   const zone = zoneForPath(pathname);
   const routes = visibleRoutesForZone(user, zone);
   // Permisos (routes) y nav (navRoutes) van separados: una ruta oculta sigue
@@ -66,7 +106,10 @@ function secondaryItemsForPath(
 
   const detalle = zone === "pm" ? routes.find((r) => r.key === "pm.detalle") : undefined;
   if (!detalle || pmProjects.length === 0) {
-    return navRoutes.map((r) => asItem(r, isRouteActive(pathname, r)));
+    return {
+      items: navRoutes.map((r) => asItem(r, isRouteActive(pathname, r))),
+      config: configItemsForPath(routes, zone, pathname, false),
+    };
   }
 
   const items: SecondaryItem[] = [];
@@ -113,7 +156,105 @@ function secondaryItemsForPath(
     first = false;
   }
 
-  return items;
+  return {
+    items,
+    config: configItemsForPath(routes, zone, pathname, projectClaimed),
+  };
+}
+
+function GearIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  );
+}
+
+/**
+ * Rueda al final de la fila secundaria: popover con las páginas transversales.
+ * El popover se monta fuera del contenedor con `overflow-x-auto` de la fila —
+ * dentro quedaría recortado.
+ */
+function ConfigMenu({ items }: { items: SecondaryItem[] }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (items.length === 0) return null;
+
+  const anyActive = items.some((i) => i.active);
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Configuración"
+        title="Configuración"
+        className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+          open || anyActive
+            ? "text-white bg-white/10"
+            : "text-white/60 hover:text-white/90 hover:bg-white/5"
+        }`}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <GearIcon />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1 w-52 rounded-md border border-subtle/50 bg-card py-1 shadow-lg"
+        >
+          {items.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              role="menuitem"
+              aria-current={item.active ? "page" : undefined}
+              onClick={() => setOpen(false)}
+              className={`block w-full min-h-11 px-3 py-2 text-sm transition hover:bg-page ${
+                item.active
+                  ? "text-text-primary font-medium"
+                  : "text-text-body"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 interface DashboardNavProps {
@@ -132,8 +273,11 @@ export function DashboardNav({
   const { user } = useCurrentUser();
   const isVertical = layout === "vertical";
 
-  const secondary = useMemo(
-    () => (user ? secondaryItemsForPath(user, pathname, pmProjects) : []),
+  const { items: secondary, config } = useMemo(
+    () =>
+      user
+        ? secondaryItemsForPath(user, pathname, pmProjects)
+        : { items: [] as SecondaryItem[], config: [] as SecondaryItem[] },
     [user, pathname, pmProjects],
   );
 
@@ -259,35 +403,62 @@ export function DashboardNav({
           </Link>
         </Fragment>
       ))}
+      {config.length > 0 ? (
+        <>
+          <div className="mt-2 border-t border-white/10" aria-hidden="true" />
+          <p className="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+            Configuración
+          </p>
+          {config.map((tab) => (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              onClick={onNavigate}
+              aria-current={tab.active ? "page" : undefined}
+              className={`min-h-11 min-w-0 flex items-center px-2 py-3 text-sm border-l-[3px] transition ${
+                tab.active
+                  ? "text-white border-icam-gold bg-white/5"
+                  : "text-white/70 border-transparent hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <span className="truncate">{tab.label}</span>
+            </Link>
+          ))}
+        </>
+      ) : null}
     </nav>
   ) : (
     // `w-max mx-auto` centra la fila cuando cabe y permite scroll cuando no
     // (justify-center + overflow dejaría inaccesibles los items del inicio).
-    <div className="overflow-x-auto">
-      <nav
-        className="flex w-max mx-auto flex-nowrap items-center gap-x-5"
-        aria-label="Subsección"
-      >
-        {secondary.map((tab) => (
-          <Fragment key={tab.key}>
-            {tab.separatorBefore ? (
-              <span className="h-4 w-px bg-white/20 shrink-0" aria-hidden="true" />
-            ) : null}
-            <Link
-              href={tab.href}
-              title={tab.title}
-              aria-current={tab.active ? "page" : undefined}
-              className={`pb-2 text-sm whitespace-nowrap transition ${
-                tab.active
-                  ? "text-white border-b-[3px] border-icam-gold"
-                  : "text-white/60 hover:text-white/90"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          </Fragment>
-        ))}
-      </nav>
+    // La rueda va fuera del contenedor scrollable: siempre visible y sin recorte.
+    <div className="flex items-center justify-center gap-x-4 min-w-0">
+      <div className="overflow-x-auto min-w-0">
+        <nav
+          className="flex w-max mx-auto flex-nowrap items-center gap-x-5"
+          aria-label="Subsección"
+        >
+          {secondary.map((tab) => (
+            <Fragment key={tab.key}>
+              {tab.separatorBefore ? (
+                <span className="h-4 w-px bg-white/20 shrink-0" aria-hidden="true" />
+              ) : null}
+              <Link
+                href={tab.href}
+                title={tab.title}
+                aria-current={tab.active ? "page" : undefined}
+                className={`pb-2 text-sm whitespace-nowrap transition ${
+                  tab.active
+                    ? "text-white border-b-[3px] border-icam-gold"
+                    : "text-white/60 hover:text-white/90"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            </Fragment>
+          ))}
+        </nav>
+      </div>
+      <ConfigMenu items={config} />
     </div>
   );
 

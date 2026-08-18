@@ -26,6 +26,9 @@ export const pmModule: ModuleDefinition = {
       key: "pm.planificacion",
       path: "/dashboard/pm/planificacion",
       label: "Planificación",
+      // El hub sale de la fila secundaria: se abre desde el menú de
+      // Configuración. Dentro de un proyecto sigue como subpestaña propia.
+      hiddenInNav: true,
       match: (p) =>
         p === "/dashboard/pm/planificacion" ||
         /^\/dashboard\/pm\/proyecto\/[^/]+\/planificacion$/.test(p),
@@ -34,6 +37,8 @@ export const pmModule: ModuleDefinition = {
       key: "pm.proyectos",
       path: "/dashboard/pm/proyectos",
       label: "Mapeo maestro",
+      // Tarea de mantenimiento, no de consulta diaria: vive en Configuración.
+      hiddenInNav: true,
       match: (p) => p === "/dashboard/pm/proyectos",
     },
     {
@@ -41,7 +46,7 @@ export const pmModule: ModuleDefinition = {
       path: "/dashboard/pm/actas",
       label: "Actas",
       // Las actas se abren desde la subpestaña de cada proyecto; el hub con
-      // sidebar (alta, duplicar, archivar, reordenar) queda solo por URL.
+      // sidebar (alta, duplicar, archivar, reordenar) queda en Configuración.
       hiddenInNav: true,
       match: (p) =>
         p === "/dashboard/pm/actas" ||
