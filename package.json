@@ -30,6 +30,7 @@
     "actas:monday-migrate-all": "tsx scripts/actas/monday-migrate-all.ts",
     "actas:validate-diagnose-authors": "tsx scripts/actas/validate-diagnose-authors.ts",
     "actas:apply-manual-mappings": "tsx scripts/actas/apply-manual-mappings.ts",
+    "actas:link-pm-activos": "tsx scripts/actas/link-pm-activos.ts",
     "actas:auth-bulk-create": "tsx scripts/actas/auth-bulk-create.ts",
     "actas:test-auth-bridge": "tsx scripts/actas/test-auth-bridge.ts",
     "actas:send-test-alert": "tsx scripts/actas/send-test-alert.ts",
