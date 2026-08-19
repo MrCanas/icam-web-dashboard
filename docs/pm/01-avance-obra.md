@@ -78,24 +78,75 @@ editar → pendiente → (admin de PM) aprobado → descargar CSV/JSON → subir
   el cambio es un botón aparte. Un GET que cambia estado se dispararía solo con el prefetch del
   navegador.
 
-## Conectar la API de Zoho (pendiente)
+## Conectar la API de Zoho
 
-Hoy no hay integración. La costura está en `src/modules/pm/avance/data/zohoClient.ts` y **ningún
-punto del código la llama**. Faltan tres cosas:
+El cliente está escrito (`src/modules/pm/avance/data/zohoClient.ts`) y **descubre por sí mismo
+el módulo y los nombres API de los campos**: nadie tiene que averiguarlos a mano. Lo único que
+falta son las credenciales.
 
-1. **El nombre API del módulo** de Promociones (Zoho → Configuración → Espacio para
-   desarrolladores → APIs) → variable `ZOHO_MODULO_PROMOCIONES`.
-2. **El nombre API de cada uno de los 7 campos** de avance → columna
-   `pm_avance_fase_catalogo.zoho_api_name`, hoy a `NULL`. Mientras falte, la exportación JSON
-   emite una clave marcada `__API_NAME_PENDIENTE__<fase>` en vez de inventarse un nombre: así el
-   fichero no se puede subir «sin querer» creyendo que está listo.
-3. **Credenciales OAuth** (self-client) y el **centro de datos**: los dominios de Zoho cambian
-   entre `.eu` y `.com`, y usar el equivocado da un 401 sin explicación. Ver
-   `.env.local.example`, sección «Zoho CRM · Avance de obra».
+### 1. Crear un Self Client en Zoho
 
-Cuando existan: implementar `pushAvance`, añadir una acción que la invoque **solo sobre cambios
-ya aprobados**, y usar el estado `enviado` del outbox, que ya está previsto en el esquema. El
-modelo de datos no hay que tocarlo.
+En la consola de API de vuestro centro de datos (`https://api-console.zoho.eu/` si sois `.eu`,
+`https://api-console.zoho.com/` si sois `.com`) → **Self Client** → *Create*. Copia el
+**Client ID** y el **Client Secret**.
+
+Después, pestaña **Generate Code**:
+
+- Scope: `ZohoCRM.settings.READ,ZohoCRM.modules.ALL`
+- Duración: 10 minutos
+- Copia el **grant code** que sale (caduca enseguida)
+
+`settings.READ` es lo que permite el autodescubrimiento de campos; `modules.ALL` da lectura de
+promociones y la escritura de los cambios aprobados.
+
+### 2. Canjear el código por un refresh token
+
+**Ejecútalo en tu terminal, no aquí**: la respuesta contiene un secreto de larga duración y no
+debe quedar en el historial de la conversación.
+
+```bash
+curl -X POST "https://accounts.zoho.eu/oauth/v2/token" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=TU_CLIENT_ID" \
+  -d "client_secret=TU_CLIENT_SECRET" \
+  -d "code=EL_GRANT_CODE"
+```
+
+La respuesta trae `refresh_token` (no caduca) y `api_domain`.
+
+### 3. Rellenar `.env.local`
+
+```
+ZOHO_ACCOUNTS_URL=https://accounts.zoho.eu
+ZOHO_API_DOMAIN=https://www.zohoapis.eu     # el api_domain de la respuesta
+ZOHO_CLIENT_ID=...
+ZOHO_CLIENT_SECRET=...
+ZOHO_REFRESH_TOKEN=...
+ZOHO_MODULO_PROMOCIONES=                    # lo averigua el paso 4
+```
+
+> El error `invalid_client` casi siempre es el centro de datos equivocado, no unas credenciales
+> malas: el refresh token solo vale en el dominio que lo emitió. El cliente lo dice en el mensaje.
+
+### 4. Descubrir el módulo y los campos
+
+```bash
+npm run pm:zoho-explore              # lista los módulos y señala el candidato
+# pon ZOHO_MODULO_PROMOCIONES en .env.local
+npm run pm:zoho-explore -- --campos  # campos, mapeo propuesto y valores de Tipología
+npm run pm:zoho-explore -- --muestra 3
+```
+
+Solo lee; no escribe nada ni en Zoho ni en la base. `--campos` propone el mapeo contra
+`pm_avance_fase_catalogo` y, si «Tipología» es un desplegable, lista sus valores — que es
+justo lo que dirá si el export de Excel venía filtrado.
+
+### 5. Lo que queda después
+
+Con el mapeo confirmado se rellena `pm_avance_fase_catalogo.zoho_api_name` y se puede
+sincronizar de verdad. La escritura (`pushAvance`) **no la invoca ningún cron ni ninguna ruta
+automática**: solo la acción que procesa cambios ya aprobados. Envía con `trigger: []` para no
+encadenar workflows del CRM: esto es una corrección de dato, no un evento de negocio.
 
 ## Estado del emparejamiento
 
