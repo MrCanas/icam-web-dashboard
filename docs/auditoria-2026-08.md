@@ -87,7 +87,7 @@ Con el matiz de que los reads de servidor usan **service role** (RLS no es segun
 
 Arreglo (migración 031): upsert de `pm_activos` por `id_activo` con UUIDs estables; borrar solo hitos/fechas.
 
-### 2.2 Subconsulta PostgREST inválida · **ALTA** · `en fase 3`
+### 2.2 Subconsulta PostgREST inválida · **ALTA** · `hecho`
 
 `actasRepository.ts:325-343` pasa un query builder como valor de `.eq()`: se serializa como string y **el filtro no filtra**. El mismo fichero lo resuelve bien 20 líneas más abajo con `await` + `.in()`.
 
@@ -103,17 +103,17 @@ Arreglo (migración 031): upsert de `pm_activos` por `id_activo` con UUIDs estab
 
 ## 3. Rendimiento (el «va lento»)
 
-### 3.1 Full-table scans · **ALTA** · `en fase 3`
+### 3.1 Full-table scans · **ALTA** · `pendiente (proyección SQL — fuera de esta tanda)`
 
 - `fetchPmPortfolio` (`pm/data/pmRepository.ts:65-93`): 4 tablas enteras con `select("*")`, filtrado en JS. Corre en `/dashboard/pm/detalle` y `pm-overview`.
 - `planificacionRepository.ts:69-77`: 5 tablas completas más.
 - `avanceRepository.ts:263-270`, `proyectosRepository.ts:60`, `syncLogsRepository.ts:207`: más `select("*")`.
 
-### 3.2 `auth.users` paginado en cada render · **ALTA** · `en fase 3`
+### 3.2 `auth.users` paginado en cada render · **ALTA** · `hecho (migración 033 lista)`
 
 `resolveUserDisplayMap` (`actas/logic/user-display.ts:57-88`) pagina `auth.admin.listUsers` de 200 en 200 **sin caché**, invocado por cada tablero de actas. Es probablemente la causa nº 1 del «va lento» en actas.
 
-### 3.3 Cero caché, cero code-splitting · **MEDIA** · `en fase 3`
+### 3.3 Cero caché, cero code-splitting · **MEDIA** · `parcial: loading.tsx hecho; recharts dynamic y caché pendientes`
 
 - `force-dynamic` + `revalidate=0` en el **layout raíz** del dashboard: todo dinámico, incluidas páginas cuyos datos cambian una vez por semana.
 - `revalidatePath` a patrones enteros y a nivel `layout` en cada edición de actas.
@@ -224,7 +224,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 | 0 | `auditoria-2026-08` | Este informe + artefacto ejecutivo | **hecho** |
 | 1 | `auditoria-2026-08` | Migraciones 030/031/032 (código listo, `--apply` pendiente), guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **código hecho** |
 | 2 | `auditoria-2026-08` | Bugs de lint (0 errores), `error.tsx`, tests de RBAC/registry/log-access (+18), CI, `npm test`/`check`, `pg.ts`→`src/lib/db` | **hecho** |
-| 3 | `saneamiento-3-rendimiento` | user-display con lookup+caché, proyecciones SQL en pmRepository/planificación, fix subconsulta inválida, bulk en lote, `loading.tsx`, recharts dinámico, medición antes/después | pendiente |
+| 3 | `auditoria-2026-08` | user-display por RPC (033), fix subconsulta inválida, bulk concurrente, `loading.tsx` en 8 páginas | **parcial** (proyecciones SQL y recharts dynamic quedan) |
 | 4 | `saneamiento-4-deuda` | Borrado con lista firmada, useToast/ErrorSection/formatters/ActionResult, README+ARCHITECTURE reales, `lang="es"`, `.gitattributes`, text-muted AA, `set-state-in-effect` | pendiente |
 
 Fuera de alcance (reevaluar más adelante): staging, `cacheComponents`, focus traps completos, refactor de monolitos, tests exhaustivos de `pm/actas`, Prettier, observabilidad (Sentry/logger).

@@ -21,15 +21,21 @@ export async function bulkChangeElementStatus(
     return { ok: false, error: "No hay elementos seleccionados" };
   }
 
+  // Concurrente en vez de secuencial: los cambios de estado son independientes
+  // entre elementos, así que no hay razón para esperar uno tras otro. El array
+  // de resultados conserva el orden de entrada, así que «primer error» sigue
+  // siendo el primero de la selección.
+  const results = await Promise.all(
+    elementIds.map((elementId) =>
+      changeElementStatus({ elementId, newStatus: input.newStatus }),
+    ),
+  );
+
   let updated = 0;
   let failed = 0;
   let firstError: string | null = null;
 
-  for (const elementId of elementIds) {
-    const result = await changeElementStatus({
-      elementId,
-      newStatus: input.newStatus,
-    });
+  for (const result of results) {
     if (!result.ok) {
       failed += 1;
       firstError ??= result.error;
