@@ -129,22 +129,22 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 ## 4. Red de seguridad (el «miedo a romper»)
 
-### 4.1 Sin CI · **ALTA** · `en fase 2`
+### 4.1 Sin CI · **ALTA** · `hecho`
 
 `.github/` no existe. Nada valida lint, tsc ni tests antes de merge. Sin husky, sin pre-commit. `npm test` no existe (solo `pm:test`).
 
-### 4.2 Bugs reales entre los 44 errores de lint · **ALTA** · `en fase 2`
+### 4.2 Bugs reales entre los 44 errores de lint · **ALTA** · `hecho (lint: 0 errores)`
 
 - `react-hooks/rules-of-hooks` en `ActasOperativoSortableElement.tsx:91`: early-return antes de `useSortable` → crash potencial «Rendered more hooks» cuando `dnd.enabled` cambia.
 - 3 `react-hooks/error-boundaries` en `HistoricoPage.tsx`: el try/catch no cubre el render y **no hay ni un `error.tsx` en toda la app**.
 - 2 `<a>` → `<Link>` (full page reload).
 - 38 `set-state-in-effect`, 7 concentrados en `ActasElementRow.tsx` (espejo de props en estado; cascadas de render en la fila más renderizada). 3 de los 44 errores están en código muerto.
 
-### 4.3 Cobertura de tests muy desigual · **ALTA** · `en fase 2`
+### 4.3 Cobertura de tests muy desigual · **ALTA** · `parcial: RBAC/registry/log-access (fase 2)`
 
 205 tests verdes, pero: `pm/actas` (20.069 LOC, 40 % del repo) **cero tests**; `src/lib/auth/` (todo el RBAC, incl. el fail-open de `canAccessRouteKey`) cero; `registry/routes` (matching por orden, la pieza más frágil) cero; `monday/logic` cero. Lo bien cubierto: `pm-viz` (36 tests), planificación, avance.
 
-### 4.4 Código de producción fuera del type-check · **ALTA** · `en fase 2`
+### 4.4 Código de producción fuera del type-check · **ALTA** · `hecho`
 
 `pm/actas/data/pg.ts` reexporta de `scripts/actas/lib/db` — carpeta excluida de tsc y ESLint **que además no compila** (14 errores de tipos preexistentes). Dos server actions de 300+ líneas dependen de ello en runtime.
 
@@ -161,7 +161,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 - Ciclos: `pm ↔ portfolio` y `avance ↔ planificacion`.
 - ESLint sin ninguna regla de fronteras: todo lo anterior pasa el lint.
 
-### 5.2 Registry frágil · **ALTA** · `en fase 2` (tests) / `pendiente` (rediseño)
+### 5.2 Registry frágil · **ALTA** · `tests hechos (fase 2)` / `rediseño pendiente`
 
 `routeKeyForPathname` devuelve el **primer** match del array: el orden de los literales en `module.ts` es semántica de permisos, ya parcheado dos veces con regex negativas y comentarios de advertencia. Dos fuentes de verdad path→key (cliente por match, servidor por key literal escrita a mano) — 4 rutas ya divergieron (§1.3). `route_key` sin FK: renombrar una key deja denies huérfanos que se descartan en silencio (ya pasó: migración 027). 4 resoluciones path→zona distintas en el código.
 
@@ -223,7 +223,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 |---|---|---|---|
 | 0 | `auditoria-2026-08` | Este informe + artefacto ejecutivo | **hecho** |
 | 1 | `auditoria-2026-08` | Migraciones 030/031/032 (código listo, `--apply` pendiente), guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **código hecho** |
-| 2 | `saneamiento-2-ci` | Bugs reales de lint, `error.tsx`, tests de RBAC/registry/actas-paths, GitHub Actions (tsc+lint+tests), `npm test`/`npm run check`, sacar `pg.ts` de scripts | pendiente |
+| 2 | `auditoria-2026-08` | Bugs de lint (0 errores), `error.tsx`, tests de RBAC/registry/log-access (+18), CI, `npm test`/`check`, `pg.ts`→`src/lib/db` | **hecho** |
 | 3 | `saneamiento-3-rendimiento` | user-display con lookup+caché, proyecciones SQL en pmRepository/planificación, fix subconsulta inválida, bulk en lote, `loading.tsx`, recharts dinámico, medición antes/después | pendiente |
 | 4 | `saneamiento-4-deuda` | Borrado con lista firmada, useToast/ErrorSection/formatters/ActionResult, README+ARCHITECTURE reales, `lang="es"`, `.gitattributes`, text-muted AA, `set-state-in-effect` | pendiente |
 
