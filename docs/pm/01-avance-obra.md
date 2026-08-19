@@ -112,10 +112,32 @@ Después, pestaña **Generate Code**:
 actualizar, borrar), no «todos los módulos en solo lectura»: con ese scope el botón «Subir a
 Zoho» funciona. `settings.READ` es lo que permite el autodescubrimiento de módulo y campos.
 
-### 2. Canjear el código por un refresh token
+### 2. Canjear el código y guardarlo, en un solo comando
 
-**Ejecútalo en tu terminal, no aquí**: la respuesta contiene un secreto de larga duración y no
-debe quedar en el historial de la conversación.
+**Ejecútalo en tu terminal, no a través del asistente**: los argumentos llevan el client secret.
+
+```bash
+npm run pm:zoho-auth -- --dc eu --client-id 1000.XXX --client-secret YYY --code ZZZ
+```
+
+`--dc` es el dominio donde abres el CRM: `crm.zoho.eu` → `eu`, `crm.zoho.com` → `com` (también
+admite `in`, `com.au`, `jp`, `ca`).
+
+Canjea el código, escribe las variables en `.env.local` respetando el resto del fichero y **no
+imprime ni el secret ni el refresh token**. Si Zoho falla no toca nada, y traduce los tres
+errores de siempre:
+
+| error | qué pasó |
+|---|---|
+| `invalid_code` | el código caducó (dura 10 min) o ya se había usado — genera otro |
+| `invalid_client` | el `--dc` no coincide con el dominio donde generaste el código |
+| `invalid_client_secret` | el secret no corresponde a ese client id |
+
+Para que el secret no quede en el historial del shell, se pueden pasar por entorno
+(`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_GRANT_CODE`) en vez de por argumento.
+
+<details>
+<summary>Hacerlo a mano con curl</summary>
 
 ```bash
 curl -X POST "https://accounts.zoho.eu/oauth/v2/token" \
@@ -125,21 +147,14 @@ curl -X POST "https://accounts.zoho.eu/oauth/v2/token" \
   -d "code=EL_GRANT_CODE"
 ```
 
-La respuesta trae `refresh_token` (no caduca) y `api_domain`.
+La respuesta trae `refresh_token` (no caduca) y `api_domain`, que hay que copiar a `.env.local`.
+</details>
 
-### 3. Rellenar `.env.local`
+### 3. Comprobar que ha quedado
 
+```bash
+grep -c "^ZOHO" .env.local     # tiene que dar 6
 ```
-ZOHO_ACCOUNTS_URL=https://accounts.zoho.eu
-ZOHO_API_DOMAIN=https://www.zohoapis.eu     # el api_domain de la respuesta
-ZOHO_CLIENT_ID=...
-ZOHO_CLIENT_SECRET=...
-ZOHO_REFRESH_TOKEN=...
-ZOHO_MODULO_PROMOCIONES=                    # lo averigua el paso 4
-```
-
-> El error `invalid_client` casi siempre es el centro de datos equivocado, no unas credenciales
-> malas: el refresh token solo vale en el dominio que lo emitió. El cliente lo dice en el mensaje.
 
 ### 4. Descubrir el módulo y los campos
 

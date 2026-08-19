@@ -41,6 +41,7 @@
     "pm:apply-migraciones-024-026": "tsx scripts/pm/apply-migraciones-024-026.ts",
     "pm:apply-migration-028": "tsx scripts/pm/apply-migration-028.ts",
     "pm:seed-avance-obra": "tsx scripts/pm/seed-avance-obra.ts",
+    "pm:zoho-auth": "tsx scripts/pm/zoho-auth.ts",
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",
     "pm:check-scripts": "tsc --noEmit -p scripts/pm/tsconfig.json",
     "pm:test": "tsx --test \"src/modules/pm/**/__tests__/*.test.ts\" \"src/modules/portfolio/logic/__tests__/*.test.ts\"",

@@ -165,7 +165,8 @@ async function main(): Promise<void> {
   }
 }
 
+// Ver la nota de zoho-auth.ts sobre process.exitCode en Windows.
 main().catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
+  process.exitCode = 1;
 });
