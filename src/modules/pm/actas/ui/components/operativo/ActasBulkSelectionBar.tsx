@@ -258,6 +258,7 @@ export function ActasBulkSelectionBar({ onError }: ActasBulkSelectionBarProps) {
             <div
               ref={ownerPopoverRef}
               role="dialog"
+      aria-modal="true"
               aria-labelledby={`${ownerInputId}-title`}
               className="fixed z-[70] w-[300px] rounded-lg border border-subtle/60 bg-card shadow-xl"
               style={{ top: ownerPosition.top, left: ownerPosition.left }}

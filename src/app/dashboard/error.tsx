@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /**
  * Error boundary del dashboard. Antes no había ninguno en toda la app: cualquier
  * fallo de render llegaba a la pantalla de error por defecto de Next, sin chrome
@@ -30,12 +32,12 @@ export default function DashboardError({
         >
           Reintentar
         </button>
-        <a
+        <Link
           href="/dashboard"
           className="rounded border border-subtle px-3 py-1.5 text-sm text-text-body hover:bg-page"
         >
           Ir al inicio
-        </a>
+        </Link>
       </div>
     </section>
   );

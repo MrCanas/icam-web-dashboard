@@ -88,6 +88,7 @@ export function ReportarFechasDialog({
             >
               <div
                 role="dialog"
+      aria-modal="true"
                 aria-label="Reportar fechas al maestro"
                 className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-subtle/60 bg-card p-4 shadow-xl"
                 onClick={(e) => e.stopPropagation()}

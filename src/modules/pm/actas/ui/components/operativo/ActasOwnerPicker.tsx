@@ -317,6 +317,7 @@ export function ActasOwnerPicker({
             <div
               ref={popoverRef}
               role="dialog"
+      aria-modal="true"
               aria-labelledby={`${inputId}-title`}
               className="fixed z-[70] w-[300px] rounded-lg border border-subtle/60 bg-card shadow-xl"
               style={{ top: position.top, left: position.left }}

@@ -186,6 +186,7 @@ export function PlanificacionFechaCell({
               ref={popRef}
               id={dialogId}
               role="dialog"
+      aria-modal="true"
               aria-label={target.tipo === "snapshot" ? "Editar fecha del trimestre" : "Editar previsión"}
               className="fixed z-[70] w-[300px] rounded-lg border border-subtle/60 bg-card p-3 shadow-lg"
               style={{ top: position.top, left: position.left }}

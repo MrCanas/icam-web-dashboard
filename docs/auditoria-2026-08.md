@@ -194,13 +194,13 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 ## 7. UX, accesibilidad y DX
 
-- Contraste `text-muted` `#8A8A8A` = 3,16:1 sobre fondo — **falla WCAG AA**, con 64 usos combinados con texto de 9-11 px. · **ALTA** · `en fase 4`
-- `lang="en"` en una app 100 % en español (`layout.tsx:22`). · trivial · `en fase 4`
+- Contraste `text-muted` `#8A8A8A` = 3,16:1 sobre fondo — **falla WCAG AA**, con 64 usos combinados con texto de 9-11 px. · **ALTA** · `pendiente de tu OK (cambio visual)`
+- `lang="en"` en una app 100 % en español (`layout.tsx:22`). · trivial · `hecho (lang="es")`
 - 250 colores hex hardcodeados (52× `#1E2A56` teniendo token); login con un azul fuera de paleta (`#1c2e69`).
-- Diálogos: 32 `role="dialog"`, **0 focus traps**, 0 restauración de foco, 10 sin `aria-modal`; ~46 inputs sin label asociado. · `en fase 4` (parcial)
+- Diálogos: 32 `role="dialog"`, **0 focus traps**, 0 restauración de foco, 10 sin `aria-modal`; ~46 inputs sin label asociado. · `aria-modal hecho; focus trap fuera de alcance`
 - 13 de 20 tablas con scroll horizontal sin columna sticky; 4 sin overflow. · `pendiente`
-- README = boilerplate de create-next-app; ARCHITECTURE.md describe un auth que ya no existe (dice «mock admin profile») y omite el modelo real de zonas/roles/denylist y el 70 % de los módulos. · **ALTA** · `en fase 4`
-- ~950 líneas de prompts de Cursor + artefactos Power BI versionados; `PROMPT_CURSOR_NEXTJS.md:35` expone la URL del proyecto Supabase. 427 ficheros CRLF sin `.gitattributes`. · `en fase 4`
+- README = boilerplate de create-next-app; ARCHITECTURE.md describe un auth que ya no existe (dice «mock admin profile») y omite el modelo real de zonas/roles/denylist y el 70 % de los módulos. · **ALTA** · `hecho (README real + sección RBAC en ARCHITECTURE)`
+- ~950 líneas de prompts de Cursor + artefactos Power BI versionados; `PROMPT_CURSOR_NEXTJS.md:35` expone la URL del proyecto Supabase. 427 ficheros CRLF sin `.gitattributes`. · `.gitattributes hecho; borrado de prompts pendiente de tu OK`
 - `tailwind.config.js` `content` omite `src/modules/**` (compensado por la autodetección de v4 — riesgo latente). `--ext` inválido en el script de lint con flat config. · `baja`
 
 ---
@@ -225,6 +225,6 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 | 1 | `auditoria-2026-08` | Migraciones 030/031/032 (código listo, `--apply` pendiente), guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **código hecho** |
 | 2 | `auditoria-2026-08` | Bugs de lint (0 errores), `error.tsx`, tests de RBAC/registry/log-access (+18), CI, `npm test`/`check`, `pg.ts`→`src/lib/db` | **hecho** |
 | 3 | `auditoria-2026-08` | user-display por RPC (033), fix subconsulta inválida, bulk concurrente, `loading.tsx` en 8 páginas | **parcial** (proyecciones SQL y recharts dynamic quedan) |
-| 4 | `saneamiento-4-deuda` | Borrado con lista firmada, useToast/ErrorSection/formatters/ActionResult, README+ARCHITECTURE reales, `lang="es"`, `.gitattributes`, text-muted AA, `set-state-in-effect` | pendiente |
+| 4 | `auditoria-2026-08` | `lang="es"`, README real, RBAC en ARCHITECTURE, `.gitattributes`, formateadores de fecha, `aria-modal` en 10 diálogos | **parcial** (borrado y contraste requieren tu OK) |
 
 Fuera de alcance (reevaluar más adelante): staging, `cacheComponents`, focus traps completos, refactor de monolitos, tests exhaustivos de `pm/actas`, Prettier, observabilidad (Sentry/logger).
