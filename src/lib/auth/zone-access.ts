@@ -24,12 +24,14 @@ export const ADMIN_PATH_PREFIX = "/dashboard/admin";
  *
  * Devuelve la primera ruta VISIBLE de la zona, no su `defaultPath`: si el
  * usuario tiene denegada la página por defecto de la zona, devolverla crearía
- * un bucle de redirect con DashboardZoneGuard.
+ * un bucle de redirect con DashboardZoneGuard. Prefiere páginas que están en
+ * la nav (`!hiddenInNav`): aterrizar en una oculta deja la nav sin resaltado.
  */
 export function firstAccessiblePath(user: UserContext): string | null {
   for (const zoneKey of ZONE_ORDER) {
     const visible = visibleRoutesForZone(user, zoneKey);
-    if (visible.length > 0) return visible[0]!.path;
+    if (visible.length === 0) continue;
+    return (visible.find((r) => !r.hiddenInNav) ?? visible[0]!).path;
   }
   return null;
 }

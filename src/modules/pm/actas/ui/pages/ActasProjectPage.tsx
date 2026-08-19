@@ -15,6 +15,7 @@ import { ActasProjectHeader } from "../components/ActasProjectHeader";
 import { ActasProjectSearch } from "../components/ActasProjectSearch";
 import { ActasProjectTabs } from "../components/ActasProjectTabs";
 import { ActasTabContent } from "../components/ActasTabContent";
+import { ActasBasePathProvider } from "../ActasBasePathContext";
 
 interface ActasProjectPageProps {
   ctx: UserContext;
@@ -23,6 +24,13 @@ interface ActasProjectPageProps {
   activeTab: ActasProjectTab;
   /** ISO date YYYY-MM-DD for snapshot histórico (tab operativo). */
   asOfParam?: string;
+  /**
+   * Base de las URLs de actas de este proyecto. La sirve la ruta anidada
+   * /dashboard/pm/proyecto/<id>/actas para que toda la navegación interna
+   * (pestañas, permalinks, as-of) se quede dentro del proyecto. Sin ella se
+   * cae a la base por código, /dashboard/pm/actas/<code>.
+   */
+  basePath?: string;
 }
 
 export function ActasProjectPage({
@@ -30,6 +38,7 @@ export function ActasProjectPage({
   project,
   activeTab,
   asOfParam,
+  basePath,
 }: ActasProjectPageProps) {
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
@@ -38,69 +47,71 @@ export function ActasProjectPage({
   const canEditOwner = checkWriteAccess(ctx, "pm") === null;
 
   return (
-    <div className="flex flex-col gap-0">
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <ActasProjectHeader project={project} canEditOwner={canEditOwner} />
-        </div>
-        {validTab === "operativo" ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Suspense fallback={null}>
-              <ActasOperativoShowCompletedToggle />
-            </Suspense>
-            <Suspense fallback={null}>
-              <ActasOperativoAsOfPicker projectCode={project.code} />
-            </Suspense>
+    <ActasBasePathProvider basePath={basePath}>
+      <div className="flex flex-col gap-0">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <ActasProjectHeader project={project} canEditOwner={canEditOwner} />
           </div>
-        ) : null}
-      </div>
-      <ActasProjectSearch projectId={project.id} projectCode={project.code} />
+          {validTab === "operativo" ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Suspense fallback={null}>
+                <ActasOperativoShowCompletedToggle />
+              </Suspense>
+              <Suspense fallback={null}>
+                <ActasOperativoAsOfPicker projectCode={project.code} />
+              </Suspense>
+            </div>
+          ) : null}
+        </div>
+        <ActasProjectSearch projectId={project.id} projectCode={project.code} />
 
-      <div className="mt-4 flex flex-col">
-        <Suspense fallback={null}>
-          <ActasProjectTabs projectCode={project.code} />
-        </Suspense>
-        {validTab === "operativo" ? (
-          <Suspense
-            fallback={
-              <section className="rounded-b-lg border border-t-0 border-subtle/50 bg-card p-6 text-sm text-text-muted">
-                Cargando operativo…
-              </section>
-            }
-          >
-            <ActasOperativoTab
+        <div className="mt-4 flex flex-col">
+          <Suspense fallback={null}>
+            <ActasProjectTabs projectCode={project.code} />
+          </Suspense>
+          {validTab === "operativo" ? (
+            <Suspense
+              fallback={
+                <section className="rounded-b-lg border border-t-0 border-subtle/50 bg-card p-6 text-sm text-text-muted">
+                  Cargando operativo…
+                </section>
+              }
+            >
+              <ActasOperativoTab
+                ctx={ctx}
+                projectId={project.id}
+                projectCode={project.code}
+                asOfParam={asOfParam}
+              />
+            </Suspense>
+          ) : validTab === "completados" ? (
+            <ActasCompletadosTab
               ctx={ctx}
               projectId={project.id}
               projectCode={project.code}
-              asOfParam={asOfParam}
             />
-          </Suspense>
-        ) : validTab === "completados" ? (
-          <ActasCompletadosTab
-            ctx={ctx}
-            projectId={project.id}
-            projectCode={project.code}
-          />
-        ) : validTab === "acta" ? (
-          <Suspense
-            fallback={
-              <section className="bg-card rounded-b-lg border border-t-0 border-subtle/50 p-6 text-sm text-text-muted">
-                Cargando acta…
-              </section>
-            }
-          >
-            <ActasActaTab projectId={project.id} projectCode={project.code} />
-          </Suspense>
-        ) : validTab === "historico" ? (
-          <ActasHistoricoTabServer
-            ctx={ctx}
-            projectId={project.id}
-            projectCode={project.code}
-          />
-        ) : (
-          <ActasTabContent tab={validTab} projectCode={project.code} />
-        )}
+          ) : validTab === "acta" ? (
+            <Suspense
+              fallback={
+                <section className="bg-card rounded-b-lg border border-t-0 border-subtle/50 p-6 text-sm text-text-muted">
+                  Cargando acta…
+                </section>
+              }
+            >
+              <ActasActaTab projectId={project.id} projectCode={project.code} />
+            </Suspense>
+          ) : validTab === "historico" ? (
+            <ActasHistoricoTabServer
+              ctx={ctx}
+              projectId={project.id}
+              projectCode={project.code}
+            />
+          ) : (
+            <ActasTabContent tab={validTab} projectCode={project.code} />
+          )}
+        </div>
       </div>
-    </div>
+    </ActasBasePathProvider>
   );
 }

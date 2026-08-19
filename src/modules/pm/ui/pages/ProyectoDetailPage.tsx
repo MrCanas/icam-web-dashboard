@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PmDeviationTable } from "@/modules/pm/ui/PmDeviationTable";
 import { PmGanttProject } from "@/modules/pm/ui/PmGanttProject";
@@ -50,13 +49,20 @@ export default async function PmProyectoDetailPage({ params, searchParams }: Pag
   return (
     <div className="space-y-8 min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/dashboard/pm/overview" className="text-sm text-icam-900 underline">
-          ← Overview
-        </Link>
-        <h1 className="text-xl font-semibold text-text-primary">{row.activo.id_activo}</h1>
+        <h1 className="text-xl font-semibold text-text-primary">
+          {row.activo.id_activo}
+          {row.activo.nombre_display ? (
+            <span className="font-normal text-text-muted"> — {row.activo.nombre_display}</span>
+          ) : null}
+        </h1>
         <span className="text-xs px-2 py-1 rounded-full bg-subtle text-text-muted">
           {row.activo.tipo_uso_activo}
         </span>
+        {row.activo.archivado_at ? (
+          <span className="text-xs px-2 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+            Archivado
+          </span>
+        ) : null}
       </div>
 
       <section className="bg-card rounded-lg border border-subtle/50 p-4 space-y-4">

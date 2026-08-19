@@ -13,6 +13,7 @@ import { searchLogEntries } from "@/modules/pm/actas/actions/search-log-entries"
 import { actasProjectElementHistoricoPath } from "@/modules/pm/actas/logic/actas-paths";
 import { formatActaEntryDateTime } from "@/modules/pm/actas/logic/actas-time";
 import type { ActasLogSearchResult } from "@/modules/pm/actas/types";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 import { ActasSearchHeadline } from "./ActasSearchHeadline";
 
@@ -55,6 +56,7 @@ export function ActasProjectSearch({
   projectId,
   projectCode,
 }: ActasProjectSearchProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -140,11 +142,10 @@ export function ActasProjectSearch({
     setOpen(false);
     setQuery("");
     router.push(
-      actasProjectElementHistoricoPath(
-        projectCode,
-        result.elementId,
-        result.logEntryId,
-      ),
+      actasProjectElementHistoricoPath(projectCode, result.elementId, {
+        logEntryId: result.logEntryId,
+        basePath,
+      }),
     );
   };
 

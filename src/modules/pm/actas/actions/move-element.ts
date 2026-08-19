@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
 import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
 import {
   countDirectChildren,
   wouldCreateParentCycle,
 } from "@/modules/pm/actas/logic/element-move-validation";
+import { ACTAS_PROJECT_ROUTE_PATTERN } from "@/modules/pm/actas/logic/actas-paths";
 
 export type MoveElementInput = {
   projectId: string;
@@ -205,5 +205,6 @@ export async function moveElement(
   }
 
   revalidatePath(`/dashboard/pm/actas/${projectCode}`);
+  revalidatePath(ACTAS_PROJECT_ROUTE_PATTERN, "page");
   return { ok: true };
 }

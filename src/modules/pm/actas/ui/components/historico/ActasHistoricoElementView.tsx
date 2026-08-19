@@ -28,6 +28,7 @@ import type { ActasHistoricoElementDetail } from "@/modules/pm/actas/types";
 import { ActasOwnerAvatars } from "../operativo/ActasOwnerAvatars";
 import { ActasHistoryEntryItem } from "../operativo/ActasHistoryEntryItem";
 import { ActasHistoricoGapSeparator } from "./ActasHistoricoTimelineEntry";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasHistoricoElementViewProps {
   projectId: string;
@@ -46,6 +47,7 @@ export function ActasHistoricoElementView({
   isPmAdmin,
   hasWriteAccess,
 }: ActasHistoricoElementViewProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const [detail, setDetail] = useState<ActasHistoricoElementDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -148,11 +150,10 @@ export function ActasHistoricoElementView({
   };
 
   const handleShare = async () => {
-    const url = actasElementPermalinkUrl(
-      projectCode,
-      elementId,
-      typeof window !== "undefined" ? window.location.origin : undefined,
-    );
+    const url = actasElementPermalinkUrl(projectCode, elementId, {
+      origin: typeof window !== "undefined" ? window.location.origin : undefined,
+      basePath,
+    });
     try {
       await navigator.clipboard.writeText(url);
       setShareToast(true);
@@ -177,7 +178,7 @@ export function ActasHistoricoElementView({
           Este elemento no pertenece a este proyecto.
         </p>
         <Link
-          href={actasProjectHistoricoHubPath(projectCode)}
+          href={actasProjectHistoricoHubPath(projectCode, basePath)}
           className="mt-4 inline-flex min-h-10 items-center rounded-md bg-icam-900 px-4 text-sm font-medium text-white hover:bg-icam-800"
         >
           Volver al selector
@@ -209,14 +210,14 @@ export function ActasHistoricoElementView({
           aria-label="Breadcrumb"
         >
           <Link
-            href={actasProjectTabPath(projectCode, "operativo")}
+            href={actasProjectTabPath(projectCode, "operativo", { basePath })}
             className="hover:text-icam-900 hover:underline"
           >
             Proyecto {projectCode}
           </Link>
           <span aria-hidden>›</span>
           <Link
-            href={actasProjectTabPath(projectCode, "operativo")}
+            href={actasProjectTabPath(projectCode, "operativo", { basePath })}
             className="hover:text-icam-900 hover:underline"
           >
             {category.displayName}
@@ -277,7 +278,7 @@ export function ActasHistoricoElementView({
             <button
               type="button"
               onClick={() =>
-                router.push(actasProjectHistoricoHubPath(projectCode))
+                router.push(actasProjectHistoricoHubPath(projectCode, basePath))
               }
               className="min-h-10 rounded-md border border-subtle/60 px-3 text-sm text-text-primary hover:bg-page"
             >

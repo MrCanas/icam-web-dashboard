@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
+
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/currentUser";
+
+export const metadata: Metadata = { title: "Actas · Archivados" };
 import { fetchActasArchivedProjects } from "@/modules/pm/actas/data/actasRepository";
 import { ActasArchivedProjectsPage } from "@/modules/pm/actas/ui/pages/ActasArchivedProjectsPage";
 

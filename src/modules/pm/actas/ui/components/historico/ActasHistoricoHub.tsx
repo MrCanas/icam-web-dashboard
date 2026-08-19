@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getHistoricoElementOptions } from "@/modules/pm/actas/actions/get-historico-element";
 import { actasProjectElementHistoricoPath } from "@/modules/pm/actas/logic/actas-paths";
 import type { ActasHistoricoElementOption } from "@/modules/pm/actas/types";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasHistoricoHubProps {
   projectId: string;
@@ -21,6 +22,7 @@ export function ActasHistoricoHub({
   projectId,
   projectCode,
 }: ActasHistoricoHubProps) {
+  const basePath = useActasBasePath();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<ActasHistoricoElementOption[]>([]);
@@ -57,7 +59,7 @@ export function ActasHistoricoHub({
 
   const selectElement = (id: string) => {
     setOpen(false);
-    router.push(actasProjectElementHistoricoPath(projectCode, id));
+    router.push(actasProjectElementHistoricoPath(projectCode, id, { basePath }));
   };
 
   return (

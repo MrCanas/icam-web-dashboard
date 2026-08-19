@@ -9,7 +9,14 @@ interface ActasHubPageProps {
 
 export function ActasHubPage({ projects }: ActasHubPageProps) {
   if (!projects.length) {
-    return null;
+    return (
+      <section className="bg-card rounded-lg border border-subtle/50 p-6 h-full min-h-[240px] flex flex-col justify-center">
+        <p className="text-sm text-text-muted">
+          Todavía no hay proyectos de actas. Crea el primero desde la barra
+          lateral con «+ Nuevo proyecto».
+        </p>
+      </section>
+    );
   }
 
   const first = projects[0]!;

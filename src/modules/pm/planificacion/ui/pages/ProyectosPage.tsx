@@ -35,7 +35,7 @@ export default async function ProyectosPage() {
   return (
     <div className="min-w-0 space-y-6">
       <header className="rounded-lg border border-subtle/50 bg-card p-4 shadow-sm">
-        <h1 className="text-xl font-semibold text-text-primary">PM — Proyectos</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Mapeo maestro</h1>
         <p className="mt-1 text-sm text-text-muted">
           Alta y baja de proyectos, y equivalencia de nombres entre PM y el
           maestro financiero.

@@ -4,6 +4,11 @@ export interface ModuleRoute {
   label: string;
   /** When set, overrides default pathname matching for active nav state. */
   match?: (pathname: string) => boolean;
+  /**
+   * Oculta la ruta de la fila secundaria de DashboardNav sin sacarla del
+   * registry: URL directa, permisos y PermissionMatrix siguen funcionando.
+   */
+  hiddenInNav?: boolean;
 }
 
 export interface ModuleAction {

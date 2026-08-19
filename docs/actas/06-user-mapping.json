@@ -55,7 +55,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Cuenta viva de Alejandro Flecha en auth.users; 101372522 (@impargrupo.com) es su cuenta antigua de Monday, ya sin usuario."
     },
     {
       "monday_user_id": "63777492",
@@ -75,7 +75,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Sin cuenta en auth.users: el supabase_user_id de este mapa ya no existe (comprobado 2026-08-19). Cuenta antigua de Monday de Alejandro Flecha; la viva es 101836055 (alejandroflecha@imparcapital.com)."
     },
     {
       "monday_user_id": "64435059",
@@ -85,7 +85,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Sin cuenta en auth.users: el supabase_user_id de este mapa ya no existe (comprobado 2026-08-19)."
     },
     {
       "monday_user_id": "70812205",
@@ -170,7 +170,7 @@
     {
       "monday_user_id": "63778541",
       "monday_name": "Isabella París",
-      "monday_email": "isabellaparis@impargrupo.com",
+      "monday_email": "isabellaparis@imparcapital.com",
       "supabase_user_id": "0e9f9a42-16c3-43f5-861e-78e8448fcfa1",
       "mapped": true,
       "unmapped": false,
@@ -195,7 +195,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Sin cuenta en auth.users: el supabase_user_id de este mapa ya no existe (comprobado 2026-08-19)."
     },
     {
       "monday_user_id": "68771637",
@@ -225,7 +225,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Sin cuenta en auth.users: el supabase_user_id de este mapa ya no existe (comprobado 2026-08-19)."
     },
     {
       "monday_user_id": "97279646",
@@ -305,7 +305,7 @@
       "mapped": true,
       "unmapped": false,
       "match_method": "email",
-      "notes": null
+      "notes": "Sin cuenta en auth.users: el supabase_user_id de este mapa ya no existe (comprobado 2026-08-19)."
     },
     {
       "monday_user_id": "64386699",

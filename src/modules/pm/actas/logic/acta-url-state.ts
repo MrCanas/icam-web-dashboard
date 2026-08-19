@@ -97,6 +97,7 @@ export function authorIdsToKeys(ids: (string | null)[]): string[] {
 export function buildActaShareUrl(
   projectCode: string,
   state: ActasActaUrlState,
+  basePath?: string,
 ): string {
   const params = new URLSearchParams();
   params.set("tab", "acta");
@@ -112,5 +113,5 @@ export function buildActaShareUrl(
   if (state.onlyWithStatusChange) {
     params.set("statusOnly", "1");
   }
-  return `${actasProjectPath(projectCode)}?${params.toString()}`;
+  return `${actasProjectPath(projectCode, basePath)}?${params.toString()}`;
 }

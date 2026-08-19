@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 
@@ -147,20 +149,29 @@ export async function loadUserContext(
   };
 }
 
-/** SERVER: Server Components, route handlers, server actions. */
-export async function getCurrentUser(): Promise<UserContext | null> {
-  const userId = await verifiedUserIdFromServerCookies();
-  if (!userId) {
-    return null;
-  }
+/**
+ * SERVER: Server Components, route handlers, server actions.
+ *
+ * Memoizado por request con React cache(): un render de página lo invoca
+ * desde varios layouts/páginas y sin memo cada invocación repetía las 4
+ * consultas de identidad. Los llamadores comparten instancia de UserContext,
+ * que es de solo lectura por contrato — no mutar.
+ */
+export const getCurrentUser = cache(
+  async (): Promise<UserContext | null> => {
+    const userId = await verifiedUserIdFromServerCookies();
+    if (!userId) {
+      return null;
+    }
 
-  try {
-    return await loadUserContext(userId);
-  } catch (err) {
-    console.error("[auth] loadUserContext failed", err);
-    return null;
-  }
-}
+    try {
+      return await loadUserContext(userId);
+    } catch (err) {
+      console.error("[auth] loadUserContext failed", err);
+      return null;
+    }
+  },
+);
 
 /** SERVER: same identity as getCurrentUser but requires an active session. */
 export async function requireCurrentUser(): Promise<UserContext> {

@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ICAM Dashboard",
+  title: { default: "ICAM Dashboard", template: "%s · ICAM Dashboard" },
   description: "ICAM Asset Manager dashboard",
 };
 

@@ -1,7 +1,12 @@
+"use client";
+
+// Cliente solo para heredar la base de URLs de actas del proyecto (contexto).
+
 import Link from "next/link";
 
 import { actasProjectOperativoPath } from "@/modules/pm/actas/logic/actas-paths";
 import { formatAsOfDisplay } from "@/modules/pm/actas/logic/operativo-asof";
+import { useActasBasePath } from "@/modules/pm/actas/ui/ActasBasePathContext";
 
 interface ActasOperativoHistoricalBannerProps {
   projectCode: string;
@@ -12,6 +17,7 @@ export function ActasOperativoHistoricalBanner({
   projectCode,
   asOfDate,
 }: ActasOperativoHistoricalBannerProps) {
+  const basePath = useActasBasePath();
   return (
     <div
       role="status"
@@ -24,7 +30,7 @@ export function ActasOperativoHistoricalBanner({
         histórico, no editable.
       </p>
       <Link
-        href={actasProjectOperativoPath(projectCode)}
+        href={actasProjectOperativoPath(projectCode, { basePath })}
         className="shrink-0 rounded-md border border-amber-400/80 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100/80"
       >
         Volver al estado actual

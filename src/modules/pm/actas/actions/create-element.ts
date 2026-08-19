@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
 import { requireActasWriteSupabase } from "@/modules/pm/actas/data/writeClient";
 import { assertUniqueElementNameInCategory } from "@/modules/pm/actas/logic/element-name-validation";
+import { ACTAS_PROJECT_ROUTE_PATTERN } from "@/modules/pm/actas/logic/actas-paths";
 
 export type CreateElementInput = {
   categoryId: string;
@@ -157,6 +157,7 @@ export async function createElement(
       .maybeSingle();
     if (!codeErr && project?.code) {
       revalidatePath(`/dashboard/pm/actas/${project.code as string}`);
+      revalidatePath(ACTAS_PROJECT_ROUTE_PATTERN, "page");
     }
   }
 

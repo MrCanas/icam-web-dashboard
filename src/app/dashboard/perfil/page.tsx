@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth/currentUser";
 import { PerfilPasswordForm } from "@/modules/account/ui/PerfilPasswordForm";
 
 const ZONE_LABELS: Record<string, string> = {
-  financiero: "Financiero",
-  pm: "PM",
+  financiero: "Dashboard",
+  pm: "Proyectos",
   adquisiciones: "Adquisiciones",
   data: "Data",
 };

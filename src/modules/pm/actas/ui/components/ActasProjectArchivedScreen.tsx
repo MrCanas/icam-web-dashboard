@@ -25,10 +25,13 @@ function formatArchivedDate(iso: string): string {
 
 interface ActasProjectArchivedScreenProps {
   project: ActasArchivedProjectRef;
+  /** Panel del activo PM vinculado; añade «Volver al proyecto» a la botonera. */
+  backToProjectHref?: string;
 }
 
 export function ActasProjectArchivedScreen({
   project,
+  backToProjectHref,
 }: ActasProjectArchivedScreenProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +81,14 @@ export function ActasProjectArchivedScreen({
         >
           {pending ? "Restaurando…" : "Restaurar"}
         </button>
+        {backToProjectHref ? (
+          <Link
+            href={backToProjectHref}
+            className="min-h-10 inline-flex items-center rounded-md border border-subtle/60 px-4 text-sm font-medium text-text-primary hover:bg-page"
+          >
+            Volver al proyecto
+          </Link>
+        ) : null}
         <Link
           href={actasHubPath()}
           className="min-h-10 inline-flex items-center rounded-md border border-subtle/60 px-4 text-sm font-medium text-text-primary hover:bg-page"

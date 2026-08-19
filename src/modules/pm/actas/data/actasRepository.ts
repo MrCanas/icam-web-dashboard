@@ -69,6 +69,127 @@ export async function fetchActasProjects(
   return { projects, error: null };
 }
 
+export interface ActasLinkForPmActivo {
+  code: string;
+  archived: boolean;
+}
+
+/**
+ * Empareja códigos de los dos dominios ignorando mayúsculas y separadores:
+ * el activo PM «CSP-10» y el proyecto de Actas «CSP10» son el mismo proyecto.
+ * Igualdad exacta tras normalizar — nada de prefijos ni «contiene»: en el
+ * catálogo conviven SE84 y LSE84, que NO son el mismo.
+ */
+function normalizeCodeForMatch(code: string): string {
+  return code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/**
+ * Proyecto de Actas vinculado a un activo PM, incluyendo archivados:
+ * distinguir «sin actas» de «actas archivadas» evita invitar a crear un
+ * duplicado. Prioriza el proyecto no archivado si conviven varios.
+ *
+ * Dos vías, en este orden:
+ *  1. project.pm_activo_id — vínculo explícito, manda siempre.
+ *  2. código normalizado, y solo sobre proyectos SIN vínculo explícito, para
+ *     no robarle el proyecto a otro activo. Es la vía que sostiene hoy la
+ *     mayoría del catálogo: la columna del vínculo nunca se rellenó.
+ *
+ * Los códigos de ambos dominios NO tienen por qué coincidir: cuando no lo
+ * hacen ni siquiera normalizados (p. ej. PM «SA-33-31» ↦ Actas «SA31»), el
+ * único camino es el vínculo explícito.
+ */
+export async function fetchActasLinkForPmActivo(
+  ctx: UserContext,
+  idActivo: string,
+): Promise<ActasLinkForPmActivo | null> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: activo } = await supabase
+    .from("pm_activos")
+    .select("id")
+    .eq("id_activo", idActivo)
+    .maybeSingle();
+  if (!activo) return null;
+
+  const { data: projects } = await supabase
+    .from("project")
+    .select("code, archived_at, pm_activo_id")
+    .order("sort_order", { ascending: true });
+  if (!projects?.length) return null;
+
+  const explicitos = projects.filter((p) => p.pm_activo_id === activo.id);
+  const objetivo = normalizeCodeForMatch(idActivo);
+  const candidatos = explicitos.length
+    ? explicitos
+    : projects.filter(
+        (p) =>
+          p.pm_activo_id == null &&
+          normalizeCodeForMatch(p.code as string) === objetivo,
+      );
+  if (!candidatos.length) return null;
+
+  const vivo = candidatos.find((p) => !p.archived_at);
+  const elegido = vivo ?? candidatos[0]!;
+  return { code: elegido.code as string, archived: !vivo };
+}
+
+/** project.code del proyecto de Actas NO archivado vinculado al activo, o null. */
+export async function fetchActasCodeForPmActivo(
+  ctx: UserContext,
+  idActivo: string,
+): Promise<string | null> {
+  const link = await fetchActasLinkForPmActivo(ctx, idActivo);
+  return link && !link.archived ? link.code : null;
+}
+
+/**
+ * Inverso: pm_activos.id_activo del activo vinculado a un proyecto de Actas.
+ * Mismas dos vías y en el mismo orden que fetchActasLinkForPmActivo — si las
+ * dos direcciones no coincidieran, /pm/actas/<code> y /pm/proyecto/<id>/actas
+ * se redirigirían la una a la otra en bucle.
+ */
+export async function fetchPmActivoIdForActasProject(
+  ctx: UserContext,
+  projectCode: string,
+): Promise<string | null> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data: project } = await supabase
+    .from("project")
+    .select("pm_activo_id")
+    .eq("code", projectCode)
+    .maybeSingle();
+  if (!project) return null;
+
+  if (project.pm_activo_id) {
+    const { data: activo } = await supabase
+      .from("pm_activos")
+      .select("id_activo")
+      .eq("id", project.pm_activo_id)
+      .maybeSingle();
+    return (activo?.id_activo as string | undefined) ?? null;
+  }
+
+  const { data: activos } = await supabase
+    .from("pm_activos")
+    .select("id_activo")
+    .order("id_activo");
+  const objetivo = normalizeCodeForMatch(projectCode);
+  const match = (activos ?? []).find(
+    (a) => normalizeCodeForMatch(a.id_activo as string) === objetivo,
+  );
+  if (!match) return null;
+
+  // Solo devolvemos el activo si la ida coincide con la vuelta: si su acta
+  // resuelve a OTRO proyecto (p. ej. porque tiene uno vinculado explícitamente),
+  // redirigir aquí dejaría este proyecto inalcanzable en su propia URL.
+  const ida = await fetchActasLinkForPmActivo(ctx, match.id_activo as string);
+  if (ida?.code !== projectCode) return null;
+
+  return match.id_activo as string;
+}
+
 export interface FetchActasArchivedProjectsResult {
   projects: ActasArchivedProjectListItem[];
   error: string | null;
