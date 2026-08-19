@@ -69,17 +69,24 @@ function NestDropZone({ parentElementId }: { parentElementId: string }) {
   );
 }
 
-export function ActasOperativoSortableElement({
+export function ActasOperativoSortableElement(props: ActasOperativoSortableElementProps) {
+  const dnd = useOperativoDnd();
+
+  // Con el drag&drop desactivado no se monta el cuerpo que usa useSortable. La
+  // decisión es QUÉ componente renderizar, no si llamar un hook: así ningún hook
+  // queda detrás de un return condicional (antes rompía las reglas de hooks y
+  // podía tumbar el tablero al cambiar `enabled`).
+  if (!dnd?.enabled) {
+    return <>{props.children({ dragHandle: null, isDragging: false })}</>;
+  }
+  return <SortableElementBody {...props} />;
+}
+
+function SortableElementBody({
   elementId,
   showNestDropZone = false,
   children,
 }: ActasOperativoSortableElementProps) {
-  const dnd = useOperativoDnd();
-
-  if (!dnd?.enabled) {
-    return <>{children({ dragHandle: null, isDragging: false })}</>;
-  }
-
   const {
     attributes,
     listeners,

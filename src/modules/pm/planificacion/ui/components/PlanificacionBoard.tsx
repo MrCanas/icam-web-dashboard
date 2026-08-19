@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -468,9 +469,9 @@ export function PlanificacionBoard({
     return (
       <section className="rounded-lg border border-subtle/50 bg-card p-6 text-sm text-text-muted">
         No hay proyectos en PM.{" "}
-        <a href="/dashboard/pm/proyectos" className="text-icam-900 underline">
+        <Link href="/dashboard/pm/proyectos" className="text-icam-900 underline">
           Crea el primero
-        </a>
+        </Link>
         .
       </section>
     );
