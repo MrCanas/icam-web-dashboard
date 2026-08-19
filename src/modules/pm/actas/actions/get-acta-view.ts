@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import { fetchActasActaView } from "@/modules/pm/actas/data/actaRepository";
 import type {
   ActasActaQueryInput,
@@ -14,7 +14,9 @@ export type GetActaViewResult =
 export async function getActaView(
   input: ActasActaQueryInput,
 ): Promise<GetActaViewResult> {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   const { data, error } = await fetchActasActaView(ctx, input);
   if (error || !data) {
     return { ok: false, error: error ?? "No se pudo cargar el acta" };

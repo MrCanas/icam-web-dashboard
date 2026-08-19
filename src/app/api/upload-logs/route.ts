@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { readAccessResponse } from "@/lib/auth/api-guard";
 import { listUploadLogs } from "@/modules/portfolio/data/uploadLogsRepository";
 
 export async function GET(request: NextRequest) {
@@ -8,6 +9,8 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = readAccessResponse(user, "financiero");
+  if (denied) return denied;
 
   try {
     const { data, error } = await listUploadLogs(user, 200);

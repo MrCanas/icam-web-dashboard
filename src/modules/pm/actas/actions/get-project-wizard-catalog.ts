@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import {
   fetchMasterModulesWithCounts,
   fetchTemplatePreviewCounts,
@@ -17,7 +17,9 @@ export type ProjectWizardCatalogResult =
   | { ok: false; error: string };
 
 export async function getProjectWizardCatalog(): Promise<ProjectWizardCatalogResult> {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   try {
     const modules = await fetchMasterModulesWithCounts(ctx);
     const corePreview = await fetchTemplatePreviewCounts(ctx, []);
@@ -41,7 +43,9 @@ export async function getProjectWizardPreview(
   | { ok: true; preview: TemplatePreviewCounts }
   | { ok: false; error: string }
 > {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   try {
     const preview = await fetchTemplatePreviewCounts(ctx, selectedModuleIds);
     return { ok: true, preview };

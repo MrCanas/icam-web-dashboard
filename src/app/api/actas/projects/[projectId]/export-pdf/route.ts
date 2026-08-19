@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { readAccessResponse } from "@/lib/auth/api-guard";
 import { fetchActasActaView } from "@/modules/pm/actas/data/actaRepository";
 import { getActasReadSupabase } from "@/modules/pm/actas/data/readClient";
 import {
@@ -53,6 +54,8 @@ export async function POST(request: Request, context: RouteContext) {
   if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = readAccessResponse(ctx, "pm");
+  if (denied) return denied;
 
   const { projectId } = await context.params;
   const id = projectId?.trim();

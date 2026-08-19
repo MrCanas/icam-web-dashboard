@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 
 export type UpdateElementTimelineInput = {
@@ -28,7 +29,11 @@ function normalizeDate(value: string | null): string | null {
 export async function updateElementTimeline(
   input: UpdateElementTimelineInput,
 ): Promise<UpdateElementTimelineResult> {
-  await requireCurrentUser();
+  // Es una escritura: exige permiso de escritura en PM, no solo sesión. Sin
+  // esto, un rol `lector` podía mover las fechas de cualquier elemento.
+  const user = await requireCurrentUser();
+  const denied = checkWriteAccess(user, "pm");
+  if (denied) return { ok: false, error: denied };
 
   const elementId = input.elementId.trim();
   if (!elementId) {

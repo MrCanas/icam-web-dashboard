@@ -22,6 +22,8 @@ export async function markSeen(id: string): Promise<MarkSeenResult> {
       seen_at: now,
     })
     .eq("id", notificationId)
+    // Solo el destinatario puede tocar su notificación (evita IDOR):
+    .eq("recipient_user_id", ctx.authUserId)
     .select("id")
     .maybeSingle();
 

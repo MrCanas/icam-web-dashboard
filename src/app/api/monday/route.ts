@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { readAccessResponse } from "@/lib/auth/api-guard";
 import { MondayApiError } from "@/modules/monday/data/client";
 import { getMondayBoardColumns, getMondayBoardItems, getMondayBoards, getMondayMe } from "@/modules/monday/data/read";
 
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = readAccessResponse(user, "adquisiciones");
+  if (denied) return denied;
 
   const scope = parseScope(request.nextUrl.searchParams.get("scope"));
   const boardId = request.nextUrl.searchParams.get("boardId");

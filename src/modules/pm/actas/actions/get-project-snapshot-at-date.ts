@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import {
   fetchProjectCreatedAt,
   fetchProjectSnapshotAtDate,
@@ -26,7 +26,9 @@ export type GetProjectSnapshotResult =
 export async function getProjectSnapshotAtDate(
   input: GetProjectSnapshotInput,
 ): Promise<GetProjectSnapshotResult> {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   const iso = parseAsOfDateParam(input.asOfDate);
   if (!iso) {
     return { ok: false, error: "Fecha no válida" };

@@ -1,7 +1,7 @@
 "use server";
 
 import { createServiceRoleClient } from "@/lib/db/admin";
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 
 import { ACTAS_ATTACHMENT_BUCKET, type ActasAttachmentItem } from "../types";
@@ -18,7 +18,8 @@ export async function listAttachments(
   const id = elementId.trim();
   if (!id) return { ok: false, error: "elementId requerido" };
 
-  await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
 
   const { client, error: clientError } = await getActasAuthenticatedSupabase();
   if (!client) {

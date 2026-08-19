@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserFromRequest } from "@/lib/auth/currentUser";
+import { readAccessResponse } from "@/lib/auth/api-guard";
 import { fetchElementLogEntries } from "@/modules/pm/actas/data/actasRepository";
 
 interface RouteContext {
@@ -14,6 +15,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const denied = readAccessResponse(ctx, "pm");
+  if (denied) return denied;
 
   const { elementId } = await context.params;
   const id = elementId?.trim();

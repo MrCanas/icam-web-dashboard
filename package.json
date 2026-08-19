@@ -41,6 +41,8 @@
     "pm:apply-migraciones-024-026": "tsx scripts/pm/apply-migraciones-024-026.ts",
     "pm:apply-migration-028": "tsx scripts/pm/apply-migration-028.ts",
     "pm:apply-migration-029": "tsx scripts/pm/apply-migration-029.ts",
+    "pm:apply-migration-030": "tsx scripts/pm/apply-migration-030.ts",
+    "pm:apply-migration-031": "tsx scripts/pm/apply-migration-031.ts",
     "pm:seed-avance-obra": "tsx scripts/pm/seed-avance-obra.ts",
     "pm:zoho-auth": "tsx scripts/pm/zoho-auth.ts",
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",

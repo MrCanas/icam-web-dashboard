@@ -18,7 +18,9 @@ export async function deleteNotification(
   const { error, count } = await ctx.client
     .from("element_notification")
     .delete({ count: "exact" })
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    // Solo el destinatario puede borrar su notificación (evita IDOR):
+    .eq("recipient_user_id", ctx.authUserId);
 
   if (error) {
     return { ok: false, error: error.message };

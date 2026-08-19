@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-
-import { getCurrentUser } from "@/lib/auth/currentUser";
 import { getUserRole } from "@/lib/auth/permissions";
+import { requireRouteAccess } from "@/lib/auth/require-route-access";
 import {
   fetchActasArchivedProjectsCount,
   fetchActasProjects,
@@ -15,10 +13,9 @@ export default async function ActasLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const ctx = await getCurrentUser();
-  if (!ctx) {
-    redirect("/login");
-  }
+  // Corte de servidor ANTES de consultar nada: la versión anterior solo miraba
+  // la sesión y ya había pedido los proyectos cuando el guard cliente redirigía.
+  const ctx = await requireRouteAccess("pm.actas");
 
   const [{ projects, error }, { count: archivedCount }] = await Promise.all([
     fetchActasProjects(ctx),

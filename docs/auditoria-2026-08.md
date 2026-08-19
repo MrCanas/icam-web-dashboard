@@ -26,7 +26,7 @@ Estados: `pendiente` · `en fase N` · `hecho (commit)` · `aceptado` (riesgo as
 
 ## 1. Seguridad
 
-### 1.1 `temp_allow_all` — lectura y escritura anónima · **CRÍTICA** · `en fase 1`
+### 1.1 `temp_allow_all` — lectura y escritura anónima · **CRÍTICA** · `migración 030 lista (pendiente --apply)`
 
 `20260521100000_enable_rls_temp_allow_all.sql:33` crea `FOR ALL USING (true) WITH CHECK (true)` — sin `TO`, aplica a **todos** los roles incluido `anon` — en 8 tablas: `proyectos`, `upload_logs`, `pm_activos`, `pm_hitos`, `pm_snapshot_fechas`, `pm_activo_proyecto_map`, `pm_import_logs`, `monday_sync_logs`. Y `20260521110000_audit_log.sql:26` lo mismo en `audit_log`.
 
@@ -34,26 +34,26 @@ La única migración que las elimina (`005_rls.sql:136-155`) solo cubre tablas d
 
 Lo que sí está bien cerrado: `app_user_password`, `app_user_account`, `app_user_zone_role`, `app_user_route_deny`, `app_zone` (solo `service_role`).
 
-### 1.2 `SELECT TO public` deliberado en 12 tablas PM/avance · **MEDIA** · `en fase 1`
+### 1.2 `SELECT TO public` deliberado en 12 tablas PM/avance · **MEDIA** · `migración 030 lista (pendiente --apply)`
 
 `pm_hito_catalogo`, `pm_snapshots`, `pm_activo_snapshot`, `maestro_lineas_trimestre`, `maestro_hito_fechas`, `pm_snapshot_validacion` y las 6 tablas de avance de obra (028): cronograma completo, promociones de Zoho y porcentajes legibles con la anon key. Pasarán a `TO authenticated` (el navegador ya lee con el bridge JWT).
 
-### 1.3 Rutas sin guarda de servidor · **ALTA** · `en fase 1`
+### 1.3 Rutas sin guarda de servidor · **ALTA** · `hecho`
 
 `requireRouteAccess` falta en: `/dashboard/pm/planificacion`, `/dashboard/pm/proyectos`, `/dashboard/pm/proyecto/[id]` (Resumen), `/dashboard/monday/logs` (sin guard alguno: `LogsPage.tsx:41-45` consulta Monday antes de mirar `ctx`) y el layout del hub de actas. Solo las protege `DashboardZoneGuard`, que es **cliente**: el HTML con los datos ya viajó. Además `/dashboard/monday/logs` no tiene `ModuleRoute` → `routeKeyForPathname` devuelve `null` y hereda el permiso de zona.
 
-### 1.4 Escritura con rol `lector` · **ALTA** · `en fase 1`
+### 1.4 Escritura con rol `lector` · **ALTA** · `hecho`
 
 `pm/actas/actions/update-element-timeline.ts:31` solo llama `requireCurrentUser()`; hace `UPDATE element SET timeline_start/end` sin `checkWriteAccess(user, "pm")`.
 
-### 1.5 Login sin freno + oráculo de enumeración · **ALTA** · `en fase 1`
+### 1.5 Login sin freno + oráculo de enumeración · **ALTA** · `hecho (rate limit + migración 032 lista)`
 
 - Cero rate limiting en `POST /api/auth/login` (fuerza bruta ilimitada contra bcrypt coste 10).
 - `resolveAuthUserIdByEmail` (`src/lib/auth/resolve-auth-user.ts:18-30`) pagina `auth.admin.listUsers` **entero** buscando el email: tiempo distinto para email existente vs inexistente (enumeración) y coste fijo caro por intento.
 - `GET /api/auth/logout` existe → logout CSRF-able con un `<img>`.
 - Logout no invalida el token en servidor: uno robado vale los 7 días. `baja`.
 
-### 1.6 Lecturas sin comprobación de zona · **MEDIA** · `en fase 1`
+### 1.6 Lecturas sin comprobación de zona · **MEDIA** · `hecho`
 
 Con el matiz de que los reads de servidor usan **service role** (RLS no es segunda barrera, §1.7):
 
@@ -73,7 +73,7 @@ Con el matiz de que los reads de servidor usan **service role** (RLS no es segun
 
 ## 2. Integridad de datos
 
-### 2.1 `replace_pm_portfolio` destruye los mapeos manuales · **CRÍTICA** · `en fase 1`
+### 2.1 `replace_pm_portfolio` destruye los mapeos manuales · **CRÍTICA** · `migración 031 lista (pendiente --apply)`
 
 `scripts/supabase/replace_pm_portfolio.sql:25-27`: `DELETE FROM pm_activos` + reinsert con **UUIDs nuevos**. Cada subida del Excel PM (`/api/upload-pm-excel?confirm=true`) borra en cascada:
 
@@ -185,7 +185,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 ## 6. Operaciones
 
-- **Cron de notificaciones de actas nunca programado**: el endpoint existe, `vercel.json` no lo invoca. Los emails de actas solo salen a mano. · **MEDIA** · `en fase 1`
+- **Cron de notificaciones de actas nunca programado**: el endpoint existe, `vercel.json` no lo invoca. Los emails de actas solo salen a mano. · **MEDIA** · `hecho`
 - Cron portfolio-sync: si falta `CRON_SECRET` devuelve 401 en silencio; fallos de SharePoint solo dejan traza en `upload_logs`, sin alerta. Doble entrada en `vercel.json` es un truco DST correcto y documentado. · `baja`
 - `audit_log` no registra login/logout, cambios de contraseña ni acciones de admin — justo lo que más importa auditar. · **MEDIA** · `pendiente`
 - Backups: sin documentar; dependencia implícita del plan de Supabase. · `baja` · `pendiente`
@@ -222,7 +222,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 | Fase | Rama | Contenido | Estado |
 |---|---|---|---|
 | 0 | `auditoria-2026-08` | Este informe + artefacto ejecutivo | **hecho** |
-| 1 | `saneamiento-1-seguridad` | Migración 030 (cerrar RLS), 031 (replace_pm_portfolio no destructivo), guardas de servidor, rate limit + lookup directo de login, IDOR notificaciones, cron actas en vercel.json | pendiente |
+| 1 | `auditoria-2026-08` | Migraciones 030/031/032 (código listo, `--apply` pendiente), guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **código hecho** |
 | 2 | `saneamiento-2-ci` | Bugs reales de lint, `error.tsx`, tests de RBAC/registry/actas-paths, GitHub Actions (tsc+lint+tests), `npm test`/`npm run check`, sacar `pg.ts` de scripts | pendiente |
 | 3 | `saneamiento-3-rendimiento` | user-display con lookup+caché, proyecciones SQL en pmRepository/planificación, fix subconsulta inválida, bulk en lote, `loading.tsx`, recharts dinámico, medición antes/después | pendiente |
 | 4 | `saneamiento-4-deuda` | Borrado con lista firmada, useToast/ErrorSection/formatters/ActionResult, README+ARCHITECTURE reales, `lang="es"`, `.gitattributes`, text-muted AA, `set-state-in-effect` | pendiente |
