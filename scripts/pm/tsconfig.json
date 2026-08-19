@@ -1,0 +1,7 @@
+{
+  "//": "tsconfig.json de la raíz EXCLUYE scripts/, así que `npx tsc` no mira nada de aquí. Sin esto, un fallo de sintaxis en un script solo se descubre ejecutándolo — ya pasó una vez. Alcance: solo scripts/pm, porque scripts/actas arrastra errores previos.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

@@ -162,6 +162,32 @@ export async function listarModulos(cfg?: ZohoConfig): Promise<ZohoModulo[]> {
   return r.modules ?? [];
 }
 
+export interface ZohoUsuario {
+  id: string;
+  full_name: string;
+  email: string;
+  profile?: { name?: string };
+  role?: { name?: string };
+  status?: string;
+}
+
+/**
+ * A qué usuario de Zoho pertenece el token.
+ *
+ * Importa más de lo que parece: el token hereda SUS permisos. Si ese usuario no
+ * puede editar el módulo o alguno de los campos de avance, el botón «Subir a
+ * Zoho» fallará con un error de permisos por mucho que el scope OAuth sea el
+ * correcto. Saber quién es de entrada ahorra el diagnóstico.
+ */
+export async function usuarioActual(cfg?: ZohoConfig): Promise<ZohoUsuario | null> {
+  const r = await zohoJson<{ users?: ZohoUsuario[] }>(
+    "/users?type=CurrentUser",
+    undefined,
+    cfg,
+  );
+  return r.users?.[0] ?? null;
+}
+
 export interface ZohoCampo {
   api_name: string;
   field_label: string;

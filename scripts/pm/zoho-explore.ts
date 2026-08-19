@@ -17,6 +17,7 @@ import {
   getZohoConfig,
   listarCampos,
   listarModulos,
+  usuarioActual,
   zohoVariablesQueFaltan,
   type ZohoCampo,
 } from "../../src/modules/pm/avance/data/zohoClient";
@@ -48,8 +49,7 @@ function tabla(campos: ZohoCampo[]): void {
         `${c.field_label.padEnd(anchoLbl)}  ${c.data_type}`,
     );
   }
-  console.log("
-  ✎ = escribible por API · · = solo lectura (fórmula, resumen o permisos)");
+  console.log("\n  ✎ = escribible por API  ·  · = solo lectura (fórmula, resumen o permisos)");
 }
 
 async function main(): Promise<void> {
@@ -128,13 +128,9 @@ async function main(): Promise<void> {
   // permiso de edición rechaza la escritura por mucho scope OAuth que haya.
   if (noEscribibles.length > 0) {
     console.log(
-      `
-⚠ ${noEscribibles.length} campo(s) NO se pueden escribir por API: ${noEscribibles.join(", ")}.
-` +
-        "  Si es data_type=formula, Zoho lo calcula y no admite escritura: hay que decidir si se
-" +
-        "  deja fuera del envío. Si es por permisos, el usuario que generó el token necesita
-" +
+      `\n⚠ ${noEscribibles.length} campo(s) NO se pueden escribir por API: ${noEscribibles.join(", ")}.\n` +
+        "  Si es data_type=formula, Zoho lo calcula y no admite escritura: hay que decidir si se\n" +
+        "  deja fuera del envío. Si es por permisos, el usuario que generó el token necesita\n" +
         "  edición sobre ese campo en su perfil y en el diseño de página.",
     );
   }

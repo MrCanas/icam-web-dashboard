@@ -42,6 +42,7 @@
     "pm:apply-migration-028": "tsx scripts/pm/apply-migration-028.ts",
     "pm:seed-avance-obra": "tsx scripts/pm/seed-avance-obra.ts",
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",
+    "pm:check-scripts": "tsc --noEmit -p scripts/pm/tsconfig.json",
     "pm:test": "tsx --test \"src/modules/pm/**/__tests__/*.test.ts\" \"src/modules/portfolio/logic/__tests__/*.test.ts\"",
     "portfolio:check-sharepoint": "tsx scripts/portfolio/check-sharepoint.ts",
     "portfolio:sync-maestro": "tsx scripts/portfolio/sync-local-maestro.ts",
