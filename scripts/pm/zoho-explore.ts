@@ -12,6 +12,7 @@
  */
 import { loadActasEnv } from "../actas/lib/env";
 import {
+  esCampoEscribible,
   fetchTodosLosRegistros,
   getZohoConfig,
   listarCampos,
@@ -39,13 +40,16 @@ function tabla(campos: ZohoCampo[]): void {
   const anchoApi = Math.max(8, ...campos.map((c) => c.api_name.length));
   const anchoLbl = Math.max(9, ...campos.map((c) => c.field_label.length));
   console.log(
-    `  ${"api_name".padEnd(anchoApi)}  ${"etiqueta".padEnd(anchoLbl)}  tipo`,
+    `  esc  ${"api_name".padEnd(anchoApi)}  ${"etiqueta".padEnd(anchoLbl)}  tipo`,
   );
   for (const c of campos) {
     console.log(
-      `  ${c.api_name.padEnd(anchoApi)}  ${c.field_label.padEnd(anchoLbl)}  ${c.data_type}`,
+      `  ${esCampoEscribible(c) ? " ✎ " : " · "}  ${c.api_name.padEnd(anchoApi)}  ` +
+        `${c.field_label.padEnd(anchoLbl)}  ${c.data_type}`,
     );
   }
+  console.log("
+  ✎ = escribible por API · · = solo lectura (fórmula, resumen o permisos)");
 }
 
 async function main(): Promise<void> {
@@ -102,6 +106,7 @@ async function main(): Promise<void> {
 
   console.log("\n\nMapeo propuesto contra pm_avance_fase_catalogo:\n");
   const sinResolver: string[] = [];
+  const noEscribibles: string[] = [];
   for (const [nuestro, patron] of Object.entries(PISTAS)) {
     const posibles = campos.filter(
       (c) => patron.test(c.field_label) || patron.test(c.api_name),
@@ -112,10 +117,26 @@ async function main(): Promise<void> {
     } else {
       console.log(
         `  ${posibles.length === 1 ? "✓" : "?"} ${nuestro.padEnd(46)} → ${posibles
-          .map((p) => `${p.api_name} (${p.data_type})`)
+          .map((p) => `${p.api_name} (${p.data_type}${esCampoEscribible(p) ? ", escribible" : ", SOLO LECTURA"})`)
           .join("  |  ")}`,
       );
+      if (posibles.length === 1 && !esCampoEscribible(posibles[0])) noEscribibles.push(nuestro);
     }
+  }
+
+  // Lo que de verdad bloquea el botón «Subir a Zoho»: un campo de fórmula o sin
+  // permiso de edición rechaza la escritura por mucho scope OAuth que haya.
+  if (noEscribibles.length > 0) {
+    console.log(
+      `
+⚠ ${noEscribibles.length} campo(s) NO se pueden escribir por API: ${noEscribibles.join(", ")}.
+` +
+        "  Si es data_type=formula, Zoho lo calcula y no admite escritura: hay que decidir si se
+" +
+        "  deja fuera del envío. Si es por permisos, el usuario que generó el token necesita
+" +
+        "  edición sobre ese campo en su perfil y en el diseño de página.",
+    );
   }
 
   // La tipología es el motivo de todo esto: si es un desplegable, ver sus

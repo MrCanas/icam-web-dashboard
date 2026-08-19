@@ -6,6 +6,7 @@ import { fetchAvanceHubData } from "@/modules/pm/avance/data/avanceRepository";
 import { zohoVariablesQueFaltan } from "@/modules/pm/avance/data/zohoClient";
 import { avanceObraExportPath, avanceObraProyectoPath } from "@/modules/pm/avance/logic/avance-paths";
 import { fmtPorcentaje } from "@/modules/pm/avance/logic/avance-obra";
+import { EnviarAZohoButton } from "@/modules/pm/avance/ui/components/EnviarAZohoButton";
 import { ZohoOutboxTable } from "@/modules/pm/avance/ui/components/ZohoOutboxTable";
 
 export default async function AvanceObraHubPage() {
@@ -49,10 +50,16 @@ export default async function AvanceObraHubPage() {
         </p>
         <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs leading-snug text-amber-800">
           <span className="font-medium">Nada se envía a Zoho automáticamente.</span> Lo que se
-          edita en el portal queda aquí hasta que un administrador lo aprueba; después se descarga
-          y se sube a Zoho a mano.
+          edita en el portal queda aquí hasta que un administrador lo aprueba, y sale hacia Zoho
+          solo cuando alguien pulsa «Subir a Zoho». No hay ningún proceso que escriba por su
+          cuenta.
           {faltanVariables.length > 0 ? (
-            <> La integración por API no está configurada (faltan {faltanVariables.join(", ")}).</>
+            <>
+              {" "}
+              La conexión por API todavía no está configurada (faltan{" "}
+              {faltanVariables.join(", ")}), así que de momento se descarga el CSV y se sube desde
+              Zoho.
+            </>
           ) : null}
         </p>
       </header>
@@ -88,6 +95,12 @@ export default async function AvanceObraHubPage() {
             </span>
           ) : null}
         </div>
+
+        <EnviarAZohoButton
+          pendientes={aprobados.length}
+          isAdmin={isAdmin}
+          faltanVariables={faltanVariables}
+        />
         <ZohoOutboxTable filas={aprobados} modo="aprobado" isAdmin={isAdmin} />
       </section>
 

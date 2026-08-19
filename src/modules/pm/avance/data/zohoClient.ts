@@ -166,8 +166,25 @@ export interface ZohoCampo {
   api_name: string;
   field_label: string;
   data_type: string;
+  /** El campo es de sistema y no se puede escribir nunca. */
+  read_only?: boolean;
+  /** El campo es de solo lectura para ESTE usuario (permisos de perfil/diseño). */
+  field_read_only?: boolean;
   /** Valores admitidos en desplegables (tipología, situación…). */
   pick_list_values?: { display_value: string; actual_value: string }[];
+}
+
+/**
+ * ¿Se puede escribir este campo por API?
+ *
+ * El scope OAuth es necesario pero no suficiente: un campo de fórmula o de
+ * resumen lo calcula Zoho y rechaza la escritura, y `field_read_only` refleja
+ * los permisos del usuario que generó el token. Vale la pena saberlo ANTES de
+ * cablear el botón y no cuando devuelva un error opaco.
+ */
+export function esCampoEscribible(c: ZohoCampo): boolean {
+  if (c.read_only || c.field_read_only) return false;
+  return !["formula", "rollup_summary", "autonumber"].includes(c.data_type);
 }
 
 export async function listarCampos(modulo: string, cfg?: ZohoConfig): Promise<ZohoCampo[]> {

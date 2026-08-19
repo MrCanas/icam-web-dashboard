@@ -188,23 +188,38 @@ export function construirFilasCsvZoho(cambios: readonly CambioAprobado[]): FilaC
 /** Marca que hace imposible enviar por API un campo cuyo nombre no conocemos. */
 export const API_NAME_PENDIENTE = "__API_NAME_PENDIENTE__";
 
+export interface CuerpoBulkUpdateZoho {
+  /** Un objeto por registro: `id` más una clave por campo a escribir. */
+  data: Record<string, string | number | null>[];
+  /** Vacío: esto corrige un dato, no dispara automatismos del CRM. */
+  trigger: string[];
+}
+
 /**
- * Cuerpo de un bulk update de Zoho CRM: `[{ id, data: { <api_name>: valor } }]`.
+ * Cuerpo de un `PUT /crm/v8/<Módulo>` de Zoho CRM.
+ *
+ * Es literalmente lo que envía `pushAvance`, para que el fichero descargado y
+ * el botón hagan exactamente lo mismo: `{ data: [{ id, Campo: valor }] }`, con
+ * los campos al nivel del registro (no anidados bajo `data`, que es el error
+ * fácil de cometer leyendo la documentación por encima).
  *
  * Donde falta `zoho_api_name` se emite una clave marcada en vez de inventarse
  * un nombre: así el fichero no se puede subir «sin querer» creyendo que vale.
  */
 export function construirJsonZoho(
   cambios: readonly CambioAprobado[],
-): { id: string; data: Record<string, number | null> }[] {
+): CuerpoBulkUpdateZoho {
   const porPromocion = new Map<string, Record<string, number | null>>();
   for (const c of cambios) {
-    const data = porPromocion.get(c.zohoRecordId) ?? {};
+    const campos = porPromocion.get(c.zohoRecordId) ?? {};
     const clave = c.zohoApiName ?? `${API_NAME_PENDIENTE}${c.faseNombre}`;
-    data[clave] = c.porcentajeNuevo;
-    porPromocion.set(c.zohoRecordId, data);
+    campos[clave] = c.porcentajeNuevo;
+    porPromocion.set(c.zohoRecordId, campos);
   }
-  return [...porPromocion.entries()].map(([id, data]) => ({ id, data }));
+  return {
+    data: [...porPromocion.entries()].map(([id, campos]) => ({ id, ...campos })),
+    trigger: [],
+  };
 }
 
 /** Serializa a CSV con las cabeceras literales de Zoho. */

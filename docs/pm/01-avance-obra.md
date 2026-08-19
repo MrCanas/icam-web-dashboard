@@ -66,8 +66,13 @@ el valor vigente, una fila de histórico y una entrada en la bandeja de salida.
 **Nada se envía a Zoho automáticamente.** El flujo es:
 
 ```
-editar → pendiente → (admin de PM) aprobado → descargar CSV/JSON → subir a Zoho → marcar enviado
+editar → pendiente → (admin de PM) aprobado → «Subir a Zoho» → enviado
 ```
+
+Con la conexión configurada, el botón **Subir a Zoho** del hub escribe los cambios aprobados en
+el CRM. Sin ella, el mismo flujo se cierra a mano descargando el CSV/JSON y subiéndolo desde
+Zoho («Marcar como enviado»). La escritura la dispara siempre una persona: no hay cron, ni
+webhook, ni escritura al editar.
 
 - La bandeja es **estado deseado** por (promoción, fase), no un log: editar tres veces la misma
   celda deja una sola entrada que aprobar, y volver al valor de Zoho la borra sola.
@@ -77,6 +82,13 @@ editar → pendiente → (admin de PM) aprobado → descargar CSV/JSON → subir
 - El endpoint de descarga (`/api/pm/avance-obra/export`) es un `GET` y **no muta nada**: cerrar
   el cambio es un botón aparte. Un GET que cambia estado se dispararía solo con el prefetch del
   navegador.
+- El JSON de descarga es **el cuerpo exacto** del `PUT` que manda el botón, para que el camino
+  manual y el automático hagan lo mismo: `{"data":[{"id":"…","Campo":valor}],"trigger":[]}`,
+  con los campos al nivel del registro.
+- Si Zoho acepta unos registros y rechaza otros (responde 207), solo se marcan como enviados los
+  que llegaron; los demás **se quedan en «aprobado»** con el error guardado, para poder
+  reintentar sin volver a aprobarlos.
+- Solo viajan las fases con cambio aprobado. El resto de campos de la promoción no se tocan.
 
 ## Conectar la API de Zoho
 
@@ -96,8 +108,9 @@ Después, pestaña **Generate Code**:
 - Duración: 10 minutos
 - Copia el **grant code** que sale (caduca enseguida)
 
-`settings.READ` es lo que permite el autodescubrimiento de campos; `modules.ALL` da lectura de
-promociones y la escritura de los cambios aprobados.
+**`ZohoCRM.modules.ALL` ya incluye la escritura.** El `ALL` son las operaciones (leer, crear,
+actualizar, borrar), no «todos los módulos en solo lectura»: con ese scope el botón «Subir a
+Zoho» funciona. `settings.READ` es lo que permite el autodescubrimiento de módulo y campos.
 
 ### 2. Canjear el código por un refresh token
 
@@ -141,12 +154,43 @@ Solo lee; no escribe nada ni en Zoho ni en la base. `--campos` propone el mapeo 
 `pm_avance_fase_catalogo` y, si «Tipología» es un desplegable, lista sus valores — que es
 justo lo que dirá si el export de Excel venía filtrado.
 
-### 5. Lo que queda después
+### 5. Rellenar los nombres API de los campos
 
-Con el mapeo confirmado se rellena `pm_avance_fase_catalogo.zoho_api_name` y se puede
-sincronizar de verdad. La escritura (`pushAvance`) **no la invoca ningún cron ni ninguna ruta
-automática**: solo la acción que procesa cambios ya aprobados. Envía con `trigger: []` para no
-encadenar workflows del CRM: esto es una corrección de dato, no un evento de negocio.
+Con el mapeo del paso 4 confirmado, se escribe en `pm_avance_fase_catalogo.zoho_api_name` el
+`api_name` de cada fase. Hasta entonces el botón «Subir a Zoho» **se niega a enviar** y dice qué
+fases le faltan: adivinar un nombre escribiría en el campo equivocado del CRM.
+
+A partir de ahí el botón funciona. La escritura (`pushAvance`) no la invoca ningún cron ni
+ninguna ruta automática: solo la acción del botón, y solo sobre cambios ya aprobados. Envía con
+`trigger: []` para no encadenar workflows del CRM — esto es una corrección de dato, no un evento
+de negocio.
+
+### Alternativa recomendada: mínimo privilegio
+
+`modules.ALL` concede también **borrado** y acceso a **todos** los módulos del CRM, y aquí solo
+hace falta leer y actualizar Promociones. Una vez que el paso 4 diga el nombre API del módulo,
+merece la pena regenerar el token con:
+
+```
+ZohoCRM.settings.modules.READ,ZohoCRM.settings.fields.READ,ZohoCRM.modules.<Modulo>.READ,ZohoCRM.modules.<Modulo>.UPDATE
+```
+
+Sin `CREATE` ni `DELETE`: el portal nunca crea ni borra promociones, solo corrige porcentajes.
+Es el mismo trámite (Generate Code → canjear) y el token viejo se puede revocar.
+
+### El scope no es lo único que puede bloquear la escritura
+
+Dos cosas más tienen que cumplirse, y ninguna se arregla con permisos de OAuth:
+
+1. **El usuario que generó el Self Client** necesita permiso de edición sobre el módulo y sobre
+   esos campos, en su perfil y en el diseño de página. Si el campo es de solo lectura para él,
+   la API devuelve un error de permisos aunque el scope sea correcto.
+2. **Los campos de fórmula o de resumen no se pueden escribir.** Zoho los calcula. Si «Avance
+   general» resultara ser una fórmula, habría que dejarlo fuera del envío y mandar solo las 6
+   fases.
+
+`npm run pm:zoho-explore -- --campos` marca cada campo con `✎` (escribible) o `·` (solo lectura)
+y avisa explícitamente si alguno de los que necesitamos no se puede escribir.
 
 ## Estado del emparejamiento
 

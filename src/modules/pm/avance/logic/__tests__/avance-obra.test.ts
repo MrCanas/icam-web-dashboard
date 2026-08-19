@@ -179,12 +179,28 @@ test("el CSV lleva las cabeceras que espera Zoho", () => {
 });
 
 test("el JSON marca los campos cuyo nombre API no conocemos", () => {
-  const [item] = construirJsonZoho([cambio()]);
-  assert.equal(item.id, "261199000046470311");
-  assert.deepEqual(item.data, { [`${API_NAME_PENDIENTE}Instalaciones`]: 30 });
+  const cuerpo = construirJsonZoho([cambio()]);
+  assert.deepEqual(cuerpo.data, [
+    { id: "261199000046470311", [`${API_NAME_PENDIENTE}Instalaciones`]: 30 },
+  ]);
 });
 
 test("el JSON usa el nombre API en cuanto existe", () => {
-  const [item] = construirJsonZoho([cambio({ zohoApiName: "Instalaciones_pct" })]);
-  assert.deepEqual(item.data, { Instalaciones_pct: 30 });
+  const cuerpo = construirJsonZoho([cambio({ zohoApiName: "Instalaciones_pct" })]);
+  assert.deepEqual(cuerpo.data, [{ id: "261199000046470311", Instalaciones_pct: 30 }]);
+});
+
+test("el JSON es el cuerpo exacto del PUT: campos al nivel del registro, sin triggers", () => {
+  const cuerpo = construirJsonZoho([
+    cambio({ zohoApiName: "Instalaciones_pct" }),
+    cambio({ zohoApiName: "Obra_gris_pct", faseNombre: "Obra gris", porcentajeNuevo: null }),
+  ]);
+  // Una sola entrada: las dos fases son de la misma promoción.
+  assert.equal(cuerpo.data.length, 1);
+  assert.deepEqual(cuerpo.data[0], {
+    id: "261199000046470311",
+    Instalaciones_pct: 30,
+    Obra_gris_pct: null, // vaciar en el portal vacía en Zoho, no pone 0
+  });
+  assert.deepEqual(cuerpo.trigger, []);
 });
