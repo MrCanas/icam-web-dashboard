@@ -21,6 +21,7 @@ export default async function ProyectoLayout({
       <PmProjectTabs
         idActivo={idActivo}
         showPlanificacion={user ? canAccessRouteKey(user, "pm.planificacion") : true}
+        showAvanceObra={user ? canAccessRouteKey(user, "pm.avance_obra") : true}
         showActas={user ? canAccessRouteKey(user, "pm.actas") : true}
       />
       {children}

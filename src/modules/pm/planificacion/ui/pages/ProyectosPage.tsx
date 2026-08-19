@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { getUserRole } from "@/lib/auth/permissions";
+import { fetchPromocionesYMapeo } from "@/modules/pm/avance/data/avanceRepository";
 import {
   fetchHitoCatalogo,
   fetchProyectosPageData,
@@ -17,10 +18,19 @@ export default async function ProyectosPage() {
     );
   }
 
-  const [{ rows, proyectosFinancieros, mapeo, error }, { catalogo, error: eCat }] =
-    await Promise.all([fetchProyectosPageData(ctx), fetchHitoCatalogo(ctx)]);
+  // La lectura de promociones se compone aquí, no dentro de
+  // planificacionRepository: así Planificación no depende de Avance de obra.
+  const [
+    { rows, proyectosFinancieros, mapeo, error },
+    { catalogo, error: eCat },
+    { promociones, mapeo: mapeoPromociones, error: ePromo },
+  ] = await Promise.all([
+    fetchProyectosPageData(ctx),
+    fetchHitoCatalogo(ctx),
+    fetchPromocionesYMapeo(ctx),
+  ]);
 
-  const err = error ?? eCat;
+  const err = error ?? eCat ?? ePromo;
   if (err) {
     return (
       <section className="rounded-lg border border-red-200 bg-card p-6 text-red-700">
@@ -56,11 +66,19 @@ export default async function ProyectosPage() {
             hacerlo aquí. Dos activos pueden apuntar al mismo proyecto financiero
             —PM separa PC25 por uso y el maestro lo mantiene unido—; se marcan con ×2.
           </p>
+          <p className="mt-1 text-xs leading-snug text-text-muted">
+            Con Zoho pasa lo mismo, y además hay más promociones que proyectos: Zoho llama
+            «DC15» a lo que PM llama «DC-15», y «SA31» a «SA-33-31». Solo 4 activos se
+            emparejaron solos en la carga —desde una lista escrita a mano, no por una regla—;
+            el resto se elige en «Promoción (Zoho)».
+          </p>
         </div>
         <ProyectosTable
           rows={rows}
           proyectosFinancieros={proyectosFinancieros}
           mapeo={mapeo}
+          promociones={promociones}
+          mapeoPromociones={mapeoPromociones}
           hasWriteAccess={hasWriteAccess}
         />
       </section>

@@ -17,10 +17,13 @@ export const pmModule: ModuleDefinition = {
       // pero su key gobierna el permiso de proyecto/[id] y de la fila misma.
       hiddenInNav: true,
       // proyecto/[id] es el Resumen Ejecutivo; sus subpáginas de
-      // planificación/actas resuelven a sus propias keys de permiso.
+      // planificación/actas/avance de obra resuelven a sus propias keys de
+      // permiso. routeKeyForPathname devuelve el PRIMER match del array y esta
+      // ruta va la primera: si no las excluye, se las traga.
       match: (p) =>
         p === "/dashboard/pm/detalle" ||
-        (p.startsWith("/dashboard/pm/proyecto/") && !/\/(planificacion|actas)(\/|$)/.test(p)),
+        (p.startsWith("/dashboard/pm/proyecto/") &&
+          !/\/(planificacion|actas|avance-obra)(\/|$)/.test(p)),
     },
     {
       key: "pm.planificacion",
@@ -52,6 +55,19 @@ export const pmModule: ModuleDefinition = {
         p === "/dashboard/pm/actas" ||
         p.startsWith("/dashboard/pm/actas/") ||
         /^\/dashboard\/pm\/proyecto\/[^/]+\/actas$/.test(p),
+    },
+    {
+      key: "pm.avance_obra",
+      path: "/dashboard/pm/avance-obra",
+      label: "Avance de obra",
+      // Igual que las demás: la subpestaña vive dentro del proyecto y el hub
+      // (bandeja de salida hacia Zoho, listado de promociones) en Configuración.
+      // Va la última del array a propósito: pmLandingPath cae en la primera
+      // ruta visible y no queremos mover a dónde aterriza nadie.
+      hiddenInNav: true,
+      match: (p) =>
+        p === "/dashboard/pm/avance-obra" ||
+        /^\/dashboard\/pm\/proyecto\/[^/]+\/avance-obra$/.test(p),
     },
   ],
   actions: [

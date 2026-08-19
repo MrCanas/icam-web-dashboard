@@ -6,6 +6,8 @@ import Link from "next/link";
 
 import type { PmPortfolioRow } from "@/modules/pm/data/pmRepository";
 import { archiveActivo, createActivo } from "@/modules/pm/planificacion/actions/crud-activo";
+import type { PromocionesYMapeo } from "@/modules/pm/avance/data/avanceRepository";
+import { MapeoPromocionCell } from "@/modules/pm/avance/ui/components/MapeoPromocionCell";
 import type { ProyectoFinancieroOption } from "@/modules/pm/planificacion/data/planificacionRepository";
 import { TIPOS_USO } from "@/modules/pm/planificacion/logic/planificacion-validation";
 
@@ -15,6 +17,9 @@ interface ProyectosTableProps {
   rows: PmPortfolioRow[];
   proyectosFinancieros: ProyectoFinancieroOption[];
   mapeo: Record<string, string>;
+  /** Promociones de Zoho y su emparejamiento. Vacío si falta la migración 028. */
+  promociones: PromocionesYMapeo["promociones"];
+  mapeoPromociones: PromocionesYMapeo["mapeo"];
   hasWriteAccess: boolean;
 }
 
@@ -22,6 +27,8 @@ export function ProyectosTable({
   rows,
   proyectosFinancieros,
   mapeo,
+  promociones,
+  mapeoPromociones,
   hasWriteAccess,
 }: ProyectosTableProps) {
   const router = useRouter();
@@ -50,6 +57,7 @@ export function ProyectosTable({
   }, [mapeo]);
 
   const sinMapear = rows.filter((r) => !mapeo[r.activo.id]).length;
+  const sinPromocion = rows.filter((r) => !mapeoPromociones[r.activo.id]).length;
 
   const crear = () => {
     setError(null);
@@ -97,6 +105,18 @@ export function ProyectosTable({
             Todos los activos están mapeados
           </span>
         )}
+        {promociones.length > 0 ? (
+          sinPromocion > 0 ? (
+            <span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+              {sinPromocion}{" "}
+              {sinPromocion === 1 ? "activo sin promoción" : "activos sin promoción"} de Zoho
+            </span>
+          ) : (
+            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+              Todos los activos tienen promoción de Zoho
+            </span>
+          )
+        ) : null}
         {hasWriteAccess && !creando ? (
           <button
             type="button"
@@ -184,6 +204,7 @@ export function ProyectosTable({
               <th className="p-3 font-semibold text-[#1E2A56]">Uso</th>
               <th className="p-3 font-semibold text-[#1E2A56]">Hitos</th>
               <th className="p-3 font-semibold text-[#1E2A56]">Financiero / Tabla madre</th>
+              <th className="p-3 font-semibold text-[#1E2A56]">Promoción (Zoho)</th>
               <th className="p-3 font-semibold text-[#1E2A56]">Actas</th>
               <th className="p-3 font-semibold text-[#1E2A56]" />
             </tr>
@@ -203,6 +224,16 @@ export function ProyectosTable({
                       valor={key}
                       opciones={proyectosFinancieros}
                       compartidoCon={key ? (compartidos[key] ?? 1) : 1}
+                      hasWriteAccess={hasWriteAccess}
+                      onError={mostrarToast}
+                    />
+                  </td>
+                  <td className="p-3">
+                    <MapeoPromocionCell
+                      pmActivoId={r.activo.id}
+                      valor={mapeoPromociones[r.activo.id]?.promocionId ?? null}
+                      origen={mapeoPromociones[r.activo.id]?.origen ?? null}
+                      opciones={promociones}
                       hasWriteAccess={hasWriteAccess}
                       onError={mostrarToast}
                     />
