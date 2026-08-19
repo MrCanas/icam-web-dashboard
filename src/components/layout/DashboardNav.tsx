@@ -46,7 +46,12 @@ interface SecondaryItem {
  * final de la fila secundaria) en vez de ocupar una pestaña. El orden es el de
  * este array, no el del registry.
  */
-const PM_CONFIG_ROUTE_KEYS = ["pm.actas", "pm.planificacion", "pm.proyectos"];
+const PM_CONFIG_ROUTE_KEYS = [
+  "pm.actas",
+  "pm.planificacion",
+  "pm.avance_obra",
+  "pm.proyectos",
+];
 
 /**
  * Items del menú de Configuración para la zona actual. Vacío fuera de pm y para

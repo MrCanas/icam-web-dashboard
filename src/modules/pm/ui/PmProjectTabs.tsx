@@ -7,14 +7,21 @@ interface PmProjectTabsProps {
   idActivo: string;
   /** false cuando el usuario tiene denegada pm.planificacion. */
   showPlanificacion?: boolean;
+  /** false cuando el usuario tiene denegada pm.avance_obra. */
+  showAvanceObra?: boolean;
   /** false cuando el usuario tiene denegada pm.actas. */
   showActas?: boolean;
 }
 
-/** Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Actas. */
+/**
+ * Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Avance de
+ * obra / Actas. Avance de obra va junto a Planificación porque las dos hablan
+ * de la ejecución: una del cuándo y otra del cuánto.
+ */
 export function PmProjectTabs({
   idActivo,
   showPlanificacion = true,
+  showAvanceObra = true,
   showActas = true,
 }: PmProjectTabsProps) {
   const pathname = usePathname();
@@ -34,6 +41,16 @@ export function PmProjectTabs({
             label: "Planificación",
             href: `${base}/planificacion`,
             active: pathname === `${base}/planificacion`,
+          },
+        ]
+      : []),
+    ...(showAvanceObra
+      ? [
+          {
+            key: "avance-obra",
+            label: "Avance de obra",
+            href: `${base}/avance-obra`,
+            active: pathname === `${base}/avance-obra`,
           },
         ]
       : []),
