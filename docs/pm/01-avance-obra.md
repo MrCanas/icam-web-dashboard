@@ -114,27 +114,31 @@ Zoho» funciona. `settings.READ` es lo que permite el autodescubrimiento de mód
 
 ### 2. Canjear el código y guardarlo, en un solo comando
 
-**Ejecútalo en tu terminal, no a través del asistente**: los argumentos llevan el client secret.
+**En tu terminal, no a través del asistente**: esto maneja el client secret.
 
 ```bash
-npm run pm:zoho-auth -- --dc eu --client-id 1000.XXX --client-secret YYY --code ZZZ
+npm run pm:zoho-auth -- --dc eu
 ```
 
-`--dc` es el dominio donde abres el CRM: `crm.zoho.eu` → `eu`, `crm.zoho.com` → `com` (también
-admite `in`, `com.au`, `jp`, `ca`).
+Pide los tres datos de uno en uno —**el secret no se ve al teclearlo**—, canjea el código,
+escribe las variables en `.env.local` y no imprime ni el secret ni el refresh token. Si Zoho
+falla, no toca el fichero.
 
-Canjea el código, escribe las variables en `.env.local` respetando el resto del fichero y **no
-imprime ni el secret ni el refresh token**. Si Zoho falla no toca nada, y traduce los tres
-errores de siempre:
+`--dc` es el dominio donde abres el CRM: `crm.zoho.eu` → `eu`, `crm.zoho.com` → `com` (también
+`in`, `com.au`, `jp`, `ca`).
+
+Traduce los errores que salen siempre:
 
 | error | qué pasó |
 |---|---|
 | `invalid_code` | el código caducó (dura 10 min) o ya se había usado — genera otro |
 | `invalid_client` | el `--dc` no coincide con el dominio donde generaste el código |
 | `invalid_client_secret` | el secret no corresponde a ese client id |
+| llega `access_token` pero no `refresh_token` | el Self Client ya tenía un token para ese scope: revócalo y repite |
 
-Para que el secret no quede en el historial del shell, se pueden pasar por entorno
-(`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_GRANT_CODE`) en vez de por argumento.
+Para automatizarlo también admite `--client-id`, `--client-secret` y `--code`, o las variables
+`ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` / `ZOHO_GRANT_CODE`. Por argumento el secret queda en el
+historial del shell, y el script avisa.
 
 <details>
 <summary>Hacerlo a mano con curl</summary>
@@ -149,6 +153,10 @@ curl -X POST "https://accounts.zoho.eu/oauth/v2/token" \
 
 La respuesta trae `refresh_token` (no caduca) y `api_domain`, que hay que copiar a `.env.local`.
 </details>
+
+> **`.env.local` o `.env`.** Los scripts de PM leen los dos, y `.env.local` gana si una clave
+> está en ambos. El resto del repo solo mira `.env.local`, así que para la aplicación web las
+> variables tienen que acabar ahí.
 
 ### 3. Comprobar que ha quedado
 

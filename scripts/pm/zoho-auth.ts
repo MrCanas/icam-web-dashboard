@@ -5,19 +5,23 @@
  * se pierde el tiempo: el grant code caduca a los 10 minutos y solo sirve una
  * vez, así que cualquier paso manual de más suele acabar en «invalid_code».
  *
- * EJECÚTALO EN TU TERMINAL, no a través del asistente: los argumentos llevan el
- * client secret. No imprime jamás el secret ni el refresh token; solo dice si
- * ha funcionado.
+ * EJECÚTALO EN TU TERMINAL, no a través del asistente: maneja el client secret.
+ * No imprime jamás el secret ni el refresh token; solo dice si ha funcionado.
  *
- *   npm run pm:zoho-auth -- --dc eu --client-id 1000.XXX --client-secret YYY --code ZZZ
+ *   npm run pm:zoho-auth -- --dc eu
  *
- * Los valores también se pueden pasar por entorno para que no queden en el
- * historial del shell (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_GRANT_CODE).
+ * Sin argumentos pide los tres datos de uno en uno, con el secret oculto al
+ * teclearlo. Es la forma recomendada: no queda nada en el historial del shell
+ * ni hay que pelearse con el escapado de comillas de Windows.
+ *
+ * También admite `--client-id`, `--client-secret` y `--code`, o las variables
+ * ZOHO_CLIENT_ID / ZOHO_CLIENT_SECRET / ZOHO_GRANT_CODE, para poder automatizarlo.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { loadActasEnv } from "../actas/lib/env";
+import { cargarEnv, ficherosEnvPresentes } from "./lib/env";
+import { hayTerminal, preguntar } from "./lib/preguntar";
 
 const ENV_PATH = resolve(process.cwd(), ".env.local");
 
@@ -63,7 +67,7 @@ function guardarEnEnvLocal(valores: Record<string, string>): void {
 }
 
 async function main(): Promise<void> {
-  loadActasEnv();
+  cargarEnv();
 
   const dc = (arg("dc") ?? "eu").toLowerCase();
   const centro = CENTROS[dc];
@@ -74,23 +78,34 @@ async function main(): Promise<void> {
     );
   }
 
-  const clientId = arg("client-id") ?? process.env.ZOHO_CLIENT_ID;
-  const clientSecret = arg("client-secret") ?? process.env.ZOHO_CLIENT_SECRET;
-  const code = arg("code") ?? process.env.ZOHO_GRANT_CODE;
+  let clientId = arg("client-id") ?? process.env.ZOHO_CLIENT_ID;
+  let clientSecret = arg("client-secret") ?? process.env.ZOHO_CLIENT_SECRET;
+  let code = arg("code") ?? process.env.ZOHO_GRANT_CODE;
+
+  // Si falta algo y hay a quién preguntar, se pregunta. Es el modo normal: nada
+  // queda en el historial del shell y no hay que pelearse con las comillas.
+  if ((!clientId || !clientSecret || !code) && hayTerminal()) {
+    console.log(
+      `\nCredenciales del Self Client (api-console.zoho.${dc} → tu cliente).\n` +
+        "El código sale de «Generate Code» y caduca a los 10 minutos.\n",
+    );
+    if (!clientId) clientId = await preguntar("Client ID:     ");
+    if (!clientSecret) clientSecret = await preguntar("Client Secret: ", true);
+    if (!code) code = await preguntar("Grant code:    ");
+    console.log("");
+  }
 
   const faltan = [
-    !clientId && "--client-id",
-    !clientSecret && "--client-secret",
-    !code && "--code",
+    !clientId && "client id",
+    !clientSecret && "client secret",
+    !code && "grant code",
   ].filter(Boolean);
   if (faltan.length > 0) {
     throw new Error(
-      `Faltan argumentos: ${faltan.join(", ")}\n\n` +
-        "  npm run pm:zoho-auth -- --dc eu --client-id 1000.XXX --client-secret YYY --code ZZZ\n\n" +
-        "El client id y el secret están en api-console.zoho." +
-        dc +
-        " → tu Self Client.\n" +
-        "El code sale de la pestaña «Generate Code» y caduca a los 10 minutos.",
+      `Faltan datos: ${faltan.join(", ")}\n\n` +
+        `  npm run pm:zoho-auth -- --dc ${dc}\n\n` +
+        "Lánzalo sin más argumentos y te los pide de uno en uno (el secret no se ve al teclearlo).\n" +
+        `El client id y el secret están en api-console.zoho.${dc} → tu Self Client.`,
     );
   }
 
@@ -143,6 +158,7 @@ async function main(): Promise<void> {
   console.log(
     "\n✓ Credenciales guardadas en .env.local (no se imprimen aquí).\n" +
       `  centro de datos: ${body.api_domain ?? centro.api}\n\n` +
+      `  ficheros de entorno presentes: ${ficherosEnvPresentes().join(", ")}\n\n` +
       "Siguiente paso:  npm run pm:zoho-explore",
   );
   if (arg("client-secret")) {

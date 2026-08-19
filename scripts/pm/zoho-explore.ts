@@ -10,7 +10,7 @@
  *   npm run pm:zoho-explore -- --campos     # campos del módulo configurado
  *   npm run pm:zoho-explore -- --muestra 5  # 5 registros de ejemplo
  */
-import { loadActasEnv } from "../actas/lib/env";
+import { cargarEnv, ficherosEnvPresentes } from "./lib/env";
 import {
   esCampoEscribible,
   fetchTodosLosRegistros,
@@ -53,7 +53,7 @@ function tabla(campos: ZohoCampo[]): void {
 }
 
 async function main(): Promise<void> {
-  loadActasEnv();
+  cargarEnv();
   const faltan = zohoVariablesQueFaltan();
 
   // Los módulos se pueden listar sin saber cuál es el de Promociones.
@@ -61,9 +61,12 @@ async function main(): Promise<void> {
   if (faltan.length > 0 && !soloModulo) {
     console.error(
       `Faltan variables de entorno: ${faltan.join(", ")}\n` +
+        `Ficheros leídos: ${ficherosEnvPresentes().join(", ") || "ninguno (no existen .env.local ni .env)"}\n` +
+        "Consíguelas con:  npm run pm:zoho-auth\n" +
         "Ver docs/pm/01-avance-obra.md, sección «Conectar la API de Zoho».",
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (soloModulo) {
