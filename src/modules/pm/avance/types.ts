@@ -28,8 +28,17 @@ export interface PmPromocion {
   zoho_analytics_id: string | null;
   codigo_promocion: string;
   nombre: string | null;
+  /** La «tipología» de Zoho: Promoción, Fondo o Proyecto de un fondo (migración 029). */
+  tipo_proyecto: string | null;
+  tipo_activo: string | null;
+  /** Identifica el edificio cuando el nombre se ha sobrescrito con el del vehículo. */
+  direccion: string | null;
+  provincia: string | null;
   owner_zoho_id: string | null;
+  owner_nombre: string | null;
   situacion: string | null;
+  modificado_en_zoho: string | null;
+  avance_actualizado_en_zoho: string | null;
   fuente_archivo: string | null;
   importado_at: string;
 }
@@ -118,4 +127,7 @@ export interface PromocionOption {
   codigo_promocion: string;
   nombre: string | null;
   situacion: string | null;
+  /** Permite separar edificios de vehículos de inversión en el desplegable. */
+  tipo_proyecto: string | null;
+  direccion: string | null;
 }

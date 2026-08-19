@@ -57,12 +57,21 @@ export function AvanceObraPanel({ data, hasWriteAccess }: AvanceObraPanelProps) 
             {promocion.nombre ? (
               <span className="text-sm text-text-muted">{promocion.nombre}</span>
             ) : null}
+            {promocion.tipo_proyecto ? (
+              <span className="rounded-full bg-subtle px-2 py-0.5 text-xs text-text-muted">
+                {promocion.tipo_proyecto}
+              </span>
+            ) : null}
             {promocion.situacion ? (
               <span className="rounded-full bg-subtle px-2 py-0.5 text-xs text-text-muted">
                 {promocion.situacion}
               </span>
             ) : null}
           </div>
+
+          {promocion.direccion && promocion.direccion !== promocion.nombre ? (
+            <p className="-mt-2 text-xs text-text-muted">{promocion.direccion}</p>
+          ) : null}
 
           {general ? (
             <AvanceFaseRow

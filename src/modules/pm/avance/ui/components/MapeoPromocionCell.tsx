@@ -35,8 +35,18 @@ export function MapeoPromocionCell({
   const [actual, setActual] = useState<string | null>(valor);
   const [pending, startTransition] = useTransition();
 
+  // La dirección va en la etiqueta porque en Zoho hay registros cuyo nombre se
+  // ha sobrescrito con el del vehículo (SE84 → «Impar Prime Alternative
+  // Investment II»): sin ella no hay forma de saber qué edificio es.
   const etiqueta = (o: PromocionOption) =>
-    [o.codigo_promocion, o.nombre, o.situacion].filter(Boolean).join(" · ");
+    [o.codigo_promocion, o.nombre, o.direccion, o.situacion].filter(Boolean).join(" · ");
+
+  // Agrupadas por tipología: el módulo mezcla edificios con fondos y vehículos.
+  const grupos = opciones.reduce<Record<string, PromocionOption[]>>((acc, o) => {
+    const k = o.tipo_proyecto ?? "Sin tipología";
+    (acc[k] ??= []).push(o);
+    return acc;
+  }, {});
 
   const guardar = (siguiente: string | null) => {
     const previo = actual;
@@ -77,10 +87,14 @@ export function MapeoPromocionCell({
         onChange={(e) => guardar(e.target.value || null)}
       >
         <option value="">— sin vincular —</option>
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>
-            {etiqueta(o)}
-          </option>
+        {Object.entries(grupos).map(([tipo, lista]) => (
+          <optgroup key={tipo} label={tipo}>
+            {lista.map((o) => (
+              <option key={o.id} value={o.id}>
+                {etiqueta(o)}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       {actual && origen === "auto" ? (

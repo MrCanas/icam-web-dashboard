@@ -10,15 +10,23 @@
  *
  * En tiempo de ejecución NO se ejecuta ningún matching: la aplicación solo lee
  * pm_activo_promocion_map. Esta lista se aplica una sola vez desde el script de
- * carga y los 5 activos restantes (CSP-10, PC25-CP6, PC25-26-RESIDENCIAL,
- * EM-RESIDENCIAL, CA1) los empareja la PMO en /dashboard/pm/proyectos — igual
- * que la 020 dejó pm_activo_proyecto_map vacío a propósito.
+ * carga — igual que la 020 dejó pm_activo_proyecto_map vacío a propósito.
+ *
+ * Quedan fuera PC25-CP6, PC25-26-RESIDENCIAL y EM-RESIDENCIAL: los tres apuntan
+ * a la misma promoción «PC25 · Padre Claret 25», que engloba Padre Claret 25 y
+ * Emilio Mario 18. Que tres activos de PM compartan promoción es admisible
+ * —pm_activo_promocion_map no tiene UNIQUE sobre promocion_id, igual que en el
+ * caso PC25 del maestro financiero—, pero eso lo confirma la PMO en
+ * /dashboard/pm/proyectos; aquí no se decide por parecido de nombre.
  */
 export const AUTOLINK_PROMOCION_POR_ACTIVO: Readonly<Record<string, string>> = {
-  SE84: "SE84", // Santa Engracia 84 — coincidencia literal
+  SE84: "SE84", // Zoho lo renombró a «Impar Prime Alternative Investment II»,
+  //               pero su Dirección promoción sigue siendo C/Santa Engracia 84
   GQ8: "GQ8", // Glorieta de Quevedo 8 — coincidencia literal
+  CA1: "CA1", // Camino 1 — coincidencia literal
   "DC-15": "DC15", // Doctor Cortezo 15
   "SA-33-31": "SA31", // Sagasta 31
+  "CSP-10": "CSP10", // Costanilla de San Pedro 10
 };
 
 export interface AutolinkPar {

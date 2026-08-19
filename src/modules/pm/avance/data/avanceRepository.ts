@@ -172,7 +172,7 @@ export async function fetchPromocionesYMapeo(ctx: UserContext): Promise<Promocio
   const [rPromos, rMapeo] = await Promise.all([
     supabase
       .from("pm_promociones")
-      .select("id, codigo_promocion, nombre, situacion")
+      .select("id, codigo_promocion, nombre, situacion, tipo_proyecto, direccion")
       .order("codigo_promocion"),
     supabase.from("pm_activo_promocion_map").select("pm_activo_id, promocion_id, origen"),
   ]);
@@ -228,6 +228,9 @@ export interface PromocionFila {
   codigo: string;
   nombre: string | null;
   situacion: string | null;
+  /** La «tipología» de Zoho. */
+  tipoProyecto: string | null;
+  direccion: string | null;
   general: number | null;
   idsActivo: string[];
   pendientes: number;
@@ -254,7 +257,7 @@ export async function fetchAvanceHubData(ctx: UserContext): Promise<AvanceHubDat
   const [rPromos, rFases, rValores, rOutbox, rMapeo, rActivos] = await Promise.all([
     supabase
       .from("pm_promociones")
-      .select("id, codigo_promocion, nombre, situacion")
+      .select("id, codigo_promocion, nombre, situacion, tipo_proyecto, direccion")
       .order("codigo_promocion"),
     supabase.from("pm_avance_fase_catalogo").select("id, nombre, es_general").order("orden"),
     supabase.from("pm_avance_obra").select("promocion_id, fase_id, porcentaje"),
@@ -337,6 +340,8 @@ export async function fetchAvanceHubData(ctx: UserContext): Promise<AvanceHubDat
       codigo: p.codigo_promocion,
       nombre: p.nombre,
       situacion: p.situacion,
+      tipoProyecto: p.tipo_proyecto,
+      direccion: p.direccion,
       general: generalPorPromocion.get(p.id) ?? null,
       idsActivo: activosPorPromocion.get(p.id) ?? [],
       pendientes: pendientesPorPromocion.get(p.id) ?? 0,

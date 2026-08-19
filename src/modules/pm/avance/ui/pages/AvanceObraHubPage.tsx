@@ -40,6 +40,11 @@ export default async function AvanceObraHubPage() {
   const isAdmin = getUserRole(ctx, "pm") === "admin";
   const faltanVariables = zohoVariablesQueFaltan();
   const sinVincular = promociones.filter((p) => p.idsActivo.length === 0).length;
+  const porTipologia = promociones.reduce<Record<string, number>>((acc, p) => {
+    const k = p.tipoProyecto ?? "Sin tipología";
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="min-w-0 space-y-6">
@@ -117,6 +122,16 @@ export default async function AvanceObraHubPage() {
             </Link>
             .{sinVincular > 0 ? ` ${sinVincular} sin vincular a ningún proyecto de PM.` : ""}
           </p>
+          <p className="mt-1 flex flex-wrap gap-1.5 text-xs">
+            {Object.entries(porTipologia).map(([tipo, n]) => (
+              <span
+                key={tipo}
+                className="rounded border border-subtle bg-page px-1.5 py-0.5 text-text-muted"
+              >
+                {tipo}: <span className="font-medium text-text-body">{n}</span>
+              </span>
+            ))}
+          </p>
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-subtle/50 bg-card">
@@ -125,6 +140,7 @@ export default async function AvanceObraHubPage() {
               <tr>
                 <th className="p-3 font-semibold text-icam-900">Código</th>
                 <th className="p-3 font-semibold text-icam-900">Nombre</th>
+                <th className="p-3 font-semibold text-icam-900">Tipología</th>
                 <th className="p-3 font-semibold text-icam-900">Situación</th>
                 <th className="p-3 font-semibold text-icam-900">Avance general</th>
                 <th className="p-3 font-semibold text-icam-900">Proyecto de PM</th>
@@ -141,7 +157,17 @@ export default async function AvanceObraHubPage() {
                       </span>
                     ) : null}
                   </td>
-                  <td className="p-3 text-text-muted">{p.nombre ?? "—"}</td>
+                  <td className="p-3 text-text-muted">
+                    {p.nombre ?? "—"}
+                    {p.direccion && p.direccion !== p.nombre ? (
+                      <span className="block text-xs text-text-muted/80">{p.direccion}</span>
+                    ) : null}
+                  </td>
+                  <td className="p-3">
+                    <span className="rounded bg-subtle px-1.5 py-0.5 text-xs text-text-muted">
+                      {p.tipoProyecto ?? "—"}
+                    </span>
+                  </td>
                   <td className="p-3 text-text-muted">{p.situacion ?? "—"}</td>
                   <td className="p-3 tabular-nums text-text-body">{fmtPorcentaje(p.general)}</td>
                   <td className="p-3">

@@ -8,7 +8,7 @@ el *cuánto*.
 - Hub y bandeja de salida hacia Zoho: `/dashboard/pm/avance-obra` (rueda de Configuración)
 - Emparejamiento activo ↔ promoción: `/dashboard/pm/proyectos`, columna «Promoción (Zoho)»
 - Route key de permisos: `pm.avance_obra`
-- Esquema: migración **028** (`supabase/migrations/20260819120000_028_pm_avance_obra.sql`)
+- Esquema: migraciones **028** (tablas) y **029** (tipología y contexto de la promoción)
 
 ## Las tres trampas de estos datos
 
@@ -24,34 +24,47 @@ recalcula aquí**. En los datos reales la diferencia es enorme: SE84 va al 1,35 
 discrepancia cuando pasa de 5 puntos, pero solo como nota: el valor que manda es el de Zoho.
 
 **3. Los códigos no coinciden entre sistemas.** Zoho usa `T123`/`FC149` donde el maestro
-financiero usa `TO123`/`FU149`, y PM usa `DC-15` donde Zoho usa `DC15`. Además hay 30
+financiero usa `TO123`/`FU149`, y PM usa `DC-15` donde Zoho usa `DC15`. Además hay 47
 promociones para 9 proyectos de PM. **No hay ningún emparejamiento por código en tiempo de
-ejecución**: 4 pares están escritos a mano en
+ejecución**: los pares están escritos a mano en
 `src/modules/pm/avance/logic/avance-autolink.ts` y se siembran en la carga; el resto lo decide la
 PMO en Mapeo maestro. No existe regla que lleve `SA-33-31` a `SA31`, y `LDH171` convive con
 `LDH171-V1`, así que cualquier heurística acabaría emparejando mal.
+
+**Y una cuarta, que apareció con el export completo:** en Zoho hay registros cuyo
+**«Nombre Promoción» se ha sobrescrito con el nombre del vehículo de inversión**. `SE84` pasó de
+«Santa Engracia 84» a «Impar Prime Alternative Investment II» el 05/08/2026, y `SA31` a «Impar
+Prime Alternative Investment II, SICC, S.A.». El código y el Record Id no cambiaron, así que el
+emparejamiento aguanta; pero el nombre ya no identifica el edificio. Por eso se guarda también
+`direccion` («Dirección promoción»): en SE84 sigue diciendo `C/Santa Engracia 84`. La interfaz la
+muestra cuando difiere del nombre.
 
 ## Cargar o refrescar los datos de Zoho
 
 ```bash
 npm run pm:apply-migration-028 -- --apply     # solo la primera vez
+npm run pm:apply-migration-029 -- --apply     # solo la primera vez
 npm run pm:seed-avance-obra                   # dry-run
 npm run pm:seed-avance-obra -- --apply
 ```
 
-El fichero `.xlsx` no vive en el repositorio; lo versionado es el dato ya parseado en
+El export no vive en el repositorio; lo versionado es el dato ya parseado en
 `scripts/pm/data/avance-obra-promociones.ts`. Para actualizarlo con una descarga nueva:
 
 ```bash
-npm run pm:seed-avance-obra -- --xlsx "C:/ruta/KPI_AvanceProyectos_Promociones.xlsx"
+npm run pm:seed-avance-obra -- --csv "C:/ruta/Promociones_2026_08_19.csv"
 ```
 
 Eso **no escribe en la base**: imprime el diff contra el fichero versionado para que se revise
-antes de tocarlo.
+antes de tocarlo. Admite `.csv` y `.xlsx`.
 
-> El export de Zoho Analytics trae parte del texto doble codificado («RamÃ³n») y algún guion
-> blando suelto («Gran Ví­a 61»). Tanto el generador del fixture como el modo `--xlsx` lo
-> reparan; si aparece un nombre raro nuevo, es esto.
+**Exporta el módulo entero, sin filtros.** El primer export venía filtrado y traía 30 de los 47
+registros; faltaban justo los que no se podían emparejar con PM. El export bueno es el del
+módulo Promociones completo, con sus 139 columnas.
+
+> El export de Zoho **Analytics** trae parte del texto doble codificado («RamÃ³n») y algún guion
+> blando suelto («Gran Ví­a 61»); el del módulo, en CSV, viene en UTF-8 limpio. El lector repara
+> ambos casos, así que da igual cuál se use.
 
 **Reimportar no pisa el trabajo de la PMO.** `pm_avance_importar_zoho` refresca siempre
 `porcentaje_zoho` (la línea base del diff) pero solo toca `porcentaje` si el valor vigente venía
@@ -215,17 +228,39 @@ Dos cosas más tienen que cumplirse, y ninguna se arregla con permisos de OAuth:
 `npm run pm:zoho-explore -- --campos` marca cada campo con `✎` (escribible) o `·` (solo lectura)
 y avisa explícitamente si alguno de los que necesitamos no se puede escribir.
 
+## La tipología
+
+El campo de Zoho es **«Tipo de proyecto»** y tiene tres valores:
+
+| Tipología | Registros |
+|---|---|
+| Promoción | 35 |
+| Fondo | 8 |
+| Proyecto de un fondo | 4 |
+
+El primer export venía filtrado y traía 30 de los 47 registros. Con el completo aparecieron
+`CSP10`, `CA1`, `PC25`, `VE1`, `LSE84`, los fondos (`FICCI`, `FICCII`, `FICCIII`, `SICCI`,
+`SICCII`) y cinco registros que no son promociones reales: `SP` (Sin Proyecto), `PC`
+(POTENCIALES CLIENTES), `PROMOCIONTEST`, `VDR` y `Placeholder`. Se cargan todos —no se descarta
+nada por criterio propio— y el desplegable de emparejamiento los agrupa por tipología para
+poder distinguirlos.
+
 ## Estado del emparejamiento
 
 Emparejados en la carga (lista escrita a mano, no una regla):
 
 | PM | Zoho |
 |---|---|
-| `SE84` | `SE84` — Santa Engracia 84 |
+| `SE84` | `SE84` — hoy renombrado al vehículo; su dirección sigue siendo C/Santa Engracia 84 |
 | `GQ8` | `GQ8` — Glorieta de Quevedo 8 |
+| `CA1` | `CA1` — Camino 1 |
 | `DC-15` | `DC15` — Doctor Cortezo 15 |
-| `SA-33-31` | `SA31` — Sagasta 31 |
+| `SA-33-31` | `SA31` — hoy renombrado al vehículo |
+| `CSP-10` | `CSP10` — Costanilla de San Pedro 10 |
 
-Pendientes de emparejar a mano: `CSP-10`, `PC25-CP6`, `PC25-26-RESIDENCIAL`, `EM-RESIDENCIAL`,
-`CA1`. Ninguno tiene una fila en el export con un código reconocible, así que la decisión es de
-la PMO. Hasta que se emparejen, su pestaña muestra el estado vacío con el enlace a Mapeo maestro.
+Pendientes de emparejar a mano: `PC25-CP6`, `PC25-26-RESIDENCIAL` y `EM-RESIDENCIAL`. Los tres
+apuntarían a la misma promoción `PC25 · Padre Claret 25`, que engloba Padre Claret 25 y Emilio
+Mario 18 (así lo describe el campo «Destino del proyecto» de ese registro). Compartir promoción
+es admisible —`pm_activo_promocion_map` no tiene UNIQUE sobre `promocion_id`, igual que en el
+caso PC25 del maestro financiero—, pero eso lo confirma la PMO, no se deduce por parecido de
+nombre. Hasta entonces su pestaña muestra el estado vacío con el enlace a Mapeo maestro.

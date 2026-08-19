@@ -14,9 +14,9 @@
  *
  *   npm run pm:seed-avance-obra
  *   npm run pm:seed-avance-obra -- --apply
- *   npm run pm:seed-avance-obra -- --xlsx "C:/.../KPI_AvanceProyectos_Promociones.xlsx"
+ *   npm run pm:seed-avance-obra -- --csv "C:/.../Promociones_2026_08_19.csv"
  *
- * `--xlsx` reparsea el fichero real y muestra el diff contra el fixture
+ * `--csv` (o `--xlsx`) reparsea el fichero real y muestra el diff contra el fixture
  * versionado SIN escribir en la base: refrescar el fixture tiene que ser una
  * operación revisable, no un `git diff` de 400 líneas a ciegas.
  */
@@ -31,6 +31,7 @@ import {
 } from "../../src/modules/pm/avance/logic/avance-autolink";
 import { parsePorcentajeZoho } from "../../src/modules/pm/avance/logic/avance-obra";
 import { closePgPool, withPgClient } from "../actas/lib/db";
+import { cargarEnv } from "./lib/env";
 import {
   COLUMNAS_FASE,
   FUENTE_ARCHIVO,
@@ -67,8 +68,18 @@ function limpia(v: unknown): string {
   return desmojibake(String(v)).replace(/\u00ad/g, "").trim().replace(/\s+/g, " ");
 }
 
-function leerXlsx(ruta: string): PromocionZohoSeed[] {
-  const wb = XLSX.read(readFileSync(ruta), { type: "buffer" });
+/**
+ * Lee un export de Zoho, `.csv` o `.xlsx`.
+ *
+ * El CSV se lee como texto UTF-8 y no como buffer: dejando que la librería
+ * adivine la codificación, los acentos salen rotos. Para el resto (comillas,
+ * saltos de línea dentro de un campo — que los hay, en «Destino del proyecto»)
+ * se reutiliza el parser de la librería, que ya es dependencia del repo.
+ */
+function leerExport(ruta: string): PromocionZohoSeed[] {
+  const wb = ruta.toLowerCase().endsWith(".csv")
+    ? XLSX.read(readFileSync(ruta, "utf8"), { type: "string", raw: true })
+    : XLSX.read(readFileSync(ruta), { type: "buffer" });
   const hoja = wb.Sheets[wb.SheetNames[0]];
   const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(hoja, { defval: null });
 
@@ -77,19 +88,28 @@ function leerXlsx(ruta: string): PromocionZohoSeed[] {
     for (const [k, v] of Object.entries(raw)) fila[limpia(k)] = v;
 
     const analytics = limpia(fila["Record Id"]);
+    const codigo = limpia(fila["Código de Promoción"]);
     const valores: Record<string, number | null> = {};
     for (const col of COLUMNAS_FASE) {
       const p = parsePorcentajeZoho(fila[col]);
-      if (!p.ok) throw new Error(`${limpia(fila["Código de Promoción"])} · ${col}: ${p.error}`);
+      if (!p.ok) throw new Error(`${codigo} · ${col}: ${p.error}`);
       valores[col] = p.value;
     }
+    const oNull = (v: unknown): string | null => limpia(v) || null;
     return {
       zohoAnalyticsId: analytics,
       zohoRecordId: analytics.replace(/^zcrm_/, ""),
-      codigo: limpia(fila["Código de Promoción"]),
+      codigo,
       nombre: limpia(fila["Nombre Promoción"]),
-      ownerZohoId: limpia(fila["Promoción Owner.id"]) || null,
+      tipoProyecto: oNull(fila["Tipo de proyecto"]),
+      tipoActivo: oNull(fila["Tipo de activo"]),
+      direccion: oNull(fila["Dirección promoción"]),
+      provincia: oNull(fila["Provincia"]),
+      ownerZohoId: oNull(fila["Promoción Owner.id"]),
+      ownerNombre: oNull(fila["Promoción Owner"]),
       situacion: limpia(fila["Situación"]),
+      modificadoEnZoho: oNull(fila["Modified Time"]),
+      avanceActualizadoEnZoho: oNull(fila["Fecha de actualización Avance de Obra"])?.slice(0, 10) ?? null,
       valores,
     };
   });
@@ -113,6 +133,10 @@ function diffContraFixture(reciente: PromocionZohoSeed[]): void {
     }
     if (vieja.situacion !== nueva.situacion) {
       console.log(`~ ${nueva.codigo} situación: ${vieja.situacion} → ${nueva.situacion}`);
+      cambios++;
+    }
+    if (vieja.tipoProyecto !== nueva.tipoProyecto) {
+      console.log(`~ ${nueva.codigo} tipología: ${vieja.tipoProyecto} → ${nueva.tipoProyecto}`);
       cambios++;
     }
     for (const col of COLUMNAS_FASE) {
@@ -165,14 +189,15 @@ async function leerFases(client: PoolClient): Promise<Map<string, FaseRow>> {
 }
 
 async function main(): Promise<void> {
+  cargarEnv();
   const apply = process.argv.includes("--apply");
-  const iXlsx = process.argv.indexOf("--xlsx");
+  const iFichero = Math.max(process.argv.indexOf("--csv"), process.argv.indexOf("--xlsx"));
 
-  if (iXlsx >= 0) {
-    const ruta = process.argv[iXlsx + 1];
-    if (!ruta) throw new Error("--xlsx necesita la ruta del fichero");
+  if (iFichero >= 0) {
+    const ruta = process.argv[iFichero + 1];
+    if (!ruta) throw new Error("--csv necesita la ruta del fichero");
     console.log(`Comparando ${ruta} con el fixture versionado…\n`);
-    diffContraFixture(leerXlsx(ruta));
+    diffContraFixture(leerExport(ruta));
     return;
   }
 
@@ -220,33 +245,52 @@ async function main(): Promise<void> {
     console.log("\nescribiendo…");
     let cambiados = 0;
     let respetados = 0;
+    let nuevasPromociones = 0;
 
     for (const p of promociones) {
-      const { rows } = await client.query<{ id: string }>(
+      const { rows } = await client.query<{ id: string; es_nueva: boolean }>(
         `INSERT INTO public.pm_promociones
            (zoho_record_id, zoho_analytics_id, codigo_promocion, nombre,
-            owner_zoho_id, situacion, fuente_archivo, importado_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+            tipo_proyecto, tipo_activo, direccion, provincia,
+            owner_zoho_id, owner_nombre, situacion,
+            modificado_en_zoho, avance_actualizado_en_zoho,
+            fuente_archivo, importado_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
          ON CONFLICT (zoho_record_id) DO UPDATE SET
-           zoho_analytics_id = EXCLUDED.zoho_analytics_id,
-           codigo_promocion  = EXCLUDED.codigo_promocion,
-           nombre            = EXCLUDED.nombre,
-           owner_zoho_id     = EXCLUDED.owner_zoho_id,
-           situacion         = EXCLUDED.situacion,
-           fuente_archivo    = EXCLUDED.fuente_archivo,
-           importado_at      = now()
-         RETURNING id`,
+           zoho_analytics_id         = EXCLUDED.zoho_analytics_id,
+           codigo_promocion          = EXCLUDED.codigo_promocion,
+           nombre                    = EXCLUDED.nombre,
+           tipo_proyecto             = EXCLUDED.tipo_proyecto,
+           tipo_activo               = EXCLUDED.tipo_activo,
+           direccion                 = EXCLUDED.direccion,
+           provincia                 = EXCLUDED.provincia,
+           owner_zoho_id             = EXCLUDED.owner_zoho_id,
+           owner_nombre              = EXCLUDED.owner_nombre,
+           situacion                 = EXCLUDED.situacion,
+           modificado_en_zoho        = EXCLUDED.modificado_en_zoho,
+           avance_actualizado_en_zoho= EXCLUDED.avance_actualizado_en_zoho,
+           fuente_archivo            = EXCLUDED.fuente_archivo,
+           importado_at              = now()
+         RETURNING id, (xmax = 0) AS es_nueva`,
         [
           p.zohoRecordId,
           p.zohoAnalyticsId,
           p.codigo,
           p.nombre,
+          p.tipoProyecto,
+          p.tipoActivo,
+          p.direccion,
+          p.provincia,
           p.ownerZohoId,
+          p.ownerNombre,
           p.situacion,
+          p.modificadoEnZoho,
+          p.avanceActualizadoEnZoho,
           FUENTE_ARCHIVO,
         ],
       );
       const promocionId = rows[0].id;
+      if (rows[0].es_nueva) nuevasPromociones++;
 
       for (const col of COLUMNAS_FASE) {
         const fase = fases.get(col)!;
