@@ -43,6 +43,8 @@
     "pm:apply-migration-029": "tsx scripts/pm/apply-migration-029.ts",
     "pm:apply-migration-030": "tsx scripts/pm/apply-migration-030.ts",
     "pm:apply-migration-031": "tsx scripts/pm/apply-migration-031.ts",
+    "pm:apply-migration-032": "tsx scripts/pm/apply-migration-032.ts",
+    "pm:apply-migration-033": "tsx scripts/pm/apply-migration-033.ts",
     "pm:seed-avance-obra": "tsx scripts/pm/seed-avance-obra.ts",
     "pm:zoho-auth": "tsx scripts/pm/zoho-auth.ts",
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",
