@@ -169,7 +169,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 7 toasts (4 con fuga de timeout), 5 writeClients (2 byte-idénticos), 10 guards «No autorizado» (8 inalcanzables), 55 secciones rojas de error con 4 variantes, 2 celdas de mapeo optimista casi idénticas, 12 `Intl.DateTimeFormat` a mano con 3 formatos incompatibles, formatters de `monday` que reimplementan `lib/formatters.ts`, 2 rutas API gemelas (`*-status`), 2 componentes de upload con 211 líneas idénticas, ~140 tipos `Input/Result` sin genérico.
 
-### 5.4 Código muerto · **MEDIA** · `en fase 4` (con lista firmada)
+### 5.4 Código muerto · **MEDIA** · `hecho: 10 ficheros borrados; src/services y _template CONSERVADOS (sí se usan)`
 
 ~750 LOC: `src/services/monday/client.ts` entero (229, resto pre-flatten), `useProyectos.ts` (126), `ActasElementHistoryPanel.tsx` (201), 2 server actions con `.from()` que nadie invoca, ~30 exports sueltos. Más «Ajustes» de actas: pestaña navegable en producción que solo muestra «próximamente».
 
@@ -194,7 +194,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 ## 7. UX, accesibilidad y DX
 
-- Contraste `text-muted` `#8A8A8A` = 3,16:1 sobre fondo — **falla WCAG AA**, con 64 usos combinados con texto de 9-11 px. · **ALTA** · `pendiente de tu OK (cambio visual)`
+- Contraste `text-muted` `#8A8A8A` = 3,16:1 sobre fondo — **falla WCAG AA**. · **ALTA** · `hecho (#6E6E6E, 4.68:1 sobre page / 5.10 sobre card)`
 - `lang="en"` en una app 100 % en español (`layout.tsx:22`). · trivial · `hecho (lang="es")`
 - 250 colores hex hardcodeados (52× `#1E2A56` teniendo token); login con un azul fuera de paleta (`#1c2e69`).
 - Diálogos: 32 `role="dialog"`, **0 focus traps**, 0 restauración de foco, 10 sin `aria-modal`; ~46 inputs sin label asociado. · `aria-modal hecho; focus trap fuera de alcance`
