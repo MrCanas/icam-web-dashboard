@@ -14,9 +14,12 @@ export const portfolioModule: ModuleDefinition = {
       match: (p) => p === "/dashboard/portfolio",
     },
     {
+      // La key y el path quedan congelados: `key` es lo que guardan las
+      // denegaciones de permisos (app_user_route_deny.route_key). Solo cambia
+      // la etiqueta visible, que pasó de «Overview» a «WIP» en 2026-09.
       key: "portfolio.overview",
       path: "/dashboard/portfolio/overview",
-      label: "Overview",
+      label: "WIP",
       match: (p) => p.startsWith("/dashboard/portfolio/overview"),
     },
     {

@@ -10,6 +10,7 @@ import {
   groupByVintage,
   segmentKPIs,
 } from "@/modules/portfolio/logic/calculations";
+import { matchesQuery } from "@/modules/portfolio/logic/portfolioParams";
 import { sanitizeSort, sortProjects } from "@/modules/portfolio/logic/proyectoSort";
 import type { BucketCount, HoldingBucket, VintageGroup } from "@/modules/portfolio/logic/calculations";
 import type { KPIBundle, Proyecto, SegmentKPIs } from "@/modules/portfolio/types";
@@ -17,6 +18,8 @@ import type { KPIBundle, Proyecto, SegmentKPIs } from "@/modules/portfolio/types
 export interface PortfolioSearchFilters {
   situacion?: string;
   tipoProyecto?: string;
+  /** Texto libre del buscador; busca en nombre y ubicación. */
+  q?: string;
 }
 
 function toNumber(value: number | null): number {
@@ -30,7 +33,8 @@ export function applyPortfolioSearchFilters(
 ): Proyecto[] {
   return rows
     .filter((row) => (filters.situacion ? row.situacion === filters.situacion : true))
-    .filter((row) => (filters.tipoProyecto ? row.tipo_proyecto === filters.tipoProyecto : true));
+    .filter((row) => (filters.tipoProyecto ? row.tipo_proyecto === filters.tipoProyecto : true))
+    .filter((row) => (filters.q ? matchesQuery(row, filters.q) : true));
 }
 
 export interface DonutSlice {
@@ -46,7 +50,12 @@ export interface ExecutivePageModel {
   segmented: SegmentKPIs;
   donutTipoData: DonutSlice[];
   donutSituacionData: DonutSlice[];
+  /** Se sigue calculando aunque «Distribución del portfolio» esté oculta. */
   distributionRows: DonutSlice[];
+  equity: ShareSeriesDatum[];
+  beneficio: ShareSeriesDatum[];
+  yields: GroupedSeriesDatum[];
+  credito: BarSeriesDatum[];
 }
 
 export function buildExecutivePageModel(proyectos: Proyecto[]): ExecutivePageModel {
@@ -75,6 +84,10 @@ export function buildExecutivePageModel(proyectos: Proyecto[]): ExecutivePageMod
     donutTipoData,
     donutSituacionData,
     distributionRows: [...donutTipoData, ...donutSituacionData],
+    equity: buildEquityShare(proyectos),
+    beneficio: buildBeneficioShare(proyectos),
+    yields: buildYieldSeries(proyectos),
+    credito: buildCreditoSeries(proyectos),
   };
 }
 
@@ -85,6 +98,8 @@ export interface RentabilidadPageModel {
   multiploBuckets: BucketCount[];
   highTIRInvestment: number;
   highTIRPctOfTotal: number;
+  tirRoe: GroupedSeriesDatum[];
+  inversionVenta: GroupedSeriesDatum[];
 }
 
 export function buildRentabilidadPageModel(proyectos: Proyecto[]): RentabilidadPageModel {
@@ -101,10 +116,14 @@ export function buildRentabilidadPageModel(proyectos: Proyecto[]): RentabilidadP
     multiploBuckets,
     highTIRInvestment,
     highTIRPctOfTotal,
+    tirRoe: buildTirRoeSeries(proyectos),
+    inversionVenta: buildInversionVentaSeries(proyectos),
   };
 }
 
 export interface TendenciasPageModel {
+  /** Filas ya filtradas; las gráficas las necesitan para el drill-down. */
+  proyectos: Proyecto[];
   vintageGroups: VintageGroup[];
   holdingBuckets: HoldingBucket[];
   holdingAvg: number;
@@ -115,6 +134,7 @@ export interface TendenciasPageModel {
 export function buildTendenciasPageModel(rows: Proyecto[]): TendenciasPageModel {
   const vintageGroups = Object.values(groupByVintage(rows));
   return {
+    proyectos: rows,
     vintageGroups,
     holdingBuckets: getHoldingPeriodBuckets(rows),
     holdingAvg: avgHoldingPeriod(rows),
@@ -149,27 +169,32 @@ export function buildProyectosActivosPageModel(
   };
 }
 
-export interface OverviewPageModel {
-  /** TIR vs ROE por proyecto (fracciones). */
-  tirRoe: { name: string; a: number; b: number }[];
-  /** Inversión total vs Total ingresos por venta por proyecto (€). */
-  inversionVenta: { name: string; a: number; b: number }[];
-  /** Yield entrada vs Yield salida por proyecto (fracciones). */
-  yields: { name: string; a: number; b: number }[];
-  /** Crédito total por proyecto (€). */
-  credito: { name: string; value: number }[];
-  /** Reparto de equity gestionado por proyecto (€). */
-  equity: { label: string; value: number }[];
-  /** Reparto de beneficios por proyecto (€). */
-  beneficio: { label: string; value: number }[];
+export interface GroupedSeriesDatum {
+  name: string;
+  a: number;
+  b: number;
+}
+export interface BarSeriesDatum {
+  name: string;
+  value: number;
+}
+export interface ShareSeriesDatum {
+  label: string;
+  value: number;
 }
 
-/** Modelo de la subpágina Overview: replica las gráficas de "Resumen Global". */
-export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel {
-  const byDesc = <T>(rows: T[], value: (row: T) => number): T[] =>
-    [...rows].sort((a, b) => value(b) - value(a));
+function byDesc<T>(rows: T[], value: (row: T) => number): T[] {
+  return [...rows].sort((a, b) => value(b) - value(a));
+}
 
-  const tirRoe = byDesc(
+/**
+ * Series por proyecto. Vivían dentro de buildOverviewPageModel; se extraen
+ * porque el reparto de septiembre de 2026 las esparce por tres pestañas:
+ * equity/beneficio/yields/crédito en Executive, TIR-ROE e inversión-venta en
+ * Rentabilidad.
+ */
+export function buildTirRoeSeries(proyectos: Proyecto[]): GroupedSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.tir_desp_is) > 0 || toNumber(p.roe_desp_is) > 0)
       .map((p) => ({
@@ -179,8 +204,10 @@ export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel
       })),
     (row) => row.a,
   );
+}
 
-  const inversionVenta = byDesc(
+export function buildInversionVentaSeries(proyectos: Proyecto[]): GroupedSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.inversion_total) > 0 || toNumber(p.total_ingresos_venta) > 0)
       .map((p) => ({
@@ -190,8 +217,10 @@ export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel
       })),
     (row) => row.a,
   );
+}
 
-  const yields = byDesc(
+export function buildYieldSeries(proyectos: Proyecto[]): GroupedSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.entry_yield) > 0 || toNumber(p.exit_yield) > 0)
       .map((p) => ({
@@ -201,29 +230,57 @@ export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel
       })),
     (row) => row.a,
   );
+}
 
-  const credito = byDesc(
+export function buildCreditoSeries(proyectos: Proyecto[]): BarSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.credito_total) > 0)
       .map((p) => ({ name: p.proyecto, value: toNumber(p.credito_total) })),
     (row) => row.value,
   );
+}
 
-  const equity = byDesc(
+export function buildEquityShare(proyectos: Proyecto[]): ShareSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.equity) > 0)
       .map((p) => ({ label: p.proyecto, value: toNumber(p.equity) })),
     (row) => row.value,
   );
+}
 
-  const beneficio = byDesc(
+export function buildBeneficioShare(proyectos: Proyecto[]): ShareSeriesDatum[] {
+  return byDesc(
     proyectos
       .filter((p) => toNumber(p.beneficios) > 0)
       .map((p) => ({ label: p.proyecto, value: toNumber(p.beneficios) })),
     (row) => row.value,
   );
+}
 
-  return { tirRoe, inversionVenta, yields, credito, equity, beneficio };
+export interface OverviewPageModel {
+  tirRoe: GroupedSeriesDatum[];
+  inversionVenta: GroupedSeriesDatum[];
+  yields: GroupedSeriesDatum[];
+  credito: BarSeriesDatum[];
+  equity: ShareSeriesDatum[];
+  beneficio: ShareSeriesDatum[];
+}
+
+/**
+ * Composición completa de las seis series. Se conserva aunque el reparto nuevo
+ * ya no use ninguna página las seis a la vez.
+ */
+export function buildOverviewPageModel(proyectos: Proyecto[]): OverviewPageModel {
+  return {
+    tirRoe: buildTirRoeSeries(proyectos),
+    inversionVenta: buildInversionVentaSeries(proyectos),
+    yields: buildYieldSeries(proyectos),
+    credito: buildCreditoSeries(proyectos),
+    equity: buildEquityShare(proyectos),
+    beneficio: buildBeneficioShare(proyectos),
+  };
 }
 
 /** Filtrado en cliente (hook useProyectos) — misma regla que applyPortfolioSearchFilters. */

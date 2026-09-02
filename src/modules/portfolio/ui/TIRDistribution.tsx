@@ -1,9 +1,10 @@
 "use client";
 
-import { BucketCount, listProjectsInTIRBucket } from "@/modules/portfolio/logic/calculations";
-import { fmtPct } from "@/lib/formatters";
+import { BucketCount } from "@/modules/portfolio/logic/calculations";
+import { projectsInTirBucket } from "@/modules/portfolio/logic/drilldown";
+import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
+import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
 import { Proyecto } from "@/modules/portfolio/types";
-import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -25,15 +26,22 @@ interface TIRDistributionProps {
 const barColors = ["#2B3668", "#25305f", "#1f2a56", "#1E2A56", "#172047"];
 
 export function TIRDistribution({ data, proyectos }: TIRDistributionProps) {
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const drilldown = useChartDrilldown();
+  // El tramo resaltado es el que tiene el modal abierto: sin estado paralelo,
+  // al cerrar el modal la barra recupera su opacidad sola.
+  const selectedLabel = drilldown.selection?.key ?? null;
 
   function handleBarClick(item: BarRectangleItem) {
     const label = item.payload?.label as string | undefined;
     if (typeof label !== "string") return;
-    setSelectedLabel((prev) => (prev === label ? null : label));
+    const delTramo = projectsInTirBucket(proyectos, label);
+    drilldown.open({
+      title: `Tramo TIR ${label}`,
+      subtitle: `${delTramo.length} de ${proyectos.length} proyectos`,
+      proyectos: delTramo,
+      key: label,
+    });
   }
-
-  const drillItems = selectedLabel ? listProjectsInTIRBucket(proyectos, selectedLabel) : [];
 
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
@@ -55,7 +63,17 @@ export function TIRDistribution({ data, proyectos }: TIRDistributionProps) {
               height={48}
             />
             <YAxis allowDecimals={false} stroke="#8A8A8A" tick={{ fontSize: 10 }} width={32} />
-            <Tooltip cursor={false} />
+            <Tooltip
+              cursor={false}
+              content={
+                <DrilldownTooltip
+                  heading={(payload) => String(payload[0]?.payload?.label ?? "")}
+                  rows={(payload) => [
+                    { label: "Proyectos", value: String(payload[0]?.value ?? 0) },
+                  ]}
+                />
+              }
+            />
             <Bar
               dataKey="count"
               radius={[4, 4, 0, 0]}
@@ -75,28 +93,7 @@ export function TIRDistribution({ data, proyectos }: TIRDistributionProps) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      {selectedLabel ? (
-        <div className="mt-3 rounded-md border border-[#EAEBEE] bg-white p-3 text-[#1E2A56]">
-          <p className="text-sm font-semibold mb-2">
-            Proyectos en tramo TIR {selectedLabel} ({drillItems.length})
-          </p>
-          {drillItems.length === 0 ? (
-            <p className="text-sm text-text-muted">No hay proyectos en este tramo con los filtros actuales.</p>
-          ) : (
-            <ul className="space-y-1.5 text-sm max-h-48 overflow-y-auto">
-              {drillItems.map((item) => (
-                <li
-                  key={item.proyecto}
-                  className="flex justify-between gap-3 border-b border-subtle/40 pb-1 last:border-0"
-                >
-                  <span className="font-medium truncate">{item.proyecto}</span>
-                  <span className="shrink-0 font-mono text-sm">{fmtPct(item.value)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
+      {drilldown.modal}
     </section>
   );
 }

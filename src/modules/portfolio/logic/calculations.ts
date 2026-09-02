@@ -228,7 +228,7 @@ export function getTIRColorClass(tir: number): string {
   return "bg-text-muted";
 }
 
-function getProjectYear(project: Proyecto): string | null {
+export function getProjectYear(project: Proyecto): string | null {
   if (project.fecha_inicio) {
     const parsed = new Date(project.fecha_inicio);
     if (!Number.isNaN(parsed.getTime())) {
@@ -310,25 +310,33 @@ export interface HoldingBucket {
   culminados: number;
 }
 
+export const HOLDING_BUCKET_LABEL_ORDER = ["<24m", "24-36m", "36-48m", "48-60m", ">60m"] as const;
+
+export type HoldingBucketLabel = (typeof HOLDING_BUCKET_LABEL_ORDER)[number];
+
+/** Tramo al que cae un holding period en meses; null si no hay dato válido. */
+export function holdingBucketLabelForValue(months: number): HoldingBucketLabel | null {
+  if (!Number.isFinite(months) || months <= 0) return null;
+  if (months < 24) return "<24m";
+  if (months <= 36) return "24-36m";
+  if (months <= 48) return "36-48m";
+  if (months <= 60) return "48-60m";
+  return ">60m";
+}
+
 export function getHoldingPeriodBuckets(data: Proyecto[]): HoldingBucket[] {
-  const buckets: HoldingBucket[] = [
-    { label: "<24m", activos: 0, culminados: 0 },
-    { label: "24-36m", activos: 0, culminados: 0 },
-    { label: "36-48m", activos: 0, culminados: 0 },
-    { label: "48-60m", activos: 0, culminados: 0 },
-    { label: ">60m", activos: 0, culminados: 0 },
-  ];
+  const buckets: HoldingBucket[] = HOLDING_BUCKET_LABEL_ORDER.map((label) => ({
+    label,
+    activos: 0,
+    culminados: 0,
+  }));
+  const byLabel = new Map(buckets.map((b) => [b.label, b]));
 
   data.forEach((project) => {
-    const months = toNumber(project.holding_period);
-    if (months <= 0) return;
-
-    let bucket: HoldingBucket;
-    if (months < 24) bucket = buckets[0];
-    else if (months <= 36) bucket = buckets[1];
-    else if (months <= 48) bucket = buckets[2];
-    else if (months <= 60) bucket = buckets[3];
-    else bucket = buckets[4];
+    const label = holdingBucketLabelForValue(toNumber(project.holding_period));
+    if (!label) return;
+    const bucket = byLabel.get(label);
+    if (!bucket) return;
 
     if (project.situacion === "En Marcha") bucket.activos += 1;
     if (project.situacion === "Culminado") bucket.culminados += 1;

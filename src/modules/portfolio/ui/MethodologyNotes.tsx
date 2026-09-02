@@ -5,6 +5,11 @@ export function MethodologyNotes() {
       <p>TIR y ROE después de impuesto de sociedades.</p>
       <p>Inversiones y beneficios expresados en euros nominales.</p>
       <p>Holding Period calculado desde fecha de inicio hasta end quarter.</p>
+      <p>
+        Las proyecciones usan la fecha de fin del maestro (columna EndQuarter). Cuando un proyecto
+        no la trae, se estima sumando el holding period a la fecha de inicio; la propia gráfica
+        indica cuántos vencimientos son estimados.
+      </p>
       <p>28 proyectos totales · 3 sin datos financieros completos (CA82, GV61, FU149).</p>
     </section>
   );

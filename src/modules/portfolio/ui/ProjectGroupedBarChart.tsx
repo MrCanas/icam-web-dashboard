@@ -1,6 +1,10 @@
 "use client";
 
 import { fmtMEuros, fmtPct } from "@/lib/formatters";
+import { projectByName } from "@/modules/portfolio/logic/drilldown";
+import type { Proyecto } from "@/modules/portfolio/types";
+import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
+import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
 import {
   Bar,
   BarChart,
@@ -23,6 +27,8 @@ interface ProjectGroupedBarChartProps {
   data: GroupedBarDatum[];
   seriesNames: [string, string];
   valueType: "pct" | "meuros";
+  /** Filas ya filtradas, para resolver el proyecto de la barra pinchada. */
+  proyectos: Proyecto[];
 }
 
 function formatValue(value: number, valueType: "pct" | "meuros"): string {
@@ -34,9 +40,17 @@ export function ProjectGroupedBarChart({
   data,
   seriesNames,
   valueType,
+  proyectos,
 }: ProjectGroupedBarChartProps) {
   // Layout horizontal: alto proporcional al nº de proyectos para que sea legible.
   const height = Math.max(280, data.length * 42);
+  const drilldown = useChartDrilldown();
+
+  function abrirDetalle(item: unknown) {
+    const name = (item as { payload?: { name?: string } })?.payload?.name;
+    if (!name) return;
+    drilldown.open({ title: name, proyectos: projectByName(proyectos, name) });
+  }
 
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
@@ -66,17 +80,42 @@ export function ProjectGroupedBarChart({
             />
             <Tooltip
               cursor={false}
-              formatter={(value, key) => {
-                const name = key === "a" ? seriesNames[0] : seriesNames[1];
-                return [formatValue(Number(value ?? 0), valueType), name];
-              }}
+              content={
+                <DrilldownTooltip
+                  heading={(payload) => String(payload[0]?.payload?.name ?? "")}
+                  rows={(payload) =>
+                    payload.map((point) => ({
+                      label: point.dataKey === "a" ? seriesNames[0] : seriesNames[1],
+                      value: formatValue(Number(point.value ?? 0), valueType),
+                      color: point.color,
+                    }))
+                  }
+                />
+              }
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="a" name={seriesNames[0]} fill="#1E2A56" radius={[0, 3, 3, 0]} activeBar={false} />
-            <Bar dataKey="b" name={seriesNames[1]} fill="#B89660" radius={[0, 3, 3, 0]} activeBar={false} />
+            <Bar
+              dataKey="a"
+              name={seriesNames[0]}
+              fill="#1E2A56"
+              radius={[0, 3, 3, 0]}
+              activeBar={false}
+              cursor="pointer"
+              onClick={abrirDetalle}
+            />
+            <Bar
+              dataKey="b"
+              name={seriesNames[1]}
+              fill="#B89660"
+              radius={[0, 3, 3, 0]}
+              activeBar={false}
+              cursor="pointer"
+              onClick={abrirDetalle}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {drilldown.modal}
     </section>
   );
 }

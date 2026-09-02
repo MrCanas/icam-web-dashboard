@@ -1,4 +1,5 @@
-import { FilterBar } from "@/modules/portfolio/ui/FilterBar";
+import { PortfolioToolbar } from "@/modules/portfolio/ui/toolbar/PortfolioToolbar";
+import { ProjectGroupedBarChart } from "@/modules/portfolio/ui/ProjectGroupedBarChart";
 import { MultiploDistribution } from "@/modules/portfolio/ui/MultiploDistribution";
 import { RentabilidadTable } from "@/modules/portfolio/ui/RentabilidadTable";
 import { ScatterTIRvsROE } from "@/modules/portfolio/ui/ScatterTIRvsROE";
@@ -10,6 +11,7 @@ import {
   applyPortfolioSearchFilters,
   buildRentabilidadPageModel,
 } from "@/modules/portfolio/logic/pageViewModels";
+import { sanitizeSituacion, sanitizeTipo } from "@/modules/portfolio/logic/portfolioParams";
 import { portfolioPaths } from "@/modules/portfolio/logic/paths";
 import {
   filterUltimaFilaRows,
@@ -26,8 +28,8 @@ interface RentabilidadPageProps {
 
 export default async function RentabilidadPage({ searchParams }: RentabilidadPageProps) {
   const params = await searchParams;
-  const selectedSituacion = params.situacion;
-  const selectedTipo = params.tipo;
+  const selectedSituacion = sanitizeSituacion(params.situacion);
+  const selectedTipo = sanitizeTipo(params.tipo);
 
   const ctx = await getCurrentUser();
   if (!ctx) {
@@ -64,21 +66,12 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
       {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
+
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
-        <h1 className="text-xl font-semibold text-text-primary">Análisis de Rentabilidad</h1>
-        <p className="mt-1 text-sm text-text-muted">
+        <h3 className="text-base font-semibold text-text-primary">Resumen de rentabilidad</h3>
+        <p className="mt-1 mb-3 text-sm text-text-muted">
           {view.kpis.tirValidCount} proyectos con datos financieros
         </p>
-      </section>
-
-      <FilterBar
-        selectedSituacion={selectedSituacion}
-        selectedTipo={selectedTipo}
-        basePath={portfolioPaths.rentabilidad}
-      />
-
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
-        <h3 className="text-base font-semibold text-text-primary mb-3">Resumen de rentabilidad</h3>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
           <div className="p-2 sm:p-3 rounded-md border border-subtle/70 min-w-0">
             <p className="text-xs uppercase tracking-wide text-text-muted">TIR Ponderada</p>
@@ -107,6 +100,23 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
         </div>
       </section>
 
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
+        <ProjectGroupedBarChart
+          title="ROE desp. IS vs TIR desp. IS"
+          data={view.tirRoe}
+          seriesNames={["TIR desp. IS", "ROE desp. IS"]}
+          valueType="pct"
+          proyectos={view.proyectos}
+        />
+        <ProjectGroupedBarChart
+          title="Inversión vs Venta"
+          data={view.inversionVenta}
+          seriesNames={["Inversión total", "Total ingresos por venta"]}
+          valueType="meuros"
+          proyectos={view.proyectos}
+        />
+      </section>
+
       <ScatterTIRvsROE data={view.proyectos} />
 
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 min-w-0">
@@ -115,6 +125,12 @@ export default async function RentabilidadPage({ searchParams }: RentabilidadPag
       </section>
 
       <RentabilidadTable data={view.proyectos} />
+
+      <PortfolioToolbar
+        basePath={portfolioPaths.rentabilidad}
+        situacion={selectedSituacion}
+        tipo={selectedTipo}
+      />
     </div>
   );
 }

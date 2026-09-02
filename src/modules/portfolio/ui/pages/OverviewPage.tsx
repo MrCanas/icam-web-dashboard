@@ -1,13 +1,12 @@
-import { FilterBar } from "@/modules/portfolio/ui/FilterBar";
-import { ProjectGroupedBarChart } from "@/modules/portfolio/ui/ProjectGroupedBarChart";
-import { ProjectBarChart } from "@/modules/portfolio/ui/ProjectBarChart";
-import { ProjectSharePie } from "@/modules/portfolio/ui/ProjectSharePie";
+import { DonutChart } from "@/modules/portfolio/ui/DonutChart";
+import { PortfolioToolbar } from "@/modules/portfolio/ui/toolbar/PortfolioToolbar";
 import { SupabaseEmptyProjectsBanner } from "@/modules/portfolio/ui/SupabaseEmptyProjectsBanner";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import {
   applyPortfolioSearchFilters,
-  buildOverviewPageModel,
+  buildExecutivePageModel,
 } from "@/modules/portfolio/logic/pageViewModels";
+import { sanitizeSituacion, sanitizeTipo } from "@/modules/portfolio/logic/portfolioParams";
 import { portfolioPaths } from "@/modules/portfolio/logic/paths";
 import {
   filterUltimaFilaRows,
@@ -22,10 +21,14 @@ interface OverviewPageProps {
   }>;
 }
 
+/**
+ * Pestaña «WIP». Conserva la ruta y la key `portfolio.overview` porque esa key
+ * es la que guardan las denegaciones de permisos (app_user_route_deny).
+ */
 export default async function OverviewPage({ searchParams }: OverviewPageProps) {
   const params = await searchParams;
-  const selectedSituacion = params.situacion;
-  const selectedTipo = params.tipo;
+  const selectedSituacion = sanitizeSituacion(params.situacion);
+  const selectedTipo = sanitizeTipo(params.tipo);
 
   const ctx = await getCurrentUser();
   if (!ctx) {
@@ -45,7 +48,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
     const msg = error?.message ?? countError?.message ?? "Error desconocido";
     return (
       <section className="bg-card rounded-lg border border-red-200 p-6 text-red-700">
-        Error cargando overview: {msg}
+        Error cargando WIP: {msg}
       </section>
     );
   }
@@ -57,48 +60,40 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
     situacion: selectedSituacion,
     tipoProyecto: selectedTipo,
   });
-  const view = buildOverviewPageModel(proyectos);
+  const view = buildExecutivePageModel(proyectos);
 
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
       {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
 
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
-        <h1 className="text-xl font-semibold text-text-primary">Overview</h1>
+        <h1 className="text-xl font-semibold text-text-primary">WIP</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Resumen global por proyecto · {proyectos.length} proyectos
+          Reparto de la cartera · {proyectos.length} proyectos
         </p>
       </section>
 
-      <FilterBar
-        selectedSituacion={selectedSituacion}
-        selectedTipo={selectedTipo}
-        basePath={portfolioPaths.overview}
-      />
 
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
-        <ProjectGroupedBarChart
-          title="ROE desp. IS vs TIR desp. IS"
-          data={view.tirRoe}
-          seriesNames={["TIR desp. IS", "ROE desp. IS"]}
-          valueType="pct"
+        <DonutChart
+          title="Distribución por tipo de proyecto"
+          data={view.donutTipoData}
+          proyectos={proyectos}
+          field="tipo_proyecto"
         />
-        <ProjectGroupedBarChart
-          title="Inversión vs Venta"
-          data={view.inversionVenta}
-          seriesNames={["Inversión total", "Total ingresos por venta"]}
-          valueType="meuros"
+        <DonutChart
+          title="Distribución por situación"
+          data={view.donutSituacionData}
+          proyectos={proyectos}
+          field="situacion"
         />
-        <ProjectGroupedBarChart
-          title="Yield entrada vs Yield salida"
-          data={view.yields}
-          seriesNames={["Yield entrada", "Yield salida"]}
-          valueType="pct"
-        />
-        <ProjectBarChart title="Crédito" data={view.credito} valueType="meuros" />
-        <ProjectSharePie title="Equity" data={view.equity} valueType="meuros" />
-        <ProjectSharePie title="Beneficio" data={view.beneficio} valueType="meuros" />
       </section>
+
+      <PortfolioToolbar
+        basePath={portfolioPaths.overview}
+        situacion={selectedSituacion}
+        tipo={selectedTipo}
+      />
     </div>
   );
 }

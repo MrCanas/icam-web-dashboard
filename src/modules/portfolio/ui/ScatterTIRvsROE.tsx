@@ -1,6 +1,9 @@
 "use client";
 
 import { fmtMEuros, fmtPct } from "@/lib/formatters";
+import { projectByName } from "@/modules/portfolio/logic/drilldown";
+import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
+import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
 import { Proyecto } from "@/modules/portfolio/types";
 import {
   CartesianGrid,
@@ -63,6 +66,13 @@ export function ScatterTIRvsROE({ data }: ScatterTIRvsROEProps) {
 
   const enMarcha = points.filter((item) => item.situacion === "En Marcha");
   const culminado = points.filter((item) => item.situacion === "Culminado");
+  const drilldown = useChartDrilldown();
+
+  function abrirDetalle(punto: unknown) {
+    const nombre = (punto as { proyecto?: string })?.proyecto;
+    if (!nombre) return;
+    drilldown.open({ title: nombre, proyectos: projectByName(data, nombre) });
+  }
 
   return (
     <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
@@ -97,25 +107,44 @@ export function ScatterTIRvsROE({ data }: ScatterTIRvsROEProps) {
             <ReferenceLine y={0.3} stroke="#9b7f57" strokeDasharray="6 4" />
             <Tooltip
               cursor={false}
-              formatter={(value, name) => {
-                const numericValue = Number(value ?? 0);
-                const key = String(name ?? "");
-                if (key === "inversion") return [fmtMEuros(numericValue), "Inversión"];
-                if (key === "tir") return [fmtPct(numericValue), "TIR"];
-                if (key === "roe") return [fmtPct(numericValue), "ROE"];
-                return [String(value ?? "—"), key];
-              }}
-              labelFormatter={(_label, payload) => payload?.[0]?.payload?.proyecto ?? ""}
+              content={
+                <DrilldownTooltip
+                  heading={(payload) => String(payload[0]?.payload?.proyecto ?? "")}
+                  rows={(payload) => {
+                    const punto = payload[0]?.payload as
+                      | { tir?: number; roe?: number; inversion?: number }
+                      | undefined;
+                    return [
+                      { label: "TIR", value: fmtPct(Number(punto?.tir ?? 0)) },
+                      { label: "ROE", value: fmtPct(Number(punto?.roe ?? 0)) },
+                      { label: "Inversión", value: fmtMEuros(Number(punto?.inversion ?? 0)) },
+                    ];
+                  }}
+                />
+              }
             />
-            <Scatter name="En Marcha" data={enMarcha} fill="#1E2A56">
+            <Scatter
+              name="En Marcha"
+              data={enMarcha}
+              fill="#1E2A56"
+              cursor="pointer"
+              onClick={abrirDetalle}
+            >
               <LabelList dataKey="proyecto" content={renderProjectLabel} />
             </Scatter>
-            <Scatter name="Culminado" data={culminado} fill="#B89660">
+            <Scatter
+              name="Culminado"
+              data={culminado}
+              fill="#B89660"
+              cursor="pointer"
+              onClick={abrirDetalle}
+            >
               <LabelList dataKey="proyecto" content={renderProjectLabel} />
             </Scatter>
           </ScatterChart>
         </ResponsiveContainer>
       </div>
+      {drilldown.modal}
     </section>
   );
 }
