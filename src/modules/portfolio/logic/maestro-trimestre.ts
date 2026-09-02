@@ -38,3 +38,30 @@ export function limpiarFechaMaestro(iso: string | null): string | null {
   if (!iso) return null;
   return iso.startsWith("1899-") ? null : iso;
 }
+
+/** Último día de cada trimestre, en formato MM-DD. */
+const FIN_DE_TRIMESTRE: Record<string, string> = {
+  Q1: "03-31",
+  Q2: "06-30",
+  Q3: "09-30",
+  Q4: "12-31",
+};
+
+/**
+ * «2025 4T» | «2025_Q4» → «2025-12-31». La columna EndQuarter del maestro es
+ * la fecha de fin del proyecto expresada como trimestre; se materializa en su
+ * último día para poder guardarla en una columna `date` y ordenar por ella.
+ *
+ * Devuelve null para «ALL TIME» y para cualquier cosa que no sea un trimestre
+ * reconocible; el llamante decide entonces si es una fecha suelta.
+ */
+export function finDeTrimestreIso(raw: unknown): string | null {
+  const code = normalizeTrimestreCode(raw);
+  if (!code) return null;
+
+  const [year, quarter] = code.split("_");
+  const mmdd = FIN_DE_TRIMESTRE[quarter];
+  if (!mmdd) return null;
+
+  return `${year}-${mmdd}`;
+}

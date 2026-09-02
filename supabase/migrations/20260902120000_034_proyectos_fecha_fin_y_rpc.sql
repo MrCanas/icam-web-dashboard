@@ -1,24 +1,29 @@
--- =============================================================================
--- [SUPERSEDED] Versionado ahora en supabase/migrations/20260715130000_018_replace_proyectos_rpc.sql
--- Se mantiene solo como referencia / ejecución manual de emergencia.
--- =============================================================================
--- MAESTRO ICAM — Reemplazo atómico de la tabla public.proyectos
--- =============================================================================
--- 1) Abre el proyecto correcto en Supabase (el de NEXT_PUBLIC_SUPABASE_URL).
--- 2) SQL Editor → pega TODO este archivo → Run (sin omitir el final).
--- 3) Database → Functions: debe aparecer replace_proyectos(p_rows jsonb).
--- 4) Si la app seguía en marcha, reinicia `npm run dev` y vuelve a confirmar
---    la subida; si PostgREST aún no ve la función, espera ~1 min o ejecuta
---    de nuevo solo la línea NOTIFY del final.
--- =============================================================================
--- Comprobar que Postgres tiene la función (opcional):
---   select p.proname, pg_get_function_identity_arguments(p.oid)
---   from pg_proc p
---   join pg_namespace n on n.oid = p.pronamespace
---   where n.nspname = 'public' and p.proname = 'replace_proyectos';
--- =============================================================================
+-- Financiero (portfolio) 034 — el RPC deja de tirar cuatro columnas por el camino.
+--
+-- La versión de la migración 018 lista columnas explícitas en el INSERT y se
+-- dejó fuera tres que el parser SÍ lee del maestro:
+--   · entry_yield / exit_yield  (columnas «Entry Yield» / «Exit Yield»)
+--   · credito_total             (columna «Credito Total»)
+-- El gemelo manual (scripts/supabase/replace_proyectos.sql) sí las insertaba, así
+-- que el comportamiento dependía de por dónde se hubiera aplicado. Resultado en
+-- producción: las gráficas «Yield entrada vs Yield salida» y «Crédito» del
+-- dashboard salían vacías porque las tres columnas quedaban a NULL en cada carga.
+--
+-- Además se añade fecha_fin, que nunca ha existido en la tabla pese a que la hoja
+-- «Tabla madre» trae la columna EndQuarter. Sin ella no se puede proyectar el
+-- vencimiento del pipeline.
+--
+-- Migración ADITIVA e idempotente: no borra datos ni recrea la tabla. Las cuatro
+-- columnas se rellenan en la SIGUIENTE carga del maestro, no retroactivamente.
+-- Rollback: volver a ejecutar el cuerpo de 20260715130000_018_replace_proyectos_rpc.sql.
 
-CREATE OR REPLACE FUNCTION replace_proyectos(p_rows jsonb)
+ALTER TABLE public.proyectos ADD COLUMN IF NOT EXISTS fecha_fin date;
+
+COMMENT ON COLUMN public.proyectos.fecha_fin IS
+  'Fin del proyecto, de la columna EndQuarter del maestro (último día del trimestre). '
+  'Nullable: si falta, la fecha de fin efectiva se estima como fecha_inicio + holding_period meses.';
+
+CREATE OR REPLACE FUNCTION public.replace_proyectos(p_rows jsonb)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -26,7 +31,7 @@ SET search_path = public
 AS $$
 BEGIN
   DELETE FROM proyectos WHERE true;
-  
+
   INSERT INTO proyectos (
     proyecto,
     situacion,
@@ -78,8 +83,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION replace_proyectos(jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION replace_proyectos(jsonb) TO service_role;
+REVOKE ALL ON FUNCTION public.replace_proyectos(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.replace_proyectos(jsonb) TO service_role;
 
--- Recarga la caché de esquema de PostgREST (Supabase) para exponer la RPC al instante.
+-- Recarga la caché de esquema de PostgREST para exponer la RPC al instante.
 NOTIFY pgrst, 'reload schema';

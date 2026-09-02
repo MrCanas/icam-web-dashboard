@@ -4,6 +4,7 @@ import type { Proyecto, SituacionProyecto, TipoProyecto } from "@/modules/portfo
 // hito↔columna de la PMO, pero describe la Tabla madre — aquí solo se lee.
 import { TABLA_MADRE_COLUMNAS_HITO } from "@/modules/pm/planificacion/logic/tabla-madre-columnas";
 import {
+  finDeTrimestreIso,
   limpiarFechaMaestro,
   normalizeTrimestreCode,
 } from "@/modules/portfolio/logic/maestro-trimestre";
@@ -19,6 +20,7 @@ type FieldKey =
   | "esUltimaFila"
   | "holdingPeriod"
   | "fechaInicio"
+  | "fechaFin"
   | "superficieEdificable"
   | "unidadesTotales"
   | "equity"
@@ -42,6 +44,7 @@ const FIELD_KEYS: FieldKey[] = [
   "esUltimaFila",
   "holdingPeriod",
   "fechaInicio",
+  "fechaFin",
   "superficieEdificable",
   "unidadesTotales",
   "equity",
@@ -71,6 +74,7 @@ const HEADER_ALIASES: Record<FieldKey, string[]> = {
   esUltimaFila: ["es ultima fila"],
   holdingPeriod: ["holding period"],
   fechaInicio: ["fecha inicio"],
+  fechaFin: ["end quarter", "endquarter", "fecha fin"],
   superficieEdificable: ["superficie edificable"],
   unidadesTotales: ["unidades totales"],
   equity: ["equity"],
@@ -243,6 +247,17 @@ function excelCellToIsoDate(v: unknown): string | null {
   const parsed = Date.parse(s);
   if (Number.isNaN(parsed)) return null;
   return new Date(parsed).toISOString().slice(0, 10);
+}
+
+/**
+ * La columna EndQuarter llega de dos formas según la fila: como código de
+ * trimestre («2025 4T») o como fecha suelta. Se prueba primero el trimestre y
+ * se cae a la fecha; el centinela 1899 de Excel se descarta en ambos casos.
+ */
+function parseFechaFin(v: unknown): string | null {
+  const porTrimestre = finDeTrimestreIso(v);
+  if (porTrimestre) return porTrimestre;
+  return limpiarFechaMaestro(excelCellToIsoDate(v));
 }
 
 function toFlagBool(v: unknown): boolean | null {
@@ -459,6 +474,7 @@ export function parseMaestroWorkbook(buffer: ArrayBuffer): MaestroParseResult {
       superficie_edificable: toNum(cellFor(rawRow, "superficieEdificable")),
       es_ultima_fila: 1,
       fecha_inicio: excelCellToIsoDate(cellFor(rawRow, "fechaInicio")),
+      fecha_fin: parseFechaFin(cellFor(rawRow, "fechaFin")),
     };
 
     rows.push(row);
