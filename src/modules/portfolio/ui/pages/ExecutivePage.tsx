@@ -159,8 +159,12 @@ export default async function PortfolioExecutivePage({ searchParams }: Dashboard
 
       {/*
         Yield y Crédito dependen de entry_yield / exit_yield / credito_total, que
-        el RPC replace_proyectos no insertaba hasta la migración 034. Salen vacías
-        hasta que se aplique y se vuelva a cargar el maestro.
+        el RPC replace_proyectos no insertaba hasta la migración 034. La 034 está
+        aplicada desde el 2026-09-02, pero no rellena hacia atrás: las tres
+        columnas siguen a NULL en las 28 filas y estas dos gráficas saldrán
+        vacías hasta la próxima carga del maestro. Que hoy no llega, porque el
+        sync desde SharePoint nunca ha funcionado — ver el banner de la pestaña
+        Datos y `npm run portfolio:check-sharepoint -- --list`.
       */}
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
         <ProjectGroupedBarChart

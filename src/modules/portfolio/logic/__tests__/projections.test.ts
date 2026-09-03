@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   CRECIMIENTO_DEFAULT,
+  CRECIMIENTO_MAX,
   anioVencimiento,
   captacionObjetivo,
   fechaFinEfectiva,
@@ -153,5 +154,6 @@ test("sanitizeCrecimiento admite porcentaje y tanto por uno, y acota la basura",
   assert.equal(sanitizeCrecimiento(""), CRECIMIENTO_DEFAULT);
   assert.equal(sanitizeCrecimiento("abc"), CRECIMIENTO_DEFAULT);
   assert.equal(sanitizeCrecimiento("-5"), CRECIMIENTO_DEFAULT);
-  assert.equal(sanitizeCrecimiento("500"), 1, "se acota al máximo");
+  assert.equal(sanitizeCrecimiento("500"), CRECIMIENTO_MAX, "se acota al máximo");
+  assert.equal(sanitizeCrecimiento("50"), CRECIMIENTO_MAX, "el tope coincide con el del slider");
 });

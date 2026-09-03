@@ -10,6 +10,7 @@ import {
   sanitizeTipo,
   sanitizeView,
 } from "../portfolioParams";
+import { CRECIMIENTO_MAX, sanitizeCrecimiento } from "../projections";
 import type { Proyecto } from "@/modules/portfolio/types";
 
 function proyecto(overrides: Partial<Proyecto> = {}): Proyecto {
@@ -77,6 +78,18 @@ test("buildPortfolioHref omite los valores por defecto", () => {
 test("buildPortfolioHref serializa el crecimiento como porcentaje entero", () => {
   assert.equal(buildPortfolioHref("/p", { crecimiento: 0.1 }), "/p?crecimiento=10");
   assert.equal(buildPortfolioHref("/p", { crecimiento: 0 }), "/p?crecimiento=0");
+});
+
+test("el crecimiento sobrevive a la ida y vuelta por la URL", () => {
+  // El what-if de Tendencias se perdía al tocar un filtro: la barra flotante
+  // reconstruía el href sin arrastrar `crecimiento`. Lo que fija este test es el
+  // contrato del que depende ese arrastre — que lo serializado se recupere igual,
+  // y que el tope de la URL sea el mismo que el del control de la página.
+  for (const valor of [0, 0.05, 0.1, 0.25, CRECIMIENTO_MAX]) {
+    const href = buildPortfolioHref("/p", { crecimiento: valor });
+    const leido = new URL(href, "https://x").searchParams.get("crecimiento") ?? undefined;
+    assert.equal(sanitizeCrecimiento(leido), valor, `ida y vuelta de ${valor}`);
+  }
 });
 
 test("matchesQuery ignora mayúsculas y acentos, y busca también en ubicación", () => {

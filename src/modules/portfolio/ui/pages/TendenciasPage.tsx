@@ -90,6 +90,7 @@ export default async function TendenciasPage({ searchParams }: TendenciasPagePro
         basePath={portfolioPaths.tendencias}
         situacion={selectedSituacion}
         tipo={selectedTipo}
+        crecimiento={crecimiento}
       />
     </div>
   );

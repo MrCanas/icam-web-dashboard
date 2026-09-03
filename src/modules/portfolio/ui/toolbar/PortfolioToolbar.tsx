@@ -40,6 +40,12 @@ export interface PortfolioToolbarProps {
   sort?: SortKey;
   query?: string;
   view?: ProyectosView;
+  /**
+   * Crecimiento de las proyecciones (tanto por uno). La barra no lo edita: lo
+   * arrastra para no borrarlo al navegar. Sin esto, tocar un filtro en
+   * Tendencias devolvía el what-if a su valor por defecto.
+   */
+  crecimiento?: number;
 }
 
 /**
@@ -51,6 +57,11 @@ export interface PortfolioToolbarProps {
  * filtran en servidor, así que las vistas siguen siendo compartibles por enlace
  * y el botón atrás funciona. El buscador es la excepción parcial: mantiene el
  * texto en local para responder a cada tecla y vuelca a la URL con debounce.
+ *
+ * Filtros, orden y vista navegan con `push` para que atrás deshaga la elección
+ * anterior, que es lo que espera cualquiera. El buscador usa `replace`: con
+ * `push`, cada pulsación de tecla dejaría una entrada en el historial y volver
+ * atrás sería borrar el texto letra a letra.
  */
 export function PortfolioToolbar({
   basePath,
@@ -60,6 +71,7 @@ export function PortfolioToolbar({
   sort,
   query,
   view,
+  crecimiento,
 }: PortfolioToolbarProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -83,9 +95,10 @@ export function PortfolioToolbar({
       // debounce, lo ya tecleado tiene que sobrevivir a la navegación.
       q: query === undefined ? undefined : texto,
       view,
+      crecimiento,
       ...cambios,
     });
-    startTransition(() => router.replace(href, { scroll: false }));
+    startTransition(() => router.push(href, { scroll: false }));
   }
 
   // Volcado del buscador a la URL con debounce: se dispara solo cuando lo
@@ -95,12 +108,19 @@ export function PortfolioToolbar({
     if (texto === (query ?? "")) return;
 
     const id = setTimeout(() => {
-      const href = buildPortfolioHref(basePath, { situacion, tipo, sort, view, q: texto });
+      const href = buildPortfolioHref(basePath, {
+        situacion,
+        tipo,
+        sort,
+        view,
+        crecimiento,
+        q: texto,
+      });
       startTransition(() => router.replace(href, { scroll: false }));
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(id);
-  }, [texto, query, basePath, situacion, tipo, sort, view, router]);
+  }, [texto, query, basePath, situacion, tipo, sort, view, crecimiento, router]);
 
   const hayFiltros = Boolean(situacion || tipo);
   const vistaActual = OPCIONES_VISTA.find((v) => v.key === view);

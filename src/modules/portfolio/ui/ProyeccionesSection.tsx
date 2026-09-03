@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -16,7 +17,11 @@ import {
 } from "recharts";
 
 import { fmtInt, fmtMEuros } from "@/lib/formatters";
-import { captacionObjetivo, type PipelineYear } from "@/modules/portfolio/logic/projections";
+import {
+  CRECIMIENTO_MAX,
+  captacionObjetivo,
+  type PipelineYear,
+} from "@/modules/portfolio/logic/projections";
 import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
 import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
 
@@ -28,17 +33,49 @@ interface ProyeccionesSectionProps {
 
 const ATAJOS = [0, 0.05, 0.1, 0.15, 0.2];
 
+/** Espera antes de escribir el crecimiento en la URL, en ms. */
+const URL_DEBOUNCE_MS = 400;
+
 /**
  * Proyección del portfolio a futuro: cuándo vence lo que está en marcha y
  * cuánto habría que captar cada año para no decrecer.
  *
- * El porcentaje de crecimiento es estado local, no de URL: es un *what-if* que
- * se mueve muchas veces seguidas y no debe provocar una ida y vuelta al
- * servidor por cada pulsación. Todo lo que necesita ya está en el cliente.
+ * El porcentaje de crecimiento se pinta desde estado local, para que arrastrar
+ * el slider responda al instante sin una ida y vuelta al servidor por cada
+ * pulsación: todo lo que hace falta ya está en el cliente y el objetivo es una
+ * multiplicación.
+ *
+ * Pero además se vuelca a la URL con debounce, porque sin eso el what-if se
+ * perdía: la barra flotante reconstruye el href al tocar cualquier filtro, y
+ * lo que no esté en la URL vuelve a su valor por defecto. De paso, el escenario
+ * queda compartible por enlace. Se navega con `replace`, no con `push`: mover
+ * un control no debe llenar el historial.
  */
 export function ProyeccionesSection({ pipeline, crecimientoInicial }: ProyeccionesSectionProps) {
   const [crecimiento, setCrecimiento] = useState(crecimientoInicial);
   const drilldown = useChartDrilldown();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Si la URL cambia por otra vía (atrás, enlace compartido), mandar ella.
+  const [inicialVisto, setInicialVisto] = useState(crecimientoInicial);
+  if (crecimientoInicial !== inicialVisto) {
+    setInicialVisto(crecimientoInicial);
+    setCrecimiento(crecimientoInicial);
+  }
+
+  useEffect(() => {
+    if (crecimiento === crecimientoInicial) return;
+    const id = setTimeout(() => {
+      // Se parte de la query viva en vez de reconstruirla: aquí no se conocen
+      // los filtros que haya puestos la barra flotante, y rehacer el href sin
+      // ellos los borraría.
+      const actuales = new URLSearchParams(window.location.search);
+      actuales.set("crecimiento", String(Math.round(crecimiento * 100)));
+      router.replace(`${pathname}?${actuales.toString()}`, { scroll: false });
+    }, URL_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [crecimiento, crecimientoInicial, pathname, router]);
 
   const porAnio = new Map(pipeline.map((a) => [a.year, a]));
   const objetivos = captacionObjetivo(pipeline, crecimiento);
@@ -186,7 +223,7 @@ export function ProyeccionesSection({ pipeline, crecimientoInicial }: Proyeccion
               <input
                 type="range"
                 min={0}
-                max={50}
+                max={Math.round(CRECIMIENTO_MAX * 100)}
                 step={1}
                 value={pct}
                 onChange={(ev) => setCrecimiento(Number(ev.target.value) / 100)}

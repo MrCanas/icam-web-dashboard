@@ -13,7 +13,12 @@ import type { Proyecto } from "@/modules/portfolio/types";
 
 /** Crecimiento anual por defecto de la captación objetivo (tanto por uno). */
 export const CRECIMIENTO_DEFAULT = 0.1;
-export const CRECIMIENTO_MAX = 1;
+/**
+ * Tope del crecimiento. Es el mismo que el del control de la página: si la URL
+ * admitiera más que el slider, un enlace compartido podría pintar un escenario
+ * que nadie puede reproducir moviendo el control.
+ */
+export const CRECIMIENTO_MAX = 0.5;
 
 /** Años hacia delante que se proyectan cuando no se indica otra cosa. */
 const HORIZONTE_ANIOS = 6;
