@@ -16,10 +16,11 @@ export interface DownloadedFile {
   filename: string;
 }
 
-interface DriveChild {
+export interface DriveChild {
   id: string;
   name: string;
   file?: { mimeType?: string };
+  folder?: { childCount?: number };
   lastModifiedDateTime?: string;
 }
 
@@ -31,37 +32,75 @@ async function errorDetail(res: Response): Promise<string> {
 }
 
 /**
+ * Vuelca la carpeta entera, siguiendo la paginación de Graph.
+ *
+ * Se expone porque el diagnóstico necesita ver lo que hay SIN filtrar: cuando el
+ * cron dice que no encuentra el maestro, la pregunta útil es qué había realmente
+ * en la carpeta, no repetir la misma búsqueda que ya falló.
+ */
+export async function listFolderChildren(
+  driveId: string,
+  folderItemId: string,
+): Promise<{ children: DriveChild[]; paginas: number }> {
+  const children: DriveChild[] = [];
+  let paginas = 0;
+  let url: string | null =
+    `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(folderItemId)}/children` +
+    `?$select=id,name,file,folder,lastModifiedDateTime&$top=200`;
+
+  while (url) {
+    const res: Response = await graphFetch(url);
+    if (!res.ok) {
+      throw new Error(
+        `No se pudo listar la carpeta de SharePoint (HTTP ${res.status})` +
+          `${await errorDetail(res)}. Revisa driveId/folderItemId y el permiso concedido a la app.`,
+      );
+    }
+    const json = (await res.json()) as { value?: DriveChild[]; "@odata.nextLink"?: string };
+    children.push(...(json.value ?? []));
+    paginas += 1;
+    // El nextLink viene absoluto; graphFetch acepta ambas formas.
+    url = json["@odata.nextLink"] ?? null;
+  }
+
+  return { children, paginas };
+}
+
+/**
  * Localiza el fichero maestro dentro de la carpeta concedida: el Excel (.xlsx/.xlsm/
  * .xlsb) cuyo nombre contiene `nameMatch`; si hay varios, el más reciente.
+ *
+ * Si no lo encuentra, el error dice qué había en la carpeta. Sin eso, el mensaje
+ * («no se encontró ningún Excel con "MAESTRO"») no distingue entre carpeta
+ * equivocada, fichero renombrado o fichero movido a una subcarpeta — y esa
+ * ambigüedad dejó el sync roto sin diagnosticar desde que se puso en marcha.
  */
 export async function findMaestroInFolder(
   driveId: string,
   folderItemId: string,
   nameMatch = "MAESTRO",
 ): Promise<DriveChild> {
-  const res = await graphFetch(
-    `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(folderItemId)}/children` +
-      `?$select=id,name,file,lastModifiedDateTime&$top=200`,
-  );
-  if (!res.ok) {
-    throw new Error(
-      `No se pudo listar la carpeta de SharePoint (HTTP ${res.status})` +
-        `${await errorDetail(res)}. Revisa driveId/folderItemId y el permiso concedido a la app.`,
-    );
-  }
-  const json = (await res.json()) as { value?: DriveChild[] };
+  const { children } = await listFolderChildren(driveId, folderItemId);
+
   const match = (nameMatch || "").toLowerCase();
-  const candidates = (json.value ?? []).filter(
-    (it) =>
-      it.file &&
-      EXCEL_NAME_RE.test(it.name) &&
-      (match === "" || it.name.toLowerCase().includes(match)),
+  const excels = children.filter((it) => it.file && EXCEL_NAME_RE.test(it.name));
+  const candidates = excels.filter(
+    (it) => match === "" || it.name.toLowerCase().includes(match),
   );
+
   if (candidates.length === 0) {
+    const subcarpetas = children.filter((it) => it.folder).map((it) => it.name);
+    const muestra = children.slice(0, 5).map((it) => it.name);
     throw new Error(
-      `No se encontró ningún Excel${nameMatch ? ` con "${nameMatch}" en el nombre` : ""} en la carpeta de SharePoint.`,
+      `No se encontró ningún Excel${nameMatch ? ` con "${nameMatch}" en el nombre` : ""} ` +
+        `en la carpeta de SharePoint. La carpeta tenía ${children.length} elemento(s), ` +
+        `de ellos ${excels.length} Excel` +
+        (subcarpetas.length ? `, y ${subcarpetas.length} subcarpeta(s) en las que el cron no entra: ${subcarpetas.join(", ")}` : "") +
+        (muestra.length ? `. Primeros nombres: ${muestra.join(", ")}` : "") +
+        `. Revisa SHAREPOINT_FOLDER_ITEM_ID y SHAREPOINT_FILE_NAME_MATCH en el entorno del despliegue.`,
     );
   }
+
   candidates.sort((a, b) => (b.lastModifiedDateTime ?? "").localeCompare(a.lastModifiedDateTime ?? ""));
   return candidates[0];
 }

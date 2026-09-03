@@ -4,6 +4,8 @@ import { Proyecto } from "@/modules/portfolio/types";
 
 interface ProjectCardProps {
   project: Proyecto;
+  /** Menos métricas y tipografía más contenida, para rejillas de 3 y 4 columnas. */
+  compact?: boolean;
 }
 
 function maybe(value: number | null, formatter: (value: number) => string): string {
@@ -16,17 +18,23 @@ function maybeInteger(value: number | null, suffix = ""): string {
   return `${fmtInt(value)}${suffix}`;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, compact = false }: ProjectCardProps) {
   const tir = project.tir_desp_is ?? 0;
 
   return (
-    <article className="bg-card rounded-lg border border-subtle/50 shadow-sm overflow-hidden">
+    <article className="h-full bg-card rounded-lg border border-subtle/50 shadow-sm overflow-hidden">
       <div className={`h-1 ${getTIRColorClass(tir)}`} />
 
       <header className="p-3 sm:p-4 border-b border-subtle/60">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg sm:text-xl font-semibold text-icam-900 break-words">{project.proyecto}</h3>
+            <h3
+              className={`font-semibold text-icam-900 break-words ${
+                compact ? "text-base" : "text-lg sm:text-xl"
+              }`}
+            >
+              {project.proyecto}
+            </h3>
             <p className="mt-1 text-xs text-text-muted">{project.ubicacion ?? "—"}</p>
           </div>
           <span className="px-2 py-1 rounded-md text-[10px] border border-subtle text-text-body">
@@ -36,21 +44,25 @@ export function ProjectCard({ project }: ProjectCardProps) {
       </header>
 
       <div className="p-3 sm:p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+        <div className={`grid gap-2 sm:gap-3 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
           <Metric label="Inversión" value={maybe(project.inversion_total, fmtMEuros)} />
           <Metric label="TIR" value={maybe(project.tir_desp_is, fmtPct)} />
-          <Metric label="ROE" value={maybe(project.roe_desp_is, fmtPct)} />
+          {compact ? null : <Metric label="ROE" value={maybe(project.roe_desp_is, fmtPct)} />}
           <Metric label="Beneficio" value={maybe(project.beneficios, fmtMEuros)} />
           <Metric label="Múltiplo" value={maybe(project.multiplo, fmtMult)} />
-          <Metric label="Unidades" value={maybeInteger(project.unidades_totales)} />
+          {compact ? null : (
+            <Metric label="Unidades" value={maybeInteger(project.unidades_totales)} />
+          )}
         </div>
 
-        <footer className="mt-4 pt-3 border-t border-subtle/60 text-xs sm:text-sm text-text-muted flex flex-wrap gap-x-3 gap-y-2">
-          <span>Equity: {maybe(project.equity, fmtMEuros)}</span>
-          <span>Holding Period: {maybeInteger(project.holding_period, " meses")}</span>
-          <span>Superficie: {maybeInteger(project.superficie_edificable, " m²")}</span>
-          <span>Project IRR: {maybe(project.project_irr, fmtPct)}</span>
-        </footer>
+        {compact ? null : (
+          <footer className="mt-4 pt-3 border-t border-subtle/60 text-xs sm:text-sm text-text-muted flex flex-wrap gap-x-3 gap-y-2">
+            <span>Equity: {maybe(project.equity, fmtMEuros)}</span>
+            <span>Holding Period: {maybeInteger(project.holding_period, " meses")}</span>
+            <span>Superficie: {maybeInteger(project.superficie_edificable, " m²")}</span>
+            <span>Project IRR: {maybe(project.project_irr, fmtPct)}</span>
+          </footer>
+        )}
       </div>
     </article>
   );

@@ -2,6 +2,9 @@
 
 import { fmtMEuros } from "@/lib/formatters";
 import { Proyecto } from "@/modules/portfolio/types";
+import { projectByName } from "@/modules/portfolio/logic/drilldown";
+import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
+import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Top10BarChartProps {
@@ -9,6 +12,7 @@ interface Top10BarChartProps {
 }
 
 export function Top10BarChart({ data }: Top10BarChartProps) {
+  const drilldown = useChartDrilldown();
   const chartData = data.map((item) => ({
     name: item.proyecto,
     inversion: item.inversion_total ?? 0,
@@ -43,12 +47,31 @@ export function Top10BarChart({ data }: Top10BarChartProps) {
             />
             <Tooltip
               cursor={false}
-              formatter={(value) => fmtMEuros(Number(value))}
+              content={
+                <DrilldownTooltip
+                  heading={(payload) => String(payload[0]?.payload?.name ?? "")}
+                  rows={(payload) => [
+                    { label: "Inversión", value: fmtMEuros(Number(payload[0]?.value ?? 0)) },
+                  ]}
+                />
+              }
             />
-            <Bar dataKey="inversion" fill="#1E2A56" radius={[0, 4, 4, 0]} activeBar={false} />
+            <Bar
+              dataKey="inversion"
+              fill="#1E2A56"
+              radius={[0, 4, 4, 0]}
+              activeBar={false}
+              cursor="pointer"
+              onClick={(item) => {
+                const name = (item as { payload?: { name?: string } })?.payload?.name;
+                if (!name) return;
+                drilldown.open({ title: name, proyectos: projectByName(data, name) });
+              }}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {drilldown.modal}
     </section>
   );
 }

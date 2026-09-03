@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUser, type UserContext } from "@/lib/auth/currentUser";
 import { getUserRole } from "@/lib/auth/permissions";
+import { sendGraphMail } from "@/lib/email";
 import { downloadMaestroFromFolder } from "@/lib/graph/sharepoint";
 import { commitMaestroReplace } from "@/modules/portfolio/logic/commitMaestroUpload";
 import { insertUploadLog } from "@/modules/portfolio/data/uploadLogsRepository";
@@ -110,7 +111,18 @@ async function run(request: NextRequest) {
   });
 }
 
-/** Deja traza del fallo de descarga en upload_logs (sin enmascarar el error original). */
+/**
+ * Deja traza del fallo de descarga en upload_logs (sin enmascarar el error original)
+ * y avisa por correo.
+ *
+ * El aviso existe porque la traza sola no bastó: el sync falló cuatro miércoles
+ * seguidos escribiendo aquí su error, y nadie lo miró en un mes. Un log que nadie
+ * consulta no es una alerta.
+ *
+ * Se envía a PORTFOLIO_SYNC_ALERT_TO y, si no está definida, a EMAIL_FROM — que
+ * siempre lo está, porque sin él no hay envío posible. Nunca revienta el cron: si
+ * el correo falla, el error de descarga sigue siendo el que se devuelve.
+ */
 async function logDownloadError(msg: string): Promise<void> {
   try {
     await insertUploadLog(SYSTEM_CTX, {
@@ -123,6 +135,30 @@ async function logDownloadError(msg: string): Promise<void> {
   } catch {
     // no-op: el error de descarga ya se devuelve al llamante.
   }
+
+  try {
+    const to = process.env.PORTFOLIO_SYNC_ALERT_TO?.trim() || process.env.EMAIL_FROM?.trim();
+    if (!to) return;
+    await sendGraphMail({
+      to,
+      subject: "ICAM · la sincronización del maestro financiero ha fallado",
+      html:
+        `<p>El cron <code>/api/cron/portfolio-sync</code> no ha podido descargar el maestro ` +
+        `de SharePoint. El portfolio sigue mostrando los datos de la última carga buena.</p>` +
+        `<p><b>Error:</b><br><code>${escaparHtml(msg)}</code></p>` +
+        `<p>Para ver qué hay realmente en la carpeta y con qué IDs se está mirando:<br>` +
+        `<code>npm run portfolio:check-sharepoint -- --list</code></p>`,
+    });
+  } catch {
+    // no-op: avisar es un extra; que falle el aviso no debe cambiar la respuesta.
+  }
+}
+
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 export async function POST(request: NextRequest) {

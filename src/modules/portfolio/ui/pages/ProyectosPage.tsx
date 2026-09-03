@@ -1,10 +1,18 @@
 import { SupabaseEmptyProjectsBanner } from "@/modules/portfolio/ui/SupabaseEmptyProjectsBanner";
-import { ProjectCard } from "@/modules/portfolio/ui/ProjectCard";
-import { SortSelector } from "@/modules/portfolio/ui/SortSelector";
-import { SituacionFilter } from "@/modules/portfolio/ui/SituacionFilter";
+import { ProyectosView } from "@/modules/portfolio/ui/ProyectosView";
+import { PortfolioToolbar } from "@/modules/portfolio/ui/toolbar/PortfolioToolbar";
 import { fmtMEuros } from "@/lib/formatters";
 import { getCurrentUser } from "@/lib/auth/currentUser";
-import { buildProyectosActivosPageModel } from "@/modules/portfolio/logic/pageViewModels";
+import {
+  applyPortfolioSearchFilters,
+  buildProyectosActivosPageModel,
+} from "@/modules/portfolio/logic/pageViewModels";
+import {
+  sanitizeQuery,
+  sanitizeSituacion,
+  sanitizeTipo,
+  sanitizeView,
+} from "@/modules/portfolio/logic/portfolioParams";
 import { portfolioPaths } from "@/modules/portfolio/logic/paths";
 import {
   filterUltimaFilaRows,
@@ -13,23 +21,23 @@ import {
 import { sanitizeSort } from "@/modules/portfolio/logic/proyectoSort";
 import { Proyecto } from "@/modules/portfolio/types";
 
-const SITUACIONES_VALIDAS = ["En Marcha", "Culminado"] as const;
-
 interface ProyectosPageProps {
   searchParams: Promise<{
     sort?: string;
     situacion?: string;
+    tipo?: string;
+    q?: string;
+    view?: string;
   }>;
 }
 
 export default async function ProyectosPage({ searchParams }: ProyectosPageProps) {
   const params = await searchParams;
-  const selectedSort = params.sort;
-  const selectedSituacion = SITUACIONES_VALIDAS.includes(
-    params.situacion as (typeof SITUACIONES_VALIDAS)[number],
-  )
-    ? params.situacion
-    : undefined;
+  const selectedSort = sanitizeSort(params.sort);
+  const selectedSituacion = sanitizeSituacion(params.situacion);
+  const selectedTipo = sanitizeTipo(params.tipo);
+  const query = sanitizeQuery(params.q);
+  const view = sanitizeView(params.view);
 
   const ctx = await getCurrentUser();
   if (!ctx) {
@@ -43,6 +51,7 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
   const { portfolioCount, countError, data, error } = await loadProyectosPageData(
     ctx,
     selectedSituacion,
+    selectedTipo,
   );
 
   if (error || countError) {
@@ -57,42 +66,28 @@ export default async function ProyectosPage({ searchParams }: ProyectosPageProps
   const baseRows = filterUltimaFilaRows(data as Proyecto[] | null);
   const showRlsEmpty = (portfolioCount ?? 0) === 0;
   const rows = showRlsEmpty ? [] : baseRows;
-  const view = buildProyectosActivosPageModel(rows, selectedSort);
+  // El texto del buscador se aplica aquí, en servidor, con la misma función que
+  // el resto de filtros: así el modelo y la barra no pueden divergir.
+  const filtradas = applyPortfolioSearchFilters(rows, { q: query });
+  const model = buildProyectosActivosPageModel(filtradas, selectedSort);
 
-  const resumen =
-    selectedSituacion === "En Marcha"
-      ? `${view.activeCount} proyectos en marcha`
-      : selectedSituacion === "Culminado"
-        ? `${view.culminadoCount} proyectos culminados`
-        : `${view.totalCount} proyectos · ${view.activeCount} en marcha · ${view.culminadoCount} culminados`;
+  const resumen = `${model.totalCount} proyectos · ${fmtMEuros(model.inversionComprometida)}`;
 
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
       {showRlsEmpty ? <SupabaseEmptyProjectsBanner /> : null}
-      <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
-        <h1 className="text-xl font-semibold text-text-primary">Proyectos</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          {resumen} · Inversión comprometida: {fmtMEuros(view.inversionComprometida)}
-        </p>
-      </section>
 
-      <SituacionFilter
-        selectedSituacion={selectedSituacion}
-        selectedSort={sanitizeSort(selectedSort)}
+      <ProyectosView proyectos={model.projects} view={view} />
+
+      <PortfolioToolbar
         basePath={portfolioPaths.proyectos}
+        situacion={selectedSituacion}
+        tipo={selectedTipo}
+        sort={selectedSort}
+        query={query}
+        view={view}
+        resumen={resumen}
       />
-
-      <SortSelector
-        selectedSort={sanitizeSort(selectedSort)}
-        selectedSituacion={selectedSituacion}
-        basePath={portfolioPaths.proyectos}
-      />
-
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        {view.projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
-        ))}
-      </section>
     </div>
   );
 }

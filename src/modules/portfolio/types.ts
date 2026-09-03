@@ -24,6 +24,8 @@ export interface Proyecto {
   superficie_edificable: number | null;
   es_ultima_fila: number;
   fecha_inicio: string | null;
+  /** Fin del proyecto. Viene de la columna EndQuarter del maestro (último día del trimestre). */
+  fecha_fin: string | null;
   created_at?: string | null;
 }
 

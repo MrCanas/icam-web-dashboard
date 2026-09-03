@@ -26,7 +26,7 @@ Estados: `pendiente` · `en fase N` · `hecho (commit)` · `aceptado` (riesgo as
 
 ## 1. Seguridad
 
-### 1.1 `temp_allow_all` — lectura y escritura anónima · **CRÍTICA** · `migración 030 lista (pendiente --apply)`
+### 1.1 `temp_allow_all` — lectura y escritura anónima · **CRÍTICA** · `hecho (030 + 035 aplicadas 2026-09-03)`
 
 `20260521100000_enable_rls_temp_allow_all.sql:33` crea `FOR ALL USING (true) WITH CHECK (true)` — sin `TO`, aplica a **todos** los roles incluido `anon` — en 8 tablas: `proyectos`, `upload_logs`, `pm_activos`, `pm_hitos`, `pm_snapshot_fechas`, `pm_activo_proyecto_map`, `pm_import_logs`, `monday_sync_logs`. Y `20260521110000_audit_log.sql:26` lo mismo en `audit_log`.
 
@@ -34,7 +34,7 @@ La única migración que las elimina (`005_rls.sql:136-155`) solo cubre tablas d
 
 Lo que sí está bien cerrado: `app_user_password`, `app_user_account`, `app_user_zone_role`, `app_user_route_deny`, `app_zone` (solo `service_role`).
 
-### 1.2 `SELECT TO public` deliberado en 12 tablas PM/avance · **MEDIA** · `migración 030 lista (pendiente --apply)`
+### 1.2 `SELECT TO public` deliberado en 12 tablas PM/avance · **MEDIA** · `hecho (030 + 035 aplicadas 2026-09-03)`
 
 `pm_hito_catalogo`, `pm_snapshots`, `pm_activo_snapshot`, `maestro_lineas_trimestre`, `maestro_hito_fechas`, `pm_snapshot_validacion` y las 6 tablas de avance de obra (028): cronograma completo, promociones de Zoho y porcentajes legibles con la anon key. Pasarán a `TO authenticated` (el navegador ya lee con el bridge JWT).
 
@@ -73,7 +73,7 @@ Con el matiz de que los reads de servidor usan **service role** (RLS no es segun
 
 ## 2. Integridad de datos
 
-### 2.1 `replace_pm_portfolio` destruye los mapeos manuales · **CRÍTICA** · `migración 031 lista (pendiente --apply)`
+### 2.1 `replace_pm_portfolio` destruye los mapeos manuales · **CRÍTICA** · `hecho (031 aplicada 2026-09-03)`
 
 `scripts/supabase/replace_pm_portfolio.sql:25-27`: `DELETE FROM pm_activos` + reinsert con **UUIDs nuevos**. Cada subida del Excel PM (`/api/upload-pm-excel?confirm=true`) borra en cascada:
 
@@ -109,7 +109,7 @@ Arreglo (migración 031): upsert de `pm_activos` por `id_activo` con UUIDs estab
 - `planificacionRepository.ts:69-77`: 5 tablas completas más.
 - `avanceRepository.ts:263-270`, `proyectosRepository.ts:60`, `syncLogsRepository.ts:207`: más `select("*")`.
 
-### 3.2 `auth.users` paginado en cada render · **ALTA** · `hecho (migración 033 lista)`
+### 3.2 `auth.users` paginado en cada render · **ALTA** · `hecho (033 aplicada 2026-09-03)`
 
 `resolveUserDisplayMap` (`actas/logic/user-display.ts:57-88`) pagina `auth.admin.listUsers` de 200 en 200 **sin caché**, invocado por cada tablero de actas. Es probablemente la causa nº 1 del «va lento» en actas.
 
@@ -165,7 +165,7 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 
 `routeKeyForPathname` devuelve el **primer** match del array: el orden de los literales en `module.ts` es semántica de permisos, ya parcheado dos veces con regex negativas y comentarios de advertencia. Dos fuentes de verdad path→key (cliente por match, servidor por key literal escrita a mano) — 4 rutas ya divergieron (§1.3). `route_key` sin FK: renombrar una key deja denies huérfanos que se descartan en silencio (ya pasó: migración 027). 4 resoluciones path→zona distintas en el código.
 
-### 5.3 Duplicación estructural · **MEDIA** · `en fase 4`
+### 5.3 Duplicación estructural · **MEDIA** · `parcial: formateadores de fecha hechos (fase 4); el resto pendiente`
 
 7 toasts (4 con fuga de timeout), 5 writeClients (2 byte-idénticos), 10 guards «No autorizado» (8 inalcanzables), 55 secciones rojas de error con 4 variantes, 2 celdas de mapeo optimista casi idénticas, 12 `Intl.DateTimeFormat` a mano con 3 formatos incompatibles, formatters de `monday` que reimplementan `lib/formatters.ts`, 2 rutas API gemelas (`*-status`), 2 componentes de upload con 211 líneas idénticas, ~140 tipos `Input/Result` sin genérico.
 
@@ -222,9 +222,28 @@ Dev con Turbopack, `build --webpack` sin justificación documentada en ningún s
 | Fase | Rama | Contenido | Estado |
 |---|---|---|---|
 | 0 | `auditoria-2026-08` | Este informe + artefacto ejecutivo | **hecho** |
-| 1 | `auditoria-2026-08` | Migraciones 030/031/032 (código listo, `--apply` pendiente), guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **código hecho** |
+| 1 | `auditoria-2026-08` | Migraciones 030/031/032, guardas de servidor, rate limit + lookup directo, IDOR notificaciones, cron actas | **hecho** (aplicadas el 2026-09-03, más la 035 correctiva) |
 | 2 | `auditoria-2026-08` | Bugs de lint (0 errores), `error.tsx`, tests de RBAC/registry/log-access (+18), CI, `npm test`/`check`, `pg.ts`→`src/lib/db` | **hecho** |
 | 3 | `auditoria-2026-08` | user-display por RPC (033), fix subconsulta inválida, bulk concurrente, `loading.tsx` en 8 páginas | **parcial** (proyecciones SQL y recharts dynamic quedan) |
-| 4 | `auditoria-2026-08` | `lang="es"`, README real, RBAC en ARCHITECTURE, `.gitattributes`, formateadores de fecha, `aria-modal` en 10 diálogos | **parcial** (borrado y contraste requieren tu OK) |
+| 4 | `auditoria-2026-08` | `lang="es"`, README real, RBAC en ARCHITECTURE, `.gitattributes`, formateadores de fecha, `aria-modal` en 10 diálogos | **parcial** (borrado y contraste hechos en `9f3752b`; solo queda retirar los prompts de Cursor y los artefactos de Power BI, que el usuario deja para más adelante) |
+
+### Lo que enseñó aplicarlas (2026-09-03)
+
+Dos de los scripts de migración daban por bueno un cierre incompleto, y por la misma razón:
+**verificaban por nombre y sobre listas fijas.**
+
+- El de la **030** contaba las políticas restantes con `policyname LIKE '%_public_read'` y
+  sondeaba la anon key contra cinco tablas escritas a mano. Ninguna de las cinco que quedaban
+  abiertas estaba en esa lista, y una de ellas se llamaba `pm_map_public_read` — fuera de la
+  convención. Resultado: `pm_hitos` (131 filas) y `pm_snapshot_fechas` (416) siguieron
+  legibles desde internet, es decir el cronograma de PM al completo. Lo cierra la **035**.
+- El de la **031** omitió su prueba de conservación con un «no hay activos con mapeo para
+  probar»: miraba `pm_activo_proyecto_map` (0 filas) y no `pm_activo_promocion_map`, que tiene
+  los 6 emparejamientos a Zoho de la PMO. La prueba se rehizo a mano en una transacción con
+  ROLLBACK y la función nueva sí los conserva.
+
+La lección para el próximo script de migración: **verificar por el efecto, no por el nombre**.
+El de la 035 descubre las tablas del catálogo y busca las políticas por el rol al que alcanzan,
+así que cubre también lo que se añada en el futuro.
 
 Fuera de alcance (reevaluar más adelante): staging, `cacheComponents`, focus traps completos, refactor de monolitos, tests exhaustivos de `pm/actas`, Prettier, observabilidad (Sentry/logger).

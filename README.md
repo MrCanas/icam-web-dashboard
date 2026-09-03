@@ -32,18 +32,27 @@ La CI (`.github/workflows/ci.yml`) ejecuta `check` en cada PR.
 
 Migraciones en `supabase/migrations/` (`<timestamp>_<NNN>_<slug>.sql`). Se aplican con `npx supabase db push` o con los scripts `pm:apply-migration-0NN` (dry-run por defecto, `--apply` para escribir, con verificación).
 
-**Migraciones pendientes de aplicar** (código en el repo, `--apply` no lanzado):
+**Todas las migraciones del repo están aplicadas** (última comprobación: 2026-09-03).
 
-| Migración | Qué hace |
+Las 030–033 y la 035 se aplicaron ese día; la 034 ya lo estaba. Qué hizo cada una, por si
+hay que auditarlas:
+
+| Migración | Qué hizo |
 |---|---|
-| 030 | Cierra el acceso anónimo (RLS `temp_allow_all`) — **crítica** |
-| 031 | `replace_pm_portfolio` no destructivo (conserva los mapeos de la PMO) |
-| 032 | `auth_user_id_by_email` (login sin paginar) |
+| 030 | Cerró el acceso anónimo (`temp_allow_all` en 9 tablas, 13 lecturas públicas) |
+| 031 | `replace_pm_portfolio` dejó de hacer `DELETE … WHERE true` de tres tablas `pm_*` |
+| 032 | `auth_user_id_by_email` (login sin paginar `auth.users`) |
 | 033 | `auth_users_display` (avatares de actas sin paginar) |
+| 035 | Cerró las 5 lecturas públicas que la 030 no alcanzó, y la tabla de backup sin RLS |
+
+La 030 se dio por buena dejando `pm_hitos` (131 filas) y `pm_snapshot_fechas` (416) todavía
+legibles con la anon key: su script contaba políticas por patrón de nombre y sondeaba una
+lista fija de cinco tablas. La 035 lo cierra y su script sondea **todas** las tablas del
+esquema descubriéndolas del catálogo, sin listas ni convenciones de nombre. Si añades una
+tabla, esa es la comprobación que la cubre:
 
 ```bash
-npm run pm:apply-migration-030 -- --apply   # y 031
-# 032/033: npx supabase db push, o el runner que uses
+npm run pm:apply-migration-035          # dry-run: audita, no escribe
 ```
 
 ## Scripts útiles

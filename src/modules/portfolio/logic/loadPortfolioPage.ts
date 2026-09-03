@@ -7,7 +7,7 @@ import {
 import type { Proyecto } from "@/modules/portfolio/types";
 
 const TENDENCIAS_SELECT =
-  "id,proyecto,situacion,tipo_proyecto,inversion_total,total_ingresos_venta,beneficios,unidades_totales,tir_desp_is,roe_desp_is,multiplo,project_irr,bcr,ubicacion,equity,holding_period,superficie_edificable,es_ultima_fila,fecha_inicio,created_at";
+  "id,proyecto,situacion,tipo_proyecto,inversion_total,total_ingresos_venta,beneficios,unidades_totales,tir_desp_is,roe_desp_is,multiplo,project_irr,bcr,ubicacion,equity,holding_period,superficie_edificable,es_ultima_fila,fecha_inicio,fecha_fin,created_at";
 
 export async function loadPortfolioCountAndList(
   ctx: UserContext,
@@ -39,11 +39,13 @@ export async function loadTendenciasPageData(ctx: UserContext) {
 export async function loadProyectosPageData(
   ctx: UserContext,
   situacion?: string,
+  tipoProyecto?: string,
 ) {
   const [{ count: portfolioCount, error: countError }, filteredResult] = await Promise.all([
     countProyectosUltimaFila(ctx),
     listProyectos(ctx, {
       situacionEquals: situacion,
+      filters: { tipoProyecto },
       order: { column: "inversion_total", ascending: false, nullsFirst: false },
     }),
   ]);
