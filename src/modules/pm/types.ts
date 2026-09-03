@@ -1,4 +1,10 @@
-export type PmTipoUso = "APT" | "RESIDENCIAL_LIBRE";
+/**
+ * Uso del activo, en los cuatro valores que admite el CHECK de pm_activos:
+ * APT (apartamentos turísticos), RESIDENCIAL_LIBRE, TERCIARIO (locales
+ * comerciales) y FONDO (un vehículo, no un edificio). Los dos últimos los
+ * añadió la migración 037. Nada ramifica por este valor: solo se pinta.
+ */
+export type PmTipoUso = "APT" | "RESIDENCIAL_LIBRE" | "TERCIARIO" | "FONDO";
 
 export interface PmActivo {
   id: string;

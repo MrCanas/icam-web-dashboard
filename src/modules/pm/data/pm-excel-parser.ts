@@ -84,9 +84,19 @@ function toIntLoose(v: unknown): number | null {
   return Math.trunc(n);
 }
 
+/**
+ * Los dos usos que añadió la 037 se comprueban ANTES que RESIDENCIAL: el CHECK
+ * los admite, así que un «Terciario» o un «Fondo» en el Excel tiene que llegar
+ * tal cual. Si no, el upsert de replace_pm_portfolio pisaría con APT el uso que
+ * la PMO fijó a mano (LSE84 es terciario; SICCII y VBARE, fondo).
+ */
 function parseTipoUso(raw: string): PmTipoUso | null {
   const u = stripDiacritics(raw).trim().toUpperCase();
   if (!u) return null;
+  if (u.includes("TERCIARIO") || u.includes("LOCAL") || u.includes("COMERCIAL")) {
+    return "TERCIARIO";
+  }
+  if (u.includes("FONDO") || u.includes("VEHICULO")) return "FONDO";
   if (u.includes("RESIDENCIAL") || u.includes("LIBRE") || u.includes("RL")) {
     return "RESIDENCIAL_LIBRE";
   }

@@ -64,13 +64,14 @@ export function validateIdActivo(raw: string): Validated<string> {
   return { ok: true, value: v };
 }
 
-export const TIPOS_USO = ["APT", "RESIDENCIAL_LIBRE"] as const;
+export const TIPOS_USO = ["APT", "RESIDENCIAL_LIBRE", "TERCIARIO", "FONDO"] as const;
 export type TipoUso = (typeof TIPOS_USO)[number];
 
 /**
- * El CHECK de pm_activos solo admite estos dos valores. Si hace falta otro uso,
- * hay que ampliarlo con una migración: aquí solo se valida contra lo que la base
- * de datos aceptará, para dar un error legible en vez de un fallo de constraint.
+ * El CHECK de pm_activos solo admite estos cuatro valores (migración 037: la 020
+ * los dejó en APT y RESIDENCIAL_LIBRE). Si hace falta otro uso, hay que ampliarlo
+ * con una migración: aquí solo se valida contra lo que la base de datos aceptará,
+ * para dar un error legible en vez de un fallo de constraint.
  */
 export function validateTipoUso(raw: string): Validated<TipoUso> {
   const v = String(raw ?? "").trim().toUpperCase();
