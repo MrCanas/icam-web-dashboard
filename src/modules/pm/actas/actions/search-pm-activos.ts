@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import {
   searchPmActivos,
   type PmActivoOption,
@@ -9,7 +9,9 @@ import {
 export async function searchPmActivosAction(
   query: string,
 ): Promise<{ ok: true; items: PmActivoOption[] } | { ok: false; error: string }> {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   try {
     const items = await searchPmActivos(ctx, query);
     return { ok: true, items };

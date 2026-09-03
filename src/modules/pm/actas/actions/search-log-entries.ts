@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import { searchLogEntriesInProject } from "@/modules/pm/actas/data/searchRepository";
 import type { ActasLogSearchResult } from "@/modules/pm/actas/types";
 
@@ -17,7 +17,9 @@ export type SearchLogEntriesResult =
 export async function searchLogEntries(
   input: SearchLogEntriesInput,
 ): Promise<SearchLogEntriesResult> {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   const { results, error } = await searchLogEntriesInProject(
     ctx,
     input.projectId,

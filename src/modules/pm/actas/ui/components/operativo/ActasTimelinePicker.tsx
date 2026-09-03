@@ -288,6 +288,7 @@ export function ActasTimelinePicker({
               ref={popRef}
               id={listId}
               role="dialog"
+      aria-modal="true"
               aria-label="Editar plazo"
               className="fixed z-[70] w-[312px] rounded-lg border border-subtle/60 bg-card p-3 shadow-lg"
               style={{ top: position.top, left: position.left }}

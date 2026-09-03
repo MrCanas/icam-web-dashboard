@@ -218,6 +218,7 @@ export function NotificationBell() {
         <div
           ref={panelRef}
           role="dialog"
+      aria-modal="true"
           aria-label="Notificaciones Actas"
           className="absolute right-0 top-full z-[80] mt-2 w-[min(100vw-1.5rem,22rem)] overflow-hidden rounded-lg border border-subtle/60 bg-card shadow-xl"
         >

@@ -19,7 +19,7 @@ const config = {
         subtle: "#EAEBEE",
         "text-primary": "#1E2A56",
         "text-body": "#2C2C2C",
-        "text-muted": "#8A8A8A",
+        "text-muted": "#6E6E6E",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

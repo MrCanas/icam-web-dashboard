@@ -2,10 +2,14 @@ import bcrypt from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 
 import { signSessionToken } from "@/lib/auth/jwt";
+import { comprobarRateLimit, limpiarRateLimit } from "@/lib/auth/rate-limit";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { createServiceRoleClient } from "@/lib/db/admin";
 
 const GENERIC_AUTH_ERROR = "Email o contraseña incorrectos";
+
+/** 8 intentos por (IP + email) cada 5 minutos. Suficiente para <15 usuarios. */
+const RATE_LIMIT = { max: 8, ventanaMs: 5 * 60 * 1000 };
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -28,6 +32,18 @@ export async function POST(request: NextRequest) {
 
   if (!email || typeof password !== "string" || !password) {
     return NextResponse.json({ error: GENERIC_AUTH_ERROR }, { status: 401 });
+  }
+
+  // Freno de fuerza bruta: por IP + email, antes de tocar bcrypt o la base.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "sin-ip";
+  const clave = `${ip}:${email.toLowerCase()}`;
+  const limite = comprobarRateLimit(clave, RATE_LIMIT);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { error: `Demasiados intentos. Prueba de nuevo en ${limite.reintentarEnSeg} s.` },
+      { status: 429, headers: { "Retry-After": String(limite.reintentarEnSeg) } },
+    );
   }
 
   let userId: string | null;
@@ -82,6 +98,9 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  // Login correcto: limpia el contador para que no arrastre bloqueo.
+  limpiarRateLimit(clave);
 
   const response = NextResponse.json({ success: true });
   response.cookies.set("icam-auth", token, COOKIE_OPTIONS);

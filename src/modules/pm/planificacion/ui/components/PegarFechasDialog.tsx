@@ -85,6 +85,7 @@ export function PegarFechasDialog({ hitos, destinos, onAplicar }: PegarFechasDia
             >
               <div
                 role="dialog"
+      aria-modal="true"
                 aria-label="Pegar fechas desde Excel"
                 className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-subtle/60 bg-card p-4 shadow-xl"
                 onClick={(e) => e.stopPropagation()}

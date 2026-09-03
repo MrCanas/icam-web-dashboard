@@ -53,7 +53,13 @@ export function ownerFromAuthUser(
   };
 }
 
-/** Resuelve etiquetas/iniciales para avatares (service role, pagina auth.users). */
+/**
+ * Resuelve etiquetas/iniciales para avatares (service role).
+ *
+ * Usa la RPC `auth_users_display` (migración 033): trae SOLO los usuarios
+ * pedidos en una consulta, en vez de paginar auth.users entero en cada render.
+ * Si la RPC no está aplicada, cae a la paginación antigua.
+ */
 export async function resolveUserDisplayMap(
   userIds: string[],
 ): Promise<Map<string, ActasElementOwner>> {
@@ -61,15 +67,38 @@ export async function resolveUserDisplayMap(
   const result = new Map<string, ActasElementOwner>();
   if (unique.length === 0) return result;
 
-  const needed = new Set(unique);
   const admin = createServiceRoleClient();
+  const { data, error } = await admin.rpc("auth_users_display", { p_ids: unique });
+
+  if (!error && Array.isArray(data)) {
+    for (const row of data as { id: string; email: string | null; meta: Record<string, unknown> | null }[]) {
+      result.set(row.id, ownerFromAuthUser(row.id, row.email ?? undefined, row.meta ?? undefined));
+    }
+  } else if (error && !/could not find|does not exist|PGRST202|42883/i.test(error.message ?? "")) {
+    throw new Error(`auth_users_display: ${error.message}`);
+  } else if (error) {
+    // RPC sin aplicar todavía: fallback a la paginación.
+    await paginarAuthUsers(admin, new Set(unique), result);
+  }
+
+  for (const id of unique) {
+    if (!result.has(id)) {
+      result.set(id, ownerFromAuthUser(id, undefined));
+    }
+  }
+  return result;
+}
+
+async function paginarAuthUsers(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  needed: Set<string>,
+  result: Map<string, ActasElementOwner>,
+): Promise<void> {
   let page = 1;
   const perPage = 200;
-
   for (;;) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
     if (error) throw new Error(`listUsers: ${error.message}`);
-
     for (const user of data.users) {
       if (needed.has(user.id)) {
         result.set(
@@ -82,16 +111,7 @@ export async function resolveUserDisplayMap(
         );
       }
     }
-
     if (result.size >= needed.size || data.users.length < perPage) break;
     page += 1;
   }
-
-  for (const id of unique) {
-    if (!result.has(id)) {
-      result.set(id, ownerFromAuthUser(id, undefined));
-    }
-  }
-
-  return result;
 }

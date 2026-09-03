@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -224,9 +225,9 @@ export function PmDataUpload() {
           <p className="font-medium">Vía de rescate — ya no es la forma normal de actualizar PM</p>
           <p className="mt-1 leading-snug text-red-900/90">
             Los hitos se editan en{" "}
-            <a href="/dashboard/pm/planificacion" className="underline">
+            <Link href="/dashboard/pm/planificacion" className="underline">
               PM → Planificación
-            </a>
+            </Link>
             . Esta importación <strong>borra las tres tablas</strong> y se lleva por
             delante todo lo editado ahí y <strong>el histórico completo de
             los trimestres</strong>, no solo lo que traiga el Excel.

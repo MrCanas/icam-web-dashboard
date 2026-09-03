@@ -320,43 +320,41 @@ export async function fetchActasProjectDetail(
 
   const projectId = projectRow.id as string;
 
-  // Fetch latest log_entry date and element count in parallel
+  // Categorías del proyecto → elementos → última fecha de log. PostgREST no
+  // admite subconsultas dentro de .eq() (la versión anterior las pasaba como
+  // builder y no filtraban nada): se resuelven por pasos con .in().
+  const { data: cats } = await supabase
+    .from("category")
+    .select("id")
+    .eq("project_id", projectId)
+    .is("archived_at", null);
+  const categoryIds = (cats ?? []).map((c: { id: string }) => c.id);
+
+  const { data: els } = categoryIds.length
+    ? await supabase
+        .from("element")
+        .select("id")
+        .in("category_id", categoryIds)
+        .is("archived_at", null)
+    : { data: [] as { id: string }[] };
+  const elementIds = (els ?? []).map((e: { id: string }) => e.id);
+
   const [logResult, elementResult] = await Promise.all([
-    supabase
-      .from("log_entry")
-      .select("entry_date")
-      .eq(
-        "element_id",
-        supabase
+    elementIds.length
+      ? supabase
+          .from("log_entry")
+          .select("entry_date")
+          .in("element_id", elementIds)
+          .order("entry_date", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: [] as { entry_date: string }[] }),
+    categoryIds.length
+      ? supabase
           .from("element")
-          .select("id")
-          .eq(
-            "category_id",
-            supabase
-              .from("category")
-              .select("id")
-              .eq("project_id", projectId)
-              .is("archived_at", null),
-          )
-          .is("archived_at", null),
-      )
-      .order("entry_date", { ascending: false })
-      .limit(1),
-    // element count via category join
-    supabase
-      .from("element")
-      .select("id", { count: "exact", head: true })
-      .is("archived_at", null)
-      .in(
-        "category_id",
-        // subquery: categories of this project
-        (await supabase
-          .from("category")
-          .select("id")
-          .eq("project_id", projectId)
+          .select("id", { count: "exact", head: true })
           .is("archived_at", null)
-        ).data?.map((c: { id: string }) => c.id) ?? [],
-      ),
+          .in("category_id", categoryIds)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   // Responsable del proyecto (project.owner_user_id) resuelto a avatar + nombre.

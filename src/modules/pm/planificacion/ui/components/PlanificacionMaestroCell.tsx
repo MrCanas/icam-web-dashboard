@@ -170,6 +170,7 @@ export function PlanificacionMaestroCell({
               ref={popRef}
               id={dialogId}
               role="dialog"
+      aria-modal="true"
               aria-label="Resolver discrepancia con el maestro"
               className="fixed z-[70] w-[280px] rounded-lg border border-subtle/60 bg-card p-3 shadow-lg"
               style={{ top: position.top, left: position.left }}

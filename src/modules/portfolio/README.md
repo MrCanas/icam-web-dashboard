@@ -55,6 +55,5 @@ Auditoría (`audit_log`):
 - **Rutas en UI**: usar `portfolioPaths` (`logic/paths.ts`) enlazado a `module.ts`, no strings sueltas.
 - **Data workspace** vive en `src/components/data` + `platform-nav.ts`; las APIs `upload-excel` y `upload-logs` llaman a los repositorios de este módulo.
 - **Componentes compartidos**: layout en `src/components/layout`; no hay chart genérico en `components/` — los gráficos son específicos de portfolio (`ui/`). PM reutiliza `KPICard` de este módulo (deuda: extraer a `components/` si se generaliza).
-- **`seedProyectos.ts`**: datos mock locales; no toca Supabase.
 
 Módulo de referencia del patrón del portal — ver también `src/modules/_template/` y `ARCHITECTURE.md`.

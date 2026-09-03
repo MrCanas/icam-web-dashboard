@@ -17,6 +17,8 @@ export async function dismiss(id: string): Promise<DismissNotificationResult> {
     .from("element_notification")
     .update({ status: "dismissed" })
     .eq("id", notificationId)
+    // Solo el destinatario puede tocar su notificación (evita IDOR):
+    .eq("recipient_user_id", ctx.authUserId)
     .select("id")
     .maybeSingle();
 

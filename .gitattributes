@@ -1,0 +1,14 @@
+# Normaliza los finales de línea a LF en los ficheros de texto del repo.
+# El árbol venía con 427 ficheros en CRLF y unos pocos en LF, lo que hacía que
+# git mostrara reescrituras completas en ficheros hermanos. No se renormaliza el
+# histórico aquí (evita un diff de cientos de ficheros); gobierna lo nuevo.
+* text=auto eol=lf
+
+# Binarios: nunca tocar.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.xlsx binary
+*.xlsm binary
+*.docx binary
+*.ico binary

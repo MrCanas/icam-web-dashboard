@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { requireRouteAccess } from "@/lib/auth/require-route-access";
+import ProyectoDetailPage from "@/modules/pm/ui/pages/ProyectoDetailPage";
+
 export async function generateMetadata({
   params,
 }: {
@@ -9,4 +12,13 @@ export async function generateMetadata({
   return { title: `${decodeURIComponent(id)} · Resumen` };
 }
 
-export { default } from "@/modules/pm/ui/pages/ProyectoDetailPage";
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ snapshot?: string }>;
+}) {
+  await requireRouteAccess("pm.detalle");
+  return <ProyectoDetailPage params={params} searchParams={searchParams} />;
+}

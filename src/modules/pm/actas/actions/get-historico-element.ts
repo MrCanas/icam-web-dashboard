@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { requirePmReadContext } from "@/modules/pm/actas/actions/require-pm-read";
 import {
   fetchHistoricoElementDetail,
   fetchHistoricoElementOptions,
@@ -16,7 +16,9 @@ export async function getHistoricoElementOptions(
   | { ok: true; options: ActasHistoricoElementOption[] }
   | { ok: false; error: string }
 > {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   const { options, error } = await fetchHistoricoElementOptions(ctx, projectId);
   if (error) return { ok: false, error };
   return { ok: true, options };
@@ -29,7 +31,9 @@ export async function getHistoricoElementDetail(
   | { ok: true; detail: ActasHistoricoElementDetail }
   | { ok: false; error: string; notFound?: boolean }
 > {
-  const ctx = await requireCurrentUser();
+  const access = await requirePmReadContext();
+  if (!access.ok) return access;
+  const ctx = access.ctx;
   const result = await fetchHistoricoElementDetail(ctx, projectId, elementId);
   if (result.error) {
     return { ok: false, error: result.error };

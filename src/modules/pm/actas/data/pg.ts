@@ -1,1 +1,1 @@
-export { getPgPool, withPgClient } from "../../../../../scripts/actas/lib/db";
+export { getPgPool, withPgClient } from "@/lib/db/pg";
