@@ -65,6 +65,13 @@ test("validateTipoUso solo admite lo que acepta el CHECK", () => {
   assert.equal(validateTipoUso("HOTEL").ok, false);
 });
 
+test("validateTipoUso admite los usos que añadió la 037", () => {
+  // LSE84 es terciario; SICCII y VBARE son fondos. Si esto se cae, el alta
+  // desde la pantalla de Proyectos rechaza usos que la base de datos sí acepta.
+  assert.deepEqual(validateTipoUso("terciario"), { ok: true, value: "TERCIARIO" });
+  assert.deepEqual(validateTipoUso("FONDO"), { ok: true, value: "FONDO" });
+});
+
 test("validateIdActivo limpia espacios y exige contenido", () => {
   assert.deepEqual(validateIdActivo("  PC25-CP6 "), { ok: true, value: "PC25-CP6" });
   assert.equal(validateIdActivo("   ").ok, false);
