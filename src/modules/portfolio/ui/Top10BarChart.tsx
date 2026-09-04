@@ -1,77 +1,33 @@
 "use client";
 
-import { fmtMEuros } from "@/lib/formatters";
-import { Proyecto } from "@/modules/portfolio/types";
-import { projectByName } from "@/modules/portfolio/logic/drilldown";
-import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
-import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import dynamic from "next/dynamic";
 
-interface Top10BarChartProps {
-  data: Proyecto[];
-}
+import { ChartFrame } from "@/components/ui/ChartFrame";
+import type { Top10BarChartProps } from "@/modules/portfolio/ui/impl/Top10BarChart";
 
-export function Top10BarChart({ data }: Top10BarChartProps) {
-  const drilldown = useChartDrilldown();
-  const chartData = data.map((item) => ({
-    name: item.proyecto,
-    inversion: item.inversion_total ?? 0,
-  }));
+export type { Top10BarChartProps };
 
-  return (
-    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
-      <h3 className="text-base font-semibold text-text-primary mb-3 sm:mb-4">
-        Top 10 proyectos por inversión
-      </h3>
-      <div className="h-[300px] w-full sm:h-[340px] min-w-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#EAEBEE" />
-            <XAxis
-              type="number"
-              stroke="#8A8A8A"
-              tick={{ fontSize: 9 }}
-              tickFormatter={(value) => fmtMEuros(Number(value))}
-            />
-            <YAxis
-              dataKey="name"
-              type="category"
-              width={76}
-              stroke="#8A8A8A"
-              tick={{ fontSize: 9 }}
-              interval={0}
-            />
-            <Tooltip
-              cursor={false}
-              content={
-                <DrilldownTooltip
-                  heading={(payload) => String(payload[0]?.payload?.name ?? "")}
-                  rows={(payload) => [
-                    { label: "Inversión", value: fmtMEuros(Number(payload[0]?.value ?? 0)) },
-                  ]}
-                />
-              }
-            />
-            <Bar
-              dataKey="inversion"
-              fill="#1E2A56"
-              radius={[0, 4, 4, 0]}
-              activeBar={false}
-              cursor="pointer"
-              onClick={(item) => {
-                const name = (item as { payload?: { name?: string } })?.payload?.name;
-                if (!name) return;
-                drilldown.open({ title: name, proyectos: projectByName(data, name) });
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      {drilldown.modal}
-    </section>
-  );
+/**
+ * Cáscara de carga diferida de Top10BarChart.
+ *
+ * recharts pesa 356 KB y estaba en el arranque de todas las páginas con
+ * gráficas. El `dynamic` va aquí, dentro de un componente cliente, y no en la
+ * página: la documentación de esta versión dice que un Server Component que
+ * importa dinámicamente un Client Component NO parte nada, y que `ssr: false`
+ * solo funciona dentro de clientes. Las páginas siguen importando este fichero
+ * con la misma firma, así que ninguna cambia.
+ */
+const Impl = dynamic(
+  () => import("@/modules/portfolio/ui/impl/Top10BarChart").then((m) => m.Top10BarChart),
+  {
+    ssr: false,
+    loading: () => (
+      <ChartFrame title={"Top 10 proyectos por inversión"} bodyClassName="h-[300px] w-full sm:h-[340px] min-w-0"
+        titleClassName={"text-base font-semibold text-text-primary mb-3 sm:mb-4"} />
+    ),
+  },
+);
+
+export function Top10BarChart(props: Top10BarChartProps) {
+  return <Impl {...props} />;
 }

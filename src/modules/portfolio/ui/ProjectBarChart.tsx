@@ -1,93 +1,42 @@
 "use client";
 
-import { fmtMEuros, fmtPct } from "@/lib/formatters";
-import { projectByName } from "@/modules/portfolio/logic/drilldown";
-import type { Proyecto } from "@/modules/portfolio/types";
-import { DrilldownTooltip } from "@/modules/portfolio/ui/charts/DrilldownTooltip";
-import { useChartDrilldown } from "@/modules/portfolio/ui/charts/useChartDrilldown";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Suspense, lazy } from "react";
 
-export interface BarDatum {
-  name: string;
-  value: number;
+import { ChartFrame } from "@/components/ui/ChartFrame";
+import type { BarDatum, ProjectBarChartProps } from "@/modules/portfolio/ui/impl/ProjectBarChart";
+
+export type { BarDatum, ProjectBarChartProps };
+
+/** La misma fórmula que la implementación: el hueco debe medir exactamente igual. */
+function alturaDe(data: BarDatum[]): number {
+  return Math.max(280, data.length * 34);
 }
 
-interface ProjectBarChartProps {
-  title: string;
-  data: BarDatum[];
-  valueType: "pct" | "meuros";
-  /** Filas ya filtradas, para resolver el proyecto de la barra pinchada. */
-  proyectos: Proyecto[];
-}
+/**
+ * Cáscara de carga diferida de ProjectBarChart.
+ *
+ * recharts pesa 356 KB y estaba en el arranque de todas las páginas con
+ * gráficas. Aquí se usa `lazy` + `Suspense` en vez de `next/dynamic` porque la
+ * altura del hueco depende del número de barras, y el `loading` de
+ * `next/dynamic` no recibe las props. El resto de gráficas, de altura fija, sí
+ * usan `next/dynamic`.
+ */
+const Impl = lazy(() =>
+  import("@/modules/portfolio/ui/impl/ProjectBarChart").then((m) => ({ default: m.ProjectBarChart })),
+);
 
-function formatValue(value: number, valueType: "pct" | "meuros"): string {
-  return valueType === "pct" ? fmtPct(value) : fmtMEuros(value);
-}
-
-export function ProjectBarChart({ title, data, valueType, proyectos }: ProjectBarChartProps) {
-  const height = Math.max(280, data.length * 34);
-  const drilldown = useChartDrilldown();
-
+export function ProjectBarChart(props: ProjectBarChartProps) {
   return (
-    <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4 min-w-0">
-      <h3 className="text-base font-semibold text-text-primary mb-2 sm:mb-3">{title}</h3>
-      <div className="w-full min-w-0" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 8, right: 12, left: 4, bottom: 8 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#EAEBEE" />
-            <XAxis
-              type="number"
-              stroke="#8A8A8A"
-              tick={{ fontSize: 9 }}
-              tickFormatter={(value) => formatValue(Number(value), valueType)}
-            />
-            <YAxis
-              dataKey="name"
-              type="category"
-              width={82}
-              stroke="#8A8A8A"
-              tick={{ fontSize: 9 }}
-              interval={0}
-            />
-            <Tooltip
-              cursor={false}
-              content={
-                <DrilldownTooltip
-                  heading={(payload) => String(payload[0]?.payload?.name ?? "")}
-                  rows={(payload) => [
-                    { label: title, value: formatValue(Number(payload[0]?.value ?? 0), valueType) },
-                  ]}
-                />
-              }
-            />
-            <Bar
-              dataKey="value"
-              fill="#1E2A56"
-              radius={[0, 4, 4, 0]}
-              activeBar={false}
-              cursor="pointer"
-              onClick={(item) => {
-                const name = (item as { payload?: { name?: string } })?.payload?.name;
-                if (!name) return;
-                drilldown.open({ title: name, proyectos: projectByName(proyectos, name) });
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      {drilldown.modal}
-    </section>
+    <Suspense
+      fallback={
+        <ChartFrame
+          title={props.title}
+          bodyClassName="w-full min-w-0"
+          bodyStyle={{ height: alturaDe(props.data) }}
+        />
+      }
+    >
+      <Impl {...props} />
+    </Suspense>
   );
 }
