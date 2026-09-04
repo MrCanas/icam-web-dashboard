@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type SyncStatus = "idle" | "syncing" | "success" | "error";
 
@@ -31,6 +31,27 @@ export function PortfolioSyncButton() {
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  // El botón vuelve solo a su estado neutro pasados unos segundos. Sin limpiar
+  // el temporizador, salir de la página antes de tiempo dejaba un setState
+  // apuntando a un componente ya desmontado.
+  const montado = useRef(true);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  function volverAIdle(ms: number) {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      if (montado.current) setStatus("idle");
+    }, ms);
+  }
+
   async function handleSync() {
     setStatus("syncing");
     setMessage(null);
@@ -59,11 +80,12 @@ export function PortfolioSyncButton() {
         `${payload.archivo ?? "Maestro"} — ${payload.numProyectos ?? 0} proyectos cargados.`,
       );
       router.refresh();
-      setTimeout(() => setStatus("idle"), 5000);
+      volverAIdle(5000);
     } catch (err) {
+      if (!montado.current) return;
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Error al sincronizar.");
-      setTimeout(() => setStatus("idle"), 8000);
+      volverAIdle(8000);
     }
   }
 

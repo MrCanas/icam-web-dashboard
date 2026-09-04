@@ -9,6 +9,14 @@ import {
   type PmProjectNavItem,
 } from "@/modules/pm/data/pmRepository";
 
+/**
+ * Sin caché, y a propósito: cada respuesta del dashboard depende de quién la
+ * pide. El acceso se resuelve por rol de zona y por `app_user_route_deny`, así
+ * que una página cacheada podría servirle a un usuario el contenido que se le
+ * denegó a otro. Aparece como hallazgo de rendimiento en la auditoría de agosto
+ * (§3.3) — se deja como está a sabiendas: el riesgo de fuga entre usuarios no
+ * compensa los milisegundos.
+ */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

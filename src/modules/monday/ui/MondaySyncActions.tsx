@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SyncLogRecord {
   id: string;
@@ -44,6 +44,28 @@ export function MondaySyncActions({ initialLatestLog }: MondaySyncActionsProps) 
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [latestLog, setLatestLog] = useState<SyncLogRecord | null>(initialLatestLog);
 
+  // El sondeo dura hasta 120 vueltas de 3 s: seis minutos. Sin esto seguía
+  // pidiendo logs después de que el usuario se hubiera ido de la página, y
+  // llamaba a setState sobre un componente desmontado.
+  const montado = useRef(true);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  /** Vuelve a «idle» pasado un rato, sin dejar el temporizador suelto. */
+  function volverAIdle(ms: number) {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      if (montado.current) setStatus("idle");
+    }, ms);
+  }
+
   async function handleSync() {
     try {
       setStatus("syncing");
@@ -55,7 +77,9 @@ export function MondaySyncActions({ initialLatestLog }: MondaySyncActionsProps) 
       let done = false;
       for (let i = 0; i < 120 && !done; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (!montado.current) return;
         const poll = await fetch("/api/monday/sync-logs?limit=1", { cache: "no-store" });
+        if (!montado.current) return;
         if (!poll.ok) continue;
         const payload = (await poll.json()) as { logs?: SyncLogRecord[] };
         const current = payload.logs?.[0] ?? null;
@@ -66,16 +90,17 @@ export function MondaySyncActions({ initialLatestLog }: MondaySyncActionsProps) 
           if (estado === "completado" || estado === "completado_con_errores") {
             setStatus("success");
             router.refresh();
-            setTimeout(() => setStatus("idle"), 3000);
+            volverAIdle(3000);
           } else {
             setStatus("error");
-            setTimeout(() => setStatus("idle"), 5000);
+            volverAIdle(5000);
           }
         }
       }
     } catch {
+      if (!montado.current) return;
       setStatus("error");
-      setTimeout(() => setStatus("idle"), 5000);
+      volverAIdle(5000);
     }
   }
 
