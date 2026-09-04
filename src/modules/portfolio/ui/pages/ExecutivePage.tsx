@@ -1,4 +1,5 @@
 import { ConsolidatedKPIs } from "@/modules/portfolio/ui/ConsolidatedKPIs";
+import { DonutChart } from "@/modules/portfolio/ui/DonutChart";
 import { PortfolioToolbar } from "@/modules/portfolio/ui/toolbar/PortfolioToolbar";
 import { KPICard } from "@/modules/portfolio/ui/KPICard";
 import { ProjectBarChart } from "@/modules/portfolio/ui/ProjectBarChart";
@@ -179,6 +180,26 @@ export default async function PortfolioExecutivePage({ searchParams }: Dashboard
           data={view.credito}
           valueType="meuros"
           proyectos={proyectos}
+        />
+      </section>
+
+      {/*
+        Los dos donuts vivían en la pestaña «WIP». Se mueven aquí (2026-09) para
+        cerrar Executive con el reparto de la cartera; comparten el mismo
+        buildExecutivePageModel, así que respetan los filtros de la toolbar.
+      */}
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
+        <DonutChart
+          title="Distribución por tipo de proyecto"
+          data={view.donutTipoData}
+          proyectos={proyectos}
+          field="tipo_proyecto"
+        />
+        <DonutChart
+          title="Distribución por situación"
+          data={view.donutSituacionData}
+          proyectos={proyectos}
+          field="situacion"
         />
       </section>
 
