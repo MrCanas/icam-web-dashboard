@@ -39,6 +39,7 @@ export function firstAccessiblePath(user: UserContext): string | null {
 /** Zona requerida para la ruta, o null si no aplica guard (perfil, sin-acceso). */
 export function pathnameToZone(pathname: string): ZoneKey | null {
   if (pathname.startsWith("/dashboard/portfolio")) return "financiero";
+  if (pathname.startsWith("/dashboard/corporativo")) return "corporativo";
   if (pathname.startsWith("/dashboard/pm")) return "pm";
   if (pathname.startsWith("/dashboard/monday")) return "adquisiciones";
   if (pathname.startsWith("/dashboard/data")) return "data";

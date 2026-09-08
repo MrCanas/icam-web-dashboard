@@ -35,7 +35,7 @@ function parseArgs(): { email: string; zone: string; role: string } {
   if (args.length !== 3) {
     console.error(
       "Uso: npm run auth:grant -- <email> <zona> <rol>\n" +
-        "  zona: financiero | pm | adquisiciones | data\n" +
+        "  zona: financiero | corporativo | pm | adquisiciones | data\n" +
         "  rol:  admin | editor | lector | none (revoca acceso a la zona)",
     );
     process.exit(1);

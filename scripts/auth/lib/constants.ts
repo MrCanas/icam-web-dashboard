@@ -5,6 +5,7 @@ export const BCRYPT_ROUNDS = 10;
 
 export const ZONE_KEYS = [
   "financiero",
+  "corporativo",
   "pm",
   "adquisiciones",
   "data",

@@ -9,7 +9,7 @@ const TEST_EMAIL =
   process.env.AUTH_TEST_EMAIL?.trim() || "javiercanas@imparcapital.com";
 const TEST_PASSWORD = process.env.AUTH_TEST_PASSWORD?.trim() || "Capital2030";
 
-const ZONE_KEYS = ["financiero", "pm", "adquisiciones", "data"] as const;
+const ZONE_KEYS = ["financiero", "corporativo", "pm", "adquisiciones", "data"] as const;
 
 function fail(message: string): never {
   console.error(`FAIL: ${message}`);

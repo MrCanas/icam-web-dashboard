@@ -64,3 +64,63 @@ export function fmtFechaHora(value: string | number | Date | null | undefined): 
   const d = toDate(value);
   return d ? FECHA_HORA.format(d) : "—";
 }
+
+// ---------------------------------------------------------------------------
+// Euros con escala adaptativa — para las cifras corporativas.
+//
+// `fmtMEuros` fuerza millones con un decimal, que es lo correcto para el
+// portfolio de proyectos (inversiones de 5-40 M€) pero aplasta la cuenta de
+// resultados del grupo: un EBITDA trimestral de 7.768 € se lee como «0,0 M€».
+// Estas dos eligen la escala según la magnitud. No sustituyen a `fmtMEuros`:
+// las páginas de portfolio siguen usándola y no deben cambiar de aspecto.
+// ---------------------------------------------------------------------------
+
+function nf(min: number, max: number): Intl.NumberFormat {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: min,
+    maximumFractionDigits: max,
+  });
+}
+
+/**
+ * Euros a la escala que toque: «12,5 M€», «393 k€», «7,8 k€», «456 €».
+ *
+ * Por debajo de 100 k€ se conserva un decimal, porque ahí la diferencia entre
+ * 7,8 k€ y 8 k€ es la mitad de un EBITDA trimestral flojo.
+ */
+export function fmtEurosCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${nf(1, 1).format(value / 1_000_000)} M€`;
+  if (abs >= 100_000) return `${nf(0, 0).format(value / 1_000)} k€`;
+  if (abs >= 1_000) return `${nf(1, 1).format(value / 1_000)} k€`;
+  return `${nf(0, 0).format(value)} €`;
+}
+
+/** Como `fmtEurosCompact`, pero marcando el signo: «+1,2 M€», «−340 k€». */
+export function fmtEurosSigned(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  if (value === 0) return fmtEurosCompact(0);
+  const signo = value > 0 ? "+" : "−";
+  return `${signo}${fmtEurosCompact(Math.abs(value))}`;
+}
+
+/** Porcentaje con signo explícito, para variaciones interanuales. */
+export function fmtPctSigned(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  if (value === 0) return fmtPct(0);
+  const signo = value > 0 ? "+" : "−";
+  return `${signo}${fmtPct(Math.abs(value))}`;
+}
+
+/** `fmtPct` tolerante a null, para las columnas del maestro que vienen vacías. */
+export function fmtPctOrDash(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return fmtPct(value);
+}
+
+/** `fmtInt` tolerante a null. */
+export function fmtIntOrDash(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return fmtInt(value);
+}

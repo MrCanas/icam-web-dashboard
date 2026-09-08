@@ -7,6 +7,7 @@ import type { UserPermissionsInput } from "@/modules/admin/types";
 
 const ZONE_LABELS: Record<ZoneKey, string> = {
   financiero: "Dashboard",
+  corporativo: "Corporativas",
   pm: "Proyectos",
   adquisiciones: "Adquisiciones",
   data: "Data",
