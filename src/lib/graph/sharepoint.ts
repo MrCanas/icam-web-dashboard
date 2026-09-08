@@ -68,12 +68,17 @@ export async function listFolderChildren(
 
 /**
  * Localiza el fichero maestro dentro de la carpeta concedida: el Excel (.xlsx/.xlsm/
- * .xlsb) cuyo nombre contiene `nameMatch`; si hay varios, el más reciente.
+ * .xlsb) cuyo nombre contiene `nameMatch`. Tiene que haber exactamente uno.
  *
  * Si no lo encuentra, el error dice qué había en la carpeta. Sin eso, el mensaje
  * («no se encontró ningún Excel con "MAESTRO"») no distingue entre carpeta
  * equivocada, fichero renombrado o fichero movido a una subcarpeta — y esa
  * ambigüedad dejó el sync roto sin diagnosticar desde que se puso en marcha.
+ *
+ * Si encuentra varios, también falla. Antes se quedaba con el modificado más
+ * recientemente, y eso convertía en azar cuál de los dos «MAESTRO» de la carpeta
+ * —el de vehículos y el corporativo— acababa reemplazando la tabla `proyectos`:
+ * bastaba con editar el que no toca. Más vale que el cron aborte y lo diga.
  */
 export async function findMaestroInFolder(
   driveId: string,
@@ -101,7 +106,17 @@ export async function findMaestroInFolder(
     );
   }
 
-  candidates.sort((a, b) => (b.lastModifiedDateTime ?? "").localeCompare(a.lastModifiedDateTime ?? ""));
+  if (candidates.length > 1) {
+    const listado = candidates
+      .map((it) => `${it.name} (modificado ${it.lastModifiedDateTime?.slice(0, 10) ?? "?"})`)
+      .join(", ");
+    throw new Error(
+      `Hay ${candidates.length} Excel con "${nameMatch}" en el nombre en la carpeta de ` +
+        `SharePoint y no se puede saber cuál es el maestro: ${listado}. ` +
+        `Afina SHAREPOINT_FILE_NAME_MATCH en el entorno del despliegue para que case con uno solo.`,
+    );
+  }
+
   return candidates[0];
 }
 
