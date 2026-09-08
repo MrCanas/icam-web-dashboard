@@ -33,3 +33,22 @@ export async function listUploadLogs(ctx: UserContext, limit = 200) {
     .order("fecha", { ascending: false })
     .limit(limit);
 }
+
+/**
+ * Solo las cargas del maestro de VEHÍCULOS.
+ *
+ * La columna `fuente` la añadió la migración 038, cuando el maestro corporativo
+ * empezó a escribir en esta misma tabla. Las filas anteriores no la traen, y
+ * todas eran de portfolio: por eso NULL cuenta como «portfolio» y no como
+ * «desconocido». Sin este filtro, el banner de la pestaña Datos daría por caído
+ * el portfolio cuando lo que ha fallado es el corporativo.
+ */
+export async function listUploadLogsPortfolio(ctx: UserContext, limit = 20) {
+  const supabase = getPortfolioWriteSupabase(ctx);
+  return supabase
+    .from("upload_logs")
+    .select("*")
+    .or("fuente.is.null,fuente.eq.portfolio")
+    .order("fecha", { ascending: false })
+    .limit(limit);
+}

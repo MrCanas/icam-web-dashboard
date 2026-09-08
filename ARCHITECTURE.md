@@ -72,7 +72,7 @@ export const portfolioModule: ModuleDefinition = {
 
 `src/lib/auth/permissions.ts` + `src/registry`. `UserContext` lleva `zones: UserZoneRole[]`, `isPlatformAdmin` y `deniedRouteKeys` (no un campo `roles`).
 
-- **Zona**: `financiero` · `pm` · `adquisiciones` · `data`. Cada usuario tiene un **rol** por zona: `admin` · `editor` · `lector`.
+- **Zona**: `financiero` · `corporativo` · `pm` · `adquisiciones` · `data`. Cada usuario tiene un **rol** por zona: `admin` · `editor` · `lector`.
 - `hasZoneAccess(user, zona)` — ve la zona (cualquier rol). `checkWriteAccess(user, zona)` — editor/admin escriben, lector no.
 - **Denylist por ruta**: `app_user_route_deny.route_key` apunta a `ModuleRoute.key` (sin FK; renombrar una key deja denies huérfanos — ver auditoría §5.2). `canAccessRouteKey(user, key)` combina zona + denylist.
 - **Corte de servidor**: cada page shell del registry llama `await requireRouteAccess("<key>")`. Es el único corte que no se salta por URL; `DashboardZoneGuard` (cliente) es solo UX.
@@ -131,6 +131,7 @@ export async function listProyectos(ctx: UserContext, options?: ListProyectosOpt
 | Module | Repositories |
 |--------|----------------|
 | portfolio | `proyectosRepository.ts`, `uploadLogsRepository.ts`, `readClient.ts` |
+| corporativo | `corpPeriodosRepository.ts`, `readClient.ts` (service role SIN variante de navegador) |
 | pm | `pmRepository.ts`, `readClient.ts` |
 | monday | `syncLogsRepository.ts`, `readClient.ts` (+ Monday GraphQL in `read.ts`, `dashboard-read.ts`) |
 
@@ -148,6 +149,12 @@ Migration: `supabase/migrations/20260521100000_enable_rls_temp_allow_all.sql`
 - `monday_sync_logs`
 
 For each existing table, the migration enables RLS and adds policy `temp_allow_all` (`USING (true) WITH CHECK (true)`).
+
+**Excepción — `corp_periodos`, `corp_diccionario`, `corp_notas` (migración 038):** RLS habilitada y
+**sin política de SELECT**, como las tablas de log. Son la cuenta de resultados del grupo y el tab
+Corporativas se sirve entero desde Server Components con service role, así que no hay motivo para
+publicarlas a `authenticated`. Por eso `modules/corporativo/data/readClient.ts` no tiene variante de
+navegador y lanza si se le llama desde el cliente.
 
 **Technical debt:** Replace `temp_allow_all` with role- and tenant-aware policies when Entra ID / RBAC is wired. Map `UserContext.roles` to Postgres roles or JWT claims, then narrow `SELECT`/`INSERT`/`UPDATE` per module action keys (`portfolio.read`, `pm.write`, etc.).
 
