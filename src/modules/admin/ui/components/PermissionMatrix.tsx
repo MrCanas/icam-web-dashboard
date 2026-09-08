@@ -20,9 +20,30 @@ const ROLE_OPTIONS: { value: "" | ZoneRole; label: string }[] = [
   { value: "admin", label: "Admin" },
 ];
 
-/** Hoy solo la zona PM da capacidades extra al rol admin (ver ActasOperativoTab). */
+/**
+ * Qué concede el rol Admin más allá de editar, zona por zona.
+ *
+ * En Financiero y Corporativas es lo que abre el botón de sincronizar y la
+ * subida manual del maestro en la pestaña Datos, y ambas cosas **reemplazan la
+ * tabla entera**, no añaden. Quien reparte permisos desde aquí no tiene otra
+ * forma de saberlo, y es justo lo que hay que pensar dos veces antes de conceder.
+ */
 const ROLE_HELPER: Partial<Record<ZoneKey, string>> = {
+  financiero:
+    "En Dashboard, Admin permite además sincronizar y subir el maestro de vehículos, que reemplaza la tabla de proyectos entera.",
+  corporativo:
+    "En Corporativas, Admin permite además sincronizar y subir el maestro corporativo, que reemplaza la tabla de periodos entera.",
   pm: "En PM, Admin permite además reordenar y archivar proyectos.",
+};
+
+/**
+ * Aviso de la zona, visible tenga el rol que tenga. Corporativas enseña la
+ * cuenta de resultados del grupo: conviene que quien concede el acceso lo lea
+ * antes de elegir rol, no después.
+ */
+const ZONE_AVISO: Partial<Record<ZoneKey, string>> = {
+  corporativo:
+    "Incluye P&G, EBITDA y cuentas depositadas del grupo. No se hereda del acceso a Dashboard.",
 };
 
 interface PermissionMatrixProps {
@@ -97,7 +118,13 @@ export function PermissionMatrix({
               </select>
             </div>
 
-            {role && ROLE_HELPER[zoneKey] ? (
+            {/* El aviso de la zona va tenga rol o no: es lo que hay que leer
+                ANTES de elegir. El del rol solo cuando ya hay acceso. */}
+            {ZONE_AVISO[zoneKey] ? (
+              <p className="mt-1 text-xs text-text-muted">{ZONE_AVISO[zoneKey]}</p>
+            ) : null}
+
+            {role === "admin" && ROLE_HELPER[zoneKey] ? (
               <p className="mt-1 text-xs text-text-muted">
                 {ROLE_HELPER[zoneKey]}
               </p>
