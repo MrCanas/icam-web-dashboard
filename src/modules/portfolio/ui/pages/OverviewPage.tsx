@@ -1,11 +1,7 @@
-import { DonutChart } from "@/modules/portfolio/ui/DonutChart";
 import { PortfolioToolbar } from "@/modules/portfolio/ui/toolbar/PortfolioToolbar";
 import { SupabaseEmptyProjectsBanner } from "@/modules/portfolio/ui/SupabaseEmptyProjectsBanner";
 import { getCurrentUser } from "@/lib/auth/currentUser";
-import {
-  applyPortfolioSearchFilters,
-  buildExecutivePageModel,
-} from "@/modules/portfolio/logic/pageViewModels";
+import { applyPortfolioSearchFilters } from "@/modules/portfolio/logic/pageViewModels";
 import { sanitizeSituacion, sanitizeTipo } from "@/modules/portfolio/logic/portfolioParams";
 import { portfolioPaths } from "@/modules/portfolio/logic/paths";
 import {
@@ -24,6 +20,8 @@ interface OverviewPageProps {
 /**
  * Pestaña «WIP». Conserva la ruta y la key `portfolio.overview` porque esa key
  * es la que guardan las denegaciones de permisos (app_user_route_deny).
+ *
+ * Los dos donuts de reparto vivían aquí; desde 2026-09 cierran Executive.
  */
 export default async function OverviewPage({ searchParams }: OverviewPageProps) {
   const params = await searchParams;
@@ -60,7 +58,6 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
     situacion: selectedSituacion,
     tipoProyecto: selectedTipo,
   });
-  const view = buildExecutivePageModel(proyectos);
 
   return (
     <div className="space-y-3 sm:space-y-4 min-w-0">
@@ -68,25 +65,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       <section className="bg-card rounded-lg border border-subtle/50 shadow-sm p-3 sm:p-4">
         <h1 className="text-xl font-semibold text-text-primary">WIP</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Reparto de la cartera · {proyectos.length} proyectos
-        </p>
-      </section>
-
-
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
-        <DonutChart
-          title="Distribución por tipo de proyecto"
-          data={view.donutTipoData}
-          proyectos={proyectos}
-          field="tipo_proyecto"
-        />
-        <DonutChart
-          title="Distribución por situación"
-          data={view.donutSituacionData}
-          proyectos={proyectos}
-          field="situacion"
-        />
+        <p className="mt-1 text-sm text-text-muted">{proyectos.length} proyectos</p>
       </section>
 
       <PortfolioToolbar
