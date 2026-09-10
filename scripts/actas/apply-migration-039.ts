@@ -37,9 +37,10 @@ async function main(): Promise<void> {
       tablename: string;
       policyname: string;
       cmd: string;
-      roles: string[];
+      has_authenticated: boolean;
     }>(
-      `SELECT tablename, policyname, cmd, roles
+      `SELECT tablename, policyname, cmd,
+              'authenticated' = ANY(roles) AS has_authenticated
          FROM pg_policies
         WHERE schemaname = 'public'
           AND policyname = ANY($1)`,
@@ -47,7 +48,7 @@ async function main(): Promise<void> {
     );
     for (const p of pols) {
       console.log(
-        `  ${p.tablename}.${p.policyname}: cmd=${p.cmd} roles=${p.roles.join(",")}`,
+        `  ${p.tablename}.${p.policyname}: cmd=${p.cmd} authenticated=${p.has_authenticated}`,
       );
     }
 
@@ -64,7 +65,7 @@ async function main(): Promise<void> {
             p.tablename === e.table &&
             p.policyname === e.policy &&
             p.cmd === "DELETE" &&
-            p.roles.includes("authenticated"),
+            p.has_authenticated,
         ),
       ) && countAfter === countBefore;
 
