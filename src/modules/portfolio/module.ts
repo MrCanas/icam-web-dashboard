@@ -17,10 +17,13 @@ export const portfolioModule: ModuleDefinition = {
       // La key y el path quedan congelados: `key` es lo que guardan las
       // denegaciones de permisos (app_user_route_deny.route_key). Solo cambia
       // la etiqueta visible, que pasó de «Overview» a «WIP» en 2026-09.
+      // Oculta de la nav (2026-09): sigue accesible por URL directa y en
+      // PermissionMatrix, solo desaparece de la fila de pestañas.
       key: "portfolio.overview",
       path: "/dashboard/portfolio/overview",
       label: "WIP",
       match: (p) => p.startsWith("/dashboard/portfolio/overview"),
+      hiddenInNav: true,
     },
     {
       key: "portfolio.rentabilidad",
