@@ -1,81 +1,69 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { updateAvanceFase } from "@/modules/pm/avance/actions/update-avance-fase";
-import {
-  anchoBarra,
-  fmtPorcentaje,
-  hayCambioVsZoho,
-  validatePorcentaje,
-} from "@/modules/pm/avance/logic/avance-obra";
+import { fmtPorcentaje, hayCambioVsZoho } from "@/modules/pm/avance/logic/avance-obra";
 
 interface AvanceFaseRowProps {
-  promocionId: string;
   faseId: string;
   nombre: string;
-  porcentaje: number | null;
+  /** Valor local del panel: puede diferir de lo guardado mientras no se pulsa «Guardar». */
+  valor: number | null;
   porcentajeZoho: number | null;
+  /** Hay una edición sin guardar en esta fase. */
+  dirty: boolean;
   /** Barra más gruesa y tipografía mayor para el «Avance general». */
   destacado?: boolean;
   hasWriteAccess: boolean;
-  onError: (message: string) => void;
+  onChange: (faseId: string, valor: number | null) => void;
+}
+
+function redondea2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 /**
- * Una fase de obra: etiqueta, porcentaje y barra.
+ * Una fase de obra: barra deslizante para el ajuste rápido y, al lado, el
+ * valor exacto que se puede teclear con decimales — los que trae Zoho no son
+ * enteros (45,38 %, 26,54 %...) y arrastrar no llega a esa precisión.
  *
- * El editor es un input numérico con 2 decimales, no un deslizador: los valores
- * de Zoho son 45,38 / 26,54 / 1,35 y un deslizador con paso entero los
- * destrozaría. Y el botón «vaciar» es necesario porque `null` («Zoho no tiene
- * valor») no se puede expresar con un número — dejarlo a 0 sería mentir.
+ * No guarda nada aquí: solo avisa al panel del cambio (`onChange`). Lo
+ * persiste y lo sube a Zoho el botón «Guardar» de la pestaña, sobre todas las
+ * fases tocadas a la vez — por eso el estado vive en el panel, no aquí.
  */
 export function AvanceFaseRow({
-  promocionId,
   faseId,
   nombre,
-  porcentaje,
+  valor,
   porcentajeZoho,
+  dirty,
   destacado = false,
   hasWriteAccess,
-  onError,
+  onChange,
 }: AvanceFaseRowProps) {
-  const router = useRouter();
-  const [valor, setValor] = useState<number | null>(porcentaje);
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState("");
-  const [pending, startTransition] = useTransition();
 
-  const pendienteZoho = hayCambioVsZoho(valor, porcentajeZoho);
+  // Ya guardado pero sin comunicar a Zoho (fallo previo, o fase sin nombre de
+  // campo). Si hay una edición local sin guardar, esa es la que manda.
+  const pendienteEnvio = !dirty && hayCambioVsZoho(valor, porcentajeZoho);
   const completo = valor !== null && valor >= 100;
 
-  const guardar = (raw: string) => {
-    setEditando(false);
-    const validado = validatePorcentaje(raw);
-    if (!validado.ok) {
-      onError(validado.error);
-      return;
-    }
-    if (validado.value === valor) return;
-
-    const previo = valor;
-    setValor(validado.value); // optimista
-    startTransition(async () => {
-      const r = await updateAvanceFase({ promocionId, faseId, porcentaje: validado.value });
-      if (!r.ok) {
-        setValor(previo); // rollback
-        onError(r.error);
-        return;
-      }
-      router.refresh();
-    });
-  };
-
   const abrirEditor = () => {
-    if (!hasWriteAccess || pending) return;
+    if (!hasWriteAccess) return;
     setBorrador(valor === null ? "" : String(valor));
     setEditando(true);
+  };
+
+  const commitDraft = (raw: string) => {
+    setEditando(false);
+    if (raw.trim() === "") {
+      onChange(faseId, null);
+      return;
+    }
+    const n = Number(raw.trim().replace(",", "."));
+    if (!Number.isFinite(n)) return;
+    onChange(faseId, redondea2(Math.max(0, Math.min(100, n))));
   };
 
   return (
@@ -90,10 +78,17 @@ export function AvanceFaseRow({
         </span>
 
         <span className="flex shrink-0 items-center gap-2">
-          {pendienteZoho ? (
+          {dirty ? (
+            <span
+              className="rounded border border-icam-900/30 bg-icam-900/[0.06] px-1 py-0.5 text-[10px] font-medium text-icam-900"
+              title="Cambio sin guardar todavía."
+            >
+              sin guardar
+            </span>
+          ) : pendienteEnvio ? (
             <span
               className="rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700"
-              title={`Zoho tiene ${fmtPorcentaje(porcentajeZoho)}. Pendiente de aprobación para comunicarlo.`}
+              title={`Zoho tiene ${fmtPorcentaje(porcentajeZoho)}. No se ha podido comunicar todavía.`}
             >
               pendiente
             </span>
@@ -107,23 +102,23 @@ export function AvanceFaseRow({
               max="100"
               autoFocus
               value={borrador}
-              disabled={pending}
+              onFocus={(e) => e.currentTarget.select()}
               onChange={(e) => setBorrador(e.target.value)}
-              onBlur={(e) => guardar(e.target.value)}
+              onBlur={(e) => commitDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
                 if (e.key === "Escape") setEditando(false);
               }}
               placeholder="sin dato"
-              aria-label={`Porcentaje de ${nombre}`}
+              aria-label={`Porcentaje exacto de ${nombre}`}
               className="w-24 rounded border border-icam-900/30 bg-page px-1.5 py-0.5 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-icam-900/20"
             />
           ) : (
             <button
               type="button"
               onClick={abrirEditor}
-              disabled={!hasWriteAccess || pending}
-              title={hasWriteAccess ? "Editar" : undefined}
+              disabled={!hasWriteAccess}
+              title={hasWriteAccess ? "Teclear el valor exacto" : undefined}
               className={`rounded px-1 tabular-nums ${
                 destacado ? "text-base font-semibold" : "text-sm"
               } ${completo ? "font-semibold text-emerald-600" : "text-text-muted"} ${
@@ -139,11 +134,10 @@ export function AvanceFaseRow({
           {hasWriteAccess && valor !== null ? (
             <button
               type="button"
-              onClick={() => guardar("")}
-              disabled={pending}
+              onClick={() => onChange(faseId, null)}
               title="Dejar sin dato (no es lo mismo que 0 %)"
               aria-label={`Dejar ${nombre} sin dato`}
-              className="rounded px-1 text-xs text-text-muted hover:bg-page hover:text-text-primary disabled:opacity-60"
+              className="rounded px-1 text-xs text-text-muted hover:bg-page hover:text-text-primary"
             >
               ✕
             </button>
@@ -151,16 +145,20 @@ export function AvanceFaseRow({
         </span>
       </div>
 
-      <div
-        className={`mt-1 overflow-hidden rounded-full bg-subtle ${destacado ? "h-3" : "h-2"}`}
-      >
-        <div
-          className={`h-full rounded-full transition-all ${
-            completo ? "bg-emerald-600" : "bg-icam-900"
-          }`}
-          style={{ width: anchoBarra(valor) }}
-        />
-      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={valor ?? 0}
+        disabled={!hasWriteAccess}
+        aria-label={`Arrastrar para fijar el porcentaje de ${nombre}`}
+        onChange={(e) => onChange(faseId, Number(e.target.value))}
+        className={`mt-1 w-full cursor-pointer disabled:cursor-default disabled:opacity-60 ${
+          destacado ? "h-3" : "h-2"
+        } ${completo ? "accent-emerald-600" : "accent-icam-900"}`}
+        style={valor === null ? { opacity: 0.35 } : undefined}
+      />
     </div>
   );
 }
