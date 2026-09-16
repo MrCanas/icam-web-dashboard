@@ -31,12 +31,6 @@ export interface EspejoZoho {
   moduloZoho: string;
   tabla: string;
   columnas: ColumnaEspejo[];
-  /**
-   * Espejo que puede no hacer falta. `Contacts` solo se baja si el módulo de
-   * enlace no trae ya el correo; lo decide `validarMapeo`, no esta constante.
-   * Contra el CRM de ICAM no hace falta: el enlace tiene su propio `Email`.
-   */
-  condicional?: boolean;
 }
 
 const RE = {
@@ -87,10 +81,17 @@ export const ESPEJOS: readonly EspejoZoho[] = [
     ],
   },
   {
-    // No se usa contra el CRM de ICAM: ver `condicional`.
+    // La ÚNICA fuente de los correos.
+    //
+    // `Inversi_n_vs_Contactos` tiene su propio campo `Email` y durante un rato
+    // pareció que bastaba con el enlace, evitando copiar la agenda del CRM. El
+    // primer sync real lo desmintió: ese campo viene vacío en los 535 enlaces.
+    // Que un campo exista no quiere decir que nadie lo rellene.
+    //
+    // El sync filtra a los contactos REFERENCIADOS desde una cuenta, así que
+    // sigue sin copiarse la agenda entera.
     moduloZoho: "Contacts",
     tabla: "inv_contactos",
-    condicional: true,
     columnas: [
       { columna: "nombre", tipo: "text", obligatorio: false, pistas: [/^first_?name$/i] },
       { columna: "apellidos", tipo: "text", obligatorio: false, pistas: [/^last_?name$/i] },

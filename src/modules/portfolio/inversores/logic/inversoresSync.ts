@@ -191,11 +191,7 @@ export async function sincronizarInversores(
       return { ok: false, syncId, error, problemas: mapeo.bloqueantes };
     }
 
-    // Los que de verdad hay que recorrer: si el enlace ya trae el correo, el
-    // módulo Contacts sobra y no se baja.
-    const aplicables = espejos.filter(
-      (e) => !e.condicional || (e.moduloZoho === "Contacts" && mapeo.necesitaContacts),
-    );
+    const aplicables = espejos;
 
     const idsPorTabla = new Map<string, Set<string>>();
     /** Contactos que aparecen en alguna cuenta. Filtra la bajada de `Contacts`. */

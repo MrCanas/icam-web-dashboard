@@ -7,12 +7,15 @@
  *   npm run inversores:sync -- --dry-run          # lee y cuenta, no escribe
  *   npm run inversores:sync                       # de verdad
  *   npm run inversores:sync -- --modulo Aportes_Repartos
+ *   npm run inversores:sync -- --email alguien@imparcapital.com
  */
 import { cargarEnv } from "../pm/lib/env";
 import type { UserContext } from "@/lib/auth/currentUser";
+import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { sincronizarInversores } from "@/modules/portfolio/inversores/logic/inversoresSync";
 
-const CTX: UserContext = {
+/** Contexto anónimo, para cuando no se dice a nombre de quién se ejecuta. */
+const CTX_SISTEMA: UserContext = {
   id: "00000000-0000-0000-0000-000000000000",
   email: "inversores-script@imparcapital.com",
   name: "Script inversores:sync",
@@ -20,6 +23,25 @@ const CTX: UserContext = {
   isPlatformAdmin: false,
   deniedRouteKeys: [],
 };
+
+/**
+ * A nombre de quién queda la ejecución en `inv_sync_log`.
+ *
+ * Con `--email` se resuelve la persona de verdad, que es lo que hace útil la
+ * traza: «lo lanzó Javier a las 18:04» dice algo, «lo lanzó el script» no.
+ */
+async function contexto(): Promise<UserContext> {
+  const i = process.argv.indexOf("--email");
+  const email = i >= 0 ? process.argv[i + 1]?.trim().toLowerCase() : undefined;
+  if (!email) return CTX_SISTEMA;
+
+  const id = await resolveAuthUserIdByEmail(email);
+  if (!id) {
+    console.error(`No existe ningún usuario con el correo ${email}.`);
+    process.exit(1);
+  }
+  return { ...CTX_SISTEMA, id, email, name: email };
+}
 
 async function main(): Promise<void> {
   cargarEnv();
@@ -30,7 +52,8 @@ async function main(): Promise<void> {
 
   console.log(dryRun ? "Simulación (no se escribe nada).\n" : "Sincronización real.\n");
 
-  const resultado = await sincronizarInversores(CTX, {
+  const ctx = await contexto();
+  const resultado = await sincronizarInversores(ctx, {
     origen: "script",
     dryRun,
     ...(soloModulos ? { soloModulos } : {}),

@@ -30,19 +30,10 @@ export interface ProblemaMapeo {
 export interface MapeoResuelto {
   /** Módulo de Zoho → campos que hay que pedir y dónde va cada uno. */
   camposPorModulo: Map<string, CampoResuelto[]>;
-  /**
-   * Hay que bajar también el módulo `Contacts`.
-   *
-   * Solo si el módulo de enlace NO trae el correo en un campo propio. Si lo
-   * trae, bajar la agenda del CRM sería copiar dato personal de más.
-   */
-  necesitaContacts: boolean;
   bloqueantes: ProblemaMapeo[];
   avisos: ProblemaMapeo[];
   ok: boolean;
 }
-
-const MODULO_ENLACE_CONTACTOS = "Inversi_n_vs_Contactos";
 
 function clave(modulo: string, destino: string): string {
   return `${modulo}::${destino}`;
@@ -53,13 +44,7 @@ export function validarMapeo(
   camposDeZoho?: ReadonlyMap<string, readonly ZohoCampo[]>,
 ): MapeoResuelto {
   const porClave = new Map(catalogo.map((c) => [clave(c.modulo, c.destino), c]));
-
-  const emailEnEnlace = porClave.get(clave(MODULO_ENLACE_CONTACTOS, "contacto_email"));
-  const necesitaContacts = !emailEnEnlace?.zoho_api_name;
-
-  const espejosAplicables: EspejoZoho[] = ESPEJOS.filter(
-    (e) => !e.condicional || (e.moduloZoho === "Contacts" && necesitaContacts),
-  );
+  const espejosAplicables: readonly EspejoZoho[] = ESPEJOS;
 
   const bloqueantes: ProblemaMapeo[] = [];
   const avisos: ProblemaMapeo[] = [];
@@ -131,7 +116,6 @@ export function validarMapeo(
 
   return {
     camposPorModulo,
-    necesitaContacts,
     bloqueantes,
     avisos,
     ok: bloqueantes.length === 0,

@@ -368,16 +368,16 @@ GRANT ALL ON public.inv_sync_log         TO service_role;
 INSERT INTO public.inv_campo_catalogo
   (modulo, destino, zoho_api_name, zoho_label, tipo, obligatorio, notas) VALUES
   -- Promociones ---------------------------------------------------------------
-  ('Promociones', 'codigo',    'Name',                'Codigo de Promocion', 'text',     false, NULL),
-  ('Promociones', 'nombre',    'C_digo_de_Promoci_n', 'Nombre Promocion',    'text',     true,  NULL),
-  ('Promociones', 'situacion', 'Estado_Ventas',       'Situacion',           'picklist', false, NULL),
+  ('Promociones', 'codigo',    'Name',                'Código de Promoción', 'text',     false, NULL),
+  ('Promociones', 'nombre',    'C_digo_de_Promoci_n', 'Nombre Promoción',    'text',     true,  NULL),
+  ('Promociones', 'situacion', 'Estado_Ventas',       'Situación',           'picklist', false, NULL),
   ('Promociones', 'tipologia', 'Tipo_de_proyecto',    'Tipo de proyecto',    'picklist', false, NULL),
 
   -- Cuentas de inversion -------------------------------------------------------
-  ('Cuentas_de_Inversi_n', 'nombre',   'Name',           'Cuenta de Inversion Name', 'text',     true,  NULL),
+  ('Cuentas_de_Inversi_n', 'nombre',   'Name',           'Cuenta de Inversión Name', 'text',     true,  NULL),
   ('Cuentas_de_Inversi_n', 'tipo',     'Tipo_de_cuenta', 'Tipo de cuenta',           'picklist', false, NULL),
   ('Cuentas_de_Inversi_n', 'email',    'Email',          'Email',                    'email',    false, NULL),
-  ('Cuentas_de_Inversi_n', 'telefono', 'Tel_fono_M_vil', 'Telefono Movil',           'text',     false, NULL),
+  ('Cuentas_de_Inversi_n', 'telefono', 'Tel_fono_M_vil', 'Teléfono Móvil',           'text',     false, NULL),
   ('Cuentas_de_Inversi_n', 'moneda',   'Currency',       'Currency',                 'picklist', false, NULL),
   ('Cuentas_de_Inversi_n', 'codigo',   NULL, NULL, 'text', false,
      '{"sin_campo":"Cuentas_de_Inversi_n no tiene codigo propio"}'::jsonb),
@@ -389,8 +389,8 @@ INSERT INTO public.inv_campo_catalogo
      '{"sin_campo":"se deriva sumando inv_cuenta_promocion.importe_comprometido"}'::jsonb),
 
   -- Inversion vs Contactos ------------------------------------------------------
-  ('Inversi_n_vs_Contactos', 'cuenta_zoho_id',         'Cuentas_de_Inversi_n',   'Cuentas de Inversion',   'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Contactos', 'cuenta_nombre',          'Cuentas_de_Inversi_n',   'Cuentas de Inversion',   'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Contactos', 'cuenta_zoho_id',         'Cuentas_de_Inversi_n',   'Cuentas de Inversión',   'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Contactos', 'cuenta_nombre',          'Cuentas_de_Inversi_n',   'Cuentas de Inversión',   'lookup_nombre', false, NULL),
   ('Inversi_n_vs_Contactos', 'contacto_zoho_id',       'Contactos_asociados',    'Contactos asociados',    'lookup_id',     true,  NULL),
   ('Inversi_n_vs_Contactos', 'contacto_nombre',        'Contactos_asociados',    'Contactos asociados',    'lookup_nombre', false, NULL),
   ('Inversi_n_vs_Contactos', 'contacto_email',         'Email',                  'Email',                  'email',         false, NULL),
@@ -410,11 +410,11 @@ INSERT INTO public.inv_campo_catalogo
   -- Suscripcion a proyectos (Inversion vs Promocion) ----------------------------
   ('Inversi_n_vs_Promoci_n', 'cuenta_zoho_id',            'Promociones_Invertidas_linking', 'Cuenta que invierte',       'lookup_id',     true,  NULL),
   ('Inversi_n_vs_Promoci_n', 'cuenta_nombre',             'Promociones_Invertidas_linking', 'Cuenta que invierte',       'lookup_nombre', false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'promocion_zoho_id',         'Promociones_Invertidas_2',       'Promocion Invertida',       'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Promoci_n', 'promocion_nombre',          'Promociones_Invertidas_2',       'Promocion Invertida',       'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'promocion_zoho_id',         'Promociones_Invertidas_2',       'Promoción Invertida',       'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Promoci_n', 'promocion_nombre',          'Promociones_Invertidas_2',       'Promoción Invertida',       'lookup_nombre', false, NULL),
   ('Inversi_n_vs_Promoci_n', 'importe_comprometido',      'Capital_Invertido',              'Capital suscrito',          'number',        false, NULL),
   ('Inversi_n_vs_Promoci_n', 'fecha',                     'Fecha',                          'Fecha',                     'date',          false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'coste_vehiculo_intermedio', 'Coste_veh_culo_intermedio',      'Coste vehiculo intermedio', 'number',        false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'coste_vehiculo_intermedio', 'Coste_veh_culo_intermedio',      'Coste vehículo intermedio', 'number',        false, NULL),
   ('Inversi_n_vs_Promoci_n', 'status',                    'Status',                         'Status',                    'picklist',      false,
      '{"embudo":["Por contactar","Dossier + NDA","Reunion","LOI + Pack Inversor","Doc firmada","PBC","Ganado"],"decision":"por encargo se cuentan TODAS las filas en los totales; el detalle ensena el status"}'::jsonb),
   ('Inversi_n_vs_Promoci_n', 'importe_aportado', NULL, NULL, 'number', false,
@@ -423,39 +423,76 @@ INSERT INTO public.inv_campo_catalogo
      '{"sin_campo":"no existe en el CRM"}'::jsonb),
 
   -- Movimientos - A/R (Aportes y Repartos) --------------------------------------
-  ('Aportes_Repartos', 'cuenta_zoho_id',    'Cuenta_de_inversi_n', 'Cuenta de inversion', 'lookup_id', true,  NULL),
-  ('Aportes_Repartos', 'promocion_zoho_id', 'Promoci_n',           'Promocion',           'lookup_id', false, NULL),
+  ('Aportes_Repartos', 'cuenta_zoho_id',    'Cuenta_de_inversi_n', 'Cuenta de inversión', 'lookup_id', true,  NULL),
+  ('Aportes_Repartos', 'promocion_zoho_id', 'Promoci_n',           'Promoción',           'lookup_id', false, NULL),
   ('Aportes_Repartos', 'importe',           'Monto',               'Monto',               'number',    true,  NULL),
-  ('Aportes_Repartos', 'retencion',         'Retenci_n',           'Retencion',           'number',    false, NULL),
+  ('Aportes_Repartos', 'retencion',         'Retenci_n',           'Retención',           'number',    false, NULL),
   ('Aportes_Repartos', 'fecha',             'Fecha',               'Fecha',               'date',      true,  NULL),
   -- Los siete valores del desplegable, clasificados a mano. "Llamada de capital"
   -- es la PETICION de fondos, no el ingreso, asi que no suma como aporte; el
   -- impuesto y el fee no son flujos hacia el inversor. Los tres van a
   -- "desconocido": se sincronizan y se ven, pero no entran en los KPIs.
   ('Aportes_Repartos', 'tipo_zoho',         'Tipo_de_movimiento',  'Tipo de movimiento',  'picklist',  true,
-     '{"normaliza":{"Aporte de capital":"aporte","Llamada de capital":"desconocido","Reparto de capital":"reparto","Reparto de beneficios":"reparto","Impuesto de sociedades":"desconocido","Fee de exito":"desconocido"}}'::jsonb),
+     '{"normaliza":{"Aporte de capital":"aporte","Llamada de capital":"desconocido","Reparto de capital":"reparto","Reparto de beneficios":"reparto","Reparto de dividendo":"reparto","Impuesto de sociedades":"desconocido","Fee de \u00e9xito":"desconocido","Pago de intereses":"desconocido","Reducci\u00f3n de capital con CDI":"desconocido","Reducci\u00f3n de capital sin CDI":"desconocido"}}'::jsonb),
   ('Aportes_Repartos', 'concepto', NULL, NULL, 'text', false,
      '{"sin_campo":"Movimientos - A/R no tiene campo de concepto"}'::jsonb),
 
-  -- Contacts: NO se usa. El enlace ya trae el correo, asi que no hay motivo para
-  -- copiar la agenda del CRM. Las filas quedan sin resolver a proposito y
-  -- `validarMapeo` salta el modulo entero.
-  ('Contacts', 'nombre_completo',  NULL, NULL, 'text',  true,  NULL),
-  ('Contacts', 'email',            NULL, NULL, 'email', true,  NULL),
-  ('Contacts', 'nombre',           NULL, NULL, 'text',  false, NULL),
-  ('Contacts', 'apellidos',        NULL, NULL, 'text',  false, NULL),
-  ('Contacts', 'email_secundario', NULL, NULL, 'email', false, NULL),
-  ('Contacts', 'telefono',         NULL, NULL, 'text',  false, NULL)
-ON CONFLICT (modulo, destino) DO NOTHING;
+  -- Contacts: SI se usa, y es la unica fuente de los correos.
+  --
+  -- `Inversi_n_vs_Contactos` tiene su propio campo `Email`, asi que al principio
+  -- parecia que bastaba con el enlace y no hacia falta copiar nada de la agenda
+  -- del CRM. El primer sync real lo desmintio: ese campo viene VACIO en los 535
+  -- enlaces. Que un campo exista no quiere decir que alguien lo rellene.
+  --
+  -- Solo se copian los contactos REFERENCIADOS desde una cuenta de inversion
+  -- (el sync los filtra), no la agenda entera: sigue siendo dato personal.
+  ('Contacts', 'nombre_completo',  'Full_Name',       'Full Name',       'text',  true,  NULL),
+  ('Contacts', 'email',            'Email',           'Email',           'email', true,  NULL),
+  ('Contacts', 'nombre',           'First_Name',      'First Name',      'text',  false, NULL),
+  ('Contacts', 'apellidos',        'Last_Name',       'Last Name',       'text',  false, NULL),
+  ('Contacts', 'email_secundario', 'Secondary_Email', 'Secondary Email', 'email', false, NULL),
+  ('Contacts', 'telefono',         'Mobile',          'Mobile',          'text',  false, NULL)
+ON CONFLICT (modulo, destino) DO UPDATE
+  -- Volver a pasar la migración RELLENA lo que estaba sin resolver y refresca
+  -- etiqueta y tipo, pero no pisa jamás un `zoho_api_name` que ya tenga valor.
+  -- Esa columna es la costura y puede haberla puesto una persona mirando el
+  -- CRM; una migración que se repite no tiene por qué saber más que ella.
+  --
+  -- La etiqueta solo se refresca cuando ambos apuntan al mismo campo: si no,
+  -- se estaría guardando la etiqueta de un campo distinto del que se lee, y el
+  -- aviso de «te han renombrado esto» empezaría a mentir.
+  SET zoho_api_name  = COALESCE(inv_campo_catalogo.zoho_api_name, EXCLUDED.zoho_api_name),
+      zoho_label     = CASE
+                         WHEN inv_campo_catalogo.zoho_api_name IS NULL
+                           OR inv_campo_catalogo.zoho_api_name = EXCLUDED.zoho_api_name
+                         THEN EXCLUDED.zoho_label
+                         ELSE inv_campo_catalogo.zoho_label
+                       END,
+      zoho_data_type = CASE
+                         WHEN inv_campo_catalogo.zoho_api_name IS NULL
+                           OR inv_campo_catalogo.zoho_api_name = EXCLUDED.zoho_api_name
+                         THEN EXCLUDED.zoho_data_type
+                         ELSE inv_campo_catalogo.zoho_data_type
+                       END,
+      updated_at     = now();
 
 -- =============================================================================
 -- 6. La pestaña nace cerrada
 -- =============================================================================
 -- El modelo de permisos del portal es una DENYLIST: una ruta nueva la ve por
 -- defecto todo el que tenga la zona. Para Corporativas bastó con crear una zona
--- que nadie tenía concedida, pero Inversores cuelga de `financiero`, que ya
--- tiene mucha gente. Así que se deniega explícitamente a TODOS los usuarios de
--- hoy y se abre uno a uno desde /dashboard/admin/usuarios.
+-- que nadie tenía concedida, pero Inversores cuelga de `financiero`, que a día
+-- de hoy tienen DIEZ personas. Sin esta siembra, nombres, correos y patrimonio
+-- de los inversores se publicarían a las diez en cuanto se desplegara.
+--
+-- Se deniega a todo el mundo MENOS a los tres que deben verla. Se deniega
+-- también a quien hoy no tiene la zona `financiero`: no la ve igualmente, pero
+-- así conceder esa zona mañana no abre además esta pestaña de propina.
+--
+-- Los correos van escritos a mano aquí, como en la 019 con el bootstrap de
+-- platform-admin, y por el mismo motivo: es una siembra de UNA vez, no una
+-- regla. A partir de ahora esto se gestiona en /dashboard/admin/usuarios, que
+-- es donde se ve quién tiene qué; el código no vuelve a mirar estos correos.
 --
 -- Esto NO cubre a los usuarios de mañana: `setUserRouteDenies` escribe lo que le
 -- manda el formulario de alta. Ese extremo se tapa en el código, con
@@ -463,4 +500,9 @@ ON CONFLICT (modulo, destino) DO NOTHING;
 INSERT INTO public.app_user_route_deny (user_id, route_key)
 SELECT u.id, 'portfolio.inversores'
 FROM auth.users u
+WHERE lower(u.email) NOT IN (
+  'javiercanas@imparcapital.com',
+  'robertoperri@imparcapital.com',
+  'emilianoguerrero@imparcapital.com'
+)
 ON CONFLICT DO NOTHING;

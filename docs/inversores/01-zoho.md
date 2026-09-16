@@ -13,7 +13,7 @@ página nunca llama a Zoho.
 | `Inversi_n_vs_Promoci_n` | **Suscripción a proyectos** | `inv_cuenta_promocion` |
 | `Aportes_Repartos` | **Movimientos - A/R** | `inv_flujos` |
 | `Promociones` | Promociones | `inv_promociones` |
-| `Contacts` | Contacts — **no se usa** | `inv_contactos` |
+| `Contacts` | Contacts — solo los referenciados | `inv_contactos` |
 
 **El CRM tiene módulos con nombres casi iguales que NO son estos.** Verificado sobre los 78
 módulos accesibles: existen también `Aportes_y_Repartos` («Aportes y Repartos»),
@@ -21,9 +21,14 @@ módulos accesibles: existen también `Aportes_y_Repartos` («Aportes y Repartos
 `Fondos_vs_Proyectos`. Por eso los nombres están escritos en `inv_campo_catalogo` y no se eligen
 a ojo.
 
-`Contacts` es condicional y **hoy no hace falta**: `Inversi_n_vs_Contactos` tiene su propio campo
-`Email`, así que no se copia la agenda del CRM. Lo decide `validarMapeo` en cada ejecución, no una
-constante. Sus filas del catálogo quedan sin resolver a propósito.
+**`Contacts` es la única fuente de los correos**, y esto costó un sync real descubrirlo:
+`Inversi_n_vs_Contactos` tiene su propio campo `Email`, así que parecía que bastaba con el enlace
+y no hacía falta copiar nada de la agenda. Ese campo viene **vacío en los 535 enlaces**. Que un
+campo exista no quiere decir que alguien lo rellene, y el esquema de un CRM no dice cuál de sus
+campos se usa de verdad.
+
+De `Contacts` solo se copian los **referenciados desde una cuenta de inversión**: en la última
+ejecución, 325 de 1.056. La agenda entera no se copia.
 
 > **`inv_promociones` y `pm_promociones` espejan el mismo módulo de Zoho.** Están separadas a
 > propósito: `pm_promociones` (migración 028) se puebla desde un export manual de Excel y es el
@@ -68,10 +73,13 @@ se fíe del `api_name` pondrá el nombre en el código y al revés.
 
 **2. `Inversi_n_vs_Promoci_n` es un EMBUDO COMERCIAL, no una lista de inversiones cerradas.**
 Su campo `Status` recorre *Por contactar → Dossier + NDA → Reunión → LOI + Pack Inversor → Doc
-firmada → PBC → Ganado*. **Por decisión del encargo se cuentan TODAS las filas** en los totales,
-así que el capital comprometido incluye pipeline. Para que la cifra sea interpretable y no
-engañosa, el `Status` se guarda y **se enseña en el detalle de cada cuenta**. Si algún día se
-quiere filtrar, se filtra por `inv_cuenta_promocion.status`.
+firmada → PBC → Ganado*. **Por decisión del encargo se cuentan TODAS las filas** en los totales.
+
+En la práctica importa menos de lo que parecía: **343 de las 354 filas no tienen `Status`** y
+suman 290,4 M€ de los 303,8 M€. Lo marcado como pipeline temprano son 7 filas «Por contactar»
+(8,3 M€, un 2,7 % del comprometido) y una «Dossier + NDA» de 0 €. Aun así el `Status` se guarda y
+**se enseña en el detalle de cada cuenta**: si mañana la PMO empieza a rellenarlo, la cifra
+cambiaría de significado sin avisar. Para filtrar, `inv_cuenta_promocion.status`.
 
 Y ojo con el otro nombre engañoso: en ese módulo `Promociones_Invertidas_linking` **no es la
 promoción**, su etiqueta es «Cuenta que invierte». La promoción es `Promociones_Invertidas_2`.
@@ -137,17 +145,30 @@ columnas de texto, lookups que llegan como `[object Object]`, fechas al revés).
 `Tipo_de_movimiento` tiene **siete valores** y no dos. La clasificación vive en
 `inv_campo_catalogo.notas` de `Aportes_Repartos.tipo_zoho`:
 
-| Valor en el CRM | Cuenta como | Por qué |
-|---|---|---|
-| Aporte de capital | `aporte` | Dinero que entra |
-| **Llamada de capital** | `desconocido` | Es la **petición** de fondos, no el ingreso |
-| Reparto de capital | `reparto` | Devolución del principal |
-| Reparto de beneficios | `reparto` | Retorno |
-| **Impuesto de sociedades** | `desconocido` | No es un flujo hacia el inversor |
-| **Fee de éxito** | `desconocido` | Ídem |
+**El desplegable declara siete valores, pero los datos traen diez.** `Reparto de dividendo`,
+`Pago de intereses` y `Reducción de capital con/sin CDI` no aparecen en la definición del campo y
+sí en los registros: alguien los quitó del desplegable sin tocar el histórico. Por eso el
+diccionario los nombra a todos en lugar de fiarse de `pick_list_values`.
 
-Los tres marcados **se sincronizan y se ven en la tabla, pero no suman en los KPIs**. Perder una
-fila en silencio descuadraría los totales sin avisar; contarla mal los inflaría.
+| Valor en el CRM | Cuenta como | Nº | Importe |
+|---|---|---|---|
+| Aporte de capital | `aporte` | 421 | 275,7 M€ |
+| Reparto de capital | `reparto` | 462 | 109,2 M€ |
+| Reparto de beneficios | `reparto` | 457 | 33,6 M€ |
+| Reparto de dividendo | `reparto` | 35 | 1,6 M€ |
+| **Llamada de capital** | `desconocido` | 18 | 0,8 M€ |
+| **Impuesto de sociedades** | `desconocido` | 10 | 3,5 M€ |
+| **Fee de éxito** | `desconocido` | 11 | 1,4 M€ |
+| **Pago de intereses** | `desconocido` | 34 | 0,09 M€ |
+| **Reducción de capital con CDI** | `desconocido` | 17 | 1,6 M€ |
+| **Reducción de capital sin CDI** | `desconocido` | 23 | 0,004 M€ |
+
+Los seis marcados **se sincronizan y se ven en la tabla, pero no suman en los KPIs** (unos 7,4 M€
+en total). «Llamada de capital» es la petición de fondos y no el ingreso; el impuesto y el fee no
+van hacia el inversor. Los tres últimos aparecieron en los datos después de decidir el criterio,
+así que se quedan fuera por prudencia: **una cifra que no suma se ve y se corrige; una que suma de
+más no se nota**. `Pago de intereses` y `Reducción de capital` probablemente sean repartos —
+conviene confirmarlo y reclasificarlos.
 
 Para cambiar la clasificación no hace falta desplegar:
 

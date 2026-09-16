@@ -283,11 +283,6 @@ async function main(): Promise<void> {
     for (const aviso of validacion.avisos) {
       console.log(`  ⚠ ${aviso.modulo}.${aviso.columna}: ${aviso.detalle}`);
     }
-    console.log(
-      validacion.necesitaContacts
-        ? "  · El enlace no trae el correo: hará falta bajar también el módulo Contacts."
-        : "  · El enlace ya trae el correo: no hace falta copiar el módulo Contacts.",
-    );
 
     // 6. Una muestra ya mapeada, que es lo que de verdad delata un mapeo malo.
     const iMuestra = process.argv.indexOf("--muestra");

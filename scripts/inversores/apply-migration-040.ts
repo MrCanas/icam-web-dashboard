@@ -109,23 +109,36 @@ async function verificar(client: PoolClient): Promise<boolean> {
     `Catálogo de campos: ${catalogo} filas · ${sinResolver} sin resolver (${obligatorios} obligatorias)`,
   );
 
+  // Lo que de verdad importa comprobar no es cuántos están denegados, sino
+  // QUIÉN se queda viéndola. Un recuento cuadra igual con la lista equivocada.
+  const { rows: pueden } = await client.query<{ email: string }>(
+    `SELECT u.email
+       FROM auth.users u
+       JOIN public.app_user_zone_role r ON r.user_id = u.id AND r.zone_key = 'financiero'
+      WHERE NOT EXISTS (
+              SELECT 1 FROM public.app_user_route_deny d
+               WHERE d.user_id = u.id AND d.route_key = 'portfolio.inversores')
+      ORDER BY u.email`,
+  );
   const usuarios = await contar(client, "SELECT count(*)::int AS n FROM auth.users");
   const denegados = await contar(
     client,
     "SELECT count(DISTINCT user_id)::int AS n FROM public.app_user_route_deny WHERE route_key = 'portfolio.inversores'",
   );
-  console.log(`Usuarios: ${usuarios} · con la pestaña denegada: ${denegados}`);
-  if (denegados < usuarios) {
-    console.log(`  ✗ ${usuarios - denegados} usuario(s) verían Inversores sin habérsela concedido`);
-  }
+  console.log(`Usuarios: ${usuarios} · denegados: ${denegados}`);
+  console.log(`Ven Inversores (${pueden.length}):`);
+  for (const p of pueden) console.log(`  · ${p.email}`);
 
-  return (
-    faltan.length === 0 &&
-    sinRls.length === 0 &&
-    pols.length === 0 &&
-    catalogo > 0 &&
-    denegados >= usuarios
-  );
+  const esperados = [
+    "javiercanas@imparcapital.com",
+    "robertoperri@imparcapital.com",
+    "emilianoguerrero@imparcapital.com",
+  ].sort();
+  const reales = pueden.map((p) => p.email.toLowerCase()).sort();
+  const listaOk = reales.length === esperados.length && reales.every((e, i) => e === esperados[i]);
+  if (!listaOk) console.log("  ✗ La lista NO es la esperada.");
+
+  return faltan.length === 0 && sinRls.length === 0 && pols.length === 0 && catalogo > 0 && listaOk;
 }
 
 async function main(): Promise<void> {
