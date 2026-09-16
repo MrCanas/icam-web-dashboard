@@ -120,13 +120,21 @@ export function construirModelo(espejos: Espejos): ModeloInversores {
     const promocionesDeLaCuenta: PromocionDeCuenta[] = misPromos.map((enlace) => {
       const id = enlace.promocion_zoho_id ?? "";
       const deLaPromo = flujosPorPromo.get(id) ?? [];
+      const ficha = promocionPorId.get(id);
       return {
         zohoId: id,
-        // El nombre denormalizado del enlace gana al del espejo: sobrevive a un
-        // sync en el que el módulo de promociones falló.
-        nombre:
-          enlace.promocion_nombre ?? promocionPorId.get(id)?.nombre ?? "(promoción sin nombre)",
-        situacion: promocionPorId.get(id)?.situacion ?? null,
+        // El nombre del ESPEJO manda sobre el denormalizado del enlace, y no al
+        // revés como estaba. El `name` que Zoho devuelve en un lookup es el
+        // campo principal del registro, y en Promociones el campo principal es
+        // `Name`, cuya etiqueta es «Código de Promoción»: el enlace trae
+        // «SICCII» donde la promoción se llama «VBARE». Con la preferencia
+        // invertida, 353 de las 354 suscripciones enseñaban el código.
+        //
+        // El del enlace sigue siendo el respaldo, que era el motivo original:
+        // sobrevive a un sync en el que el módulo de promociones falló.
+        nombre: ficha?.nombre ?? enlace.promocion_nombre ?? "(promoción sin nombre)",
+        codigo: ficha?.codigo ?? enlace.promocion_nombre ?? null,
+        situacion: ficha?.situacion ?? null,
         status: enlace.status,
         comprometido: enlace.importe_comprometido,
         aportado:

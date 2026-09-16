@@ -137,7 +137,14 @@ export function NivelContactos({ cuenta }: { cuenta: CuentaInversion }) {
                     key={promocion.zohoId}
                     className="border-b border-subtle/60 text-text-body last:border-b-0"
                   >
-                    <td className="py-2 pr-3 font-medium text-icam-900">{promocion.nombre}</td>
+                    <td className="py-2 pr-3 font-medium text-icam-900">
+                      {promocion.nombre}
+                      {promocion.codigo && promocion.codigo !== promocion.nombre ? (
+                        <span className="block text-xs font-normal text-text-muted">
+                          {promocion.codigo}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="py-2 pr-3 whitespace-nowrap">{promocion.status ?? "—"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{promocion.situacion ?? "—"}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">

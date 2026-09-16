@@ -369,6 +369,49 @@ test("cada cuenta cae en un solo tramo y los tramos suman el total de cuentas", 
   );
 });
 
+test("la promoción se nombra con el espejo, no con el lookup del enlace", () => {
+  // En Zoho el `name` de un lookup es el campo principal del registro, y en
+  // Promociones ese campo se llama «Código de Promoción»: el enlace trae el
+  // CÓDIGO donde la promoción tiene un nombre. Si gana el enlace, la pantalla
+  // enseña «SICCII» para una promoción que se llama «VBARE».
+  const modelo = construirModelo(
+    espejos({
+      cuentas: [cuenta({ zoho_id: "C1", nombre: "Uno" })],
+      promociones: [promocion({ zoho_id: "P1", nombre: "VBARE", codigo: "SICCII" })],
+      cuentaPromocion: [
+        enlacePromocion({
+          zoho_id: "CP1",
+          cuenta_zoho_id: "C1",
+          promocion_zoho_id: "P1",
+          promocion_nombre: "SICCII",
+        }),
+      ],
+    }),
+  );
+  assert.equal(modelo.cuentas[0].promociones[0].nombre, "VBARE");
+  assert.equal(modelo.cuentas[0].promociones[0].codigo, "SICCII");
+  assert.equal(modelo.porPromocion[0].nombre, "VBARE");
+});
+
+test("si la promoción no está en el espejo, se usa lo que traiga el enlace", () => {
+  // Es el caso para el que existía la preferencia original: un sync en el que
+  // el módulo de promociones falló y el de suscripciones no.
+  const modelo = construirModelo(
+    espejos({
+      cuentas: [cuenta({ zoho_id: "C1", nombre: "Uno" })],
+      cuentaPromocion: [
+        enlacePromocion({
+          zoho_id: "CP1",
+          cuenta_zoho_id: "C1",
+          promocion_zoho_id: "P9",
+          promocion_nombre: "GQ8",
+        }),
+      ],
+    }),
+  );
+  assert.equal(modelo.cuentas[0].promociones[0].nombre, "GQ8");
+});
+
 test("el drill-down de una promoción enseña las cuentas que participan", () => {
   const modelo = construirModelo(escenario());
   assert.deepEqual(

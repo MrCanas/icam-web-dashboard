@@ -201,6 +201,8 @@ export interface ContactoInversor {
 export interface PromocionDeCuenta {
   zohoId: string;
   nombre: string;
+  /** El código corto («GQ8»). En Zoho es el campo principal del registro. */
+  codigo: string | null;
   situacion: string | null;
   /** Dónde está esa suscripción en el embudo comercial. */
   status: string | null;
