@@ -101,9 +101,20 @@ CREATE TABLE IF NOT EXISTS public.inv_cuentas (
   zoho_id                text PRIMARY KEY,
   nombre                 text NOT NULL,
   codigo                 text,
+  -- Sin equivalente en el CRM: Cuentas_de_Inversi_n no tiene un estado de
+  -- negocio, solo el Record_Status__s interno de Zoho (Trash/Available/Draft),
+  -- que no significa nada para el portal. Se deja para no cerrar la puerta.
   estado                 text,
+  -- Tipo_de_cuenta: Particular | Empresa. Es la categoría útil de la cuenta.
   tipo                   text,
   fecha_alta             date,
+  -- La cuenta es a la vez el inversor: lleva sus propios datos de contacto.
+  email                  text,
+  telefono               text,
+  -- Sin campo propio en el CRM: se deriva sumando las suscripciones
+  -- (inv_cuenta_promocion.importe_comprometido). La cuenta tiene además
+  -- «Total Inversión Promociones En Marcha/Culminadas», pero son campos que se
+  -- mantienen a mano y pueden no cuadrar con el detalle.
   capital_comprometido   numeric(18,2),
   moneda                 text NOT NULL DEFAULT 'EUR',
   propietario_zoho_id    text,
@@ -161,7 +172,19 @@ CREATE TABLE IF NOT EXISTS public.inv_cuenta_contacto (
   contacto_nombre    text,
   contacto_email     text,
   contacto_telefono  text,
+  -- El papel de la persona en la cuenta NO es un desplegable: en el CRM son
+  -- cinco casillas independientes y se pueden dar a la vez (un representante
+  -- legal que además es el contacto principal). Se guardan tal cual y el texto
+  -- legible se compone en logic/, que es donde puede cambiar sin migración.
+  es_principal            boolean,
+  es_secundario           boolean,
+  es_representante_legal  boolean,
+  es_abogado              boolean,
+  es_intermediario        boolean,
+  -- Concepto_representante: Administrador único | Administrador solidario.
+  concepto_representante  text,
   rol                text,
+  -- Sin equivalente en el CRM hoy. Se deja por si aparece.
   participacion      numeric(9,6),
   zoho_modified_at   timestamptz,
   raw                jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -204,9 +227,18 @@ CREATE TABLE IF NOT EXISTS public.inv_cuenta_promocion (
   promocion_zoho_id     text,
   promocion_nombre      text,
   importe_comprometido  numeric(18,2),
+  -- Sin campo propio en el CRM: se deriva de los flujos de la promoción.
   importe_aportado      numeric(18,2),
   participacion         numeric(9,6),
   fecha                 date,
+  -- OJO: este módulo es un EMBUDO COMERCIAL, no una lista de inversiones
+  -- cerradas. `Status` recorre «Por contactar → Dossier + NDA → Reunión →
+  -- LOI + Pack Inversor → Doc firmada → PBC → Ganado». Por decisión del
+  -- encargo se cuentan TODAS las filas en los totales, así que esta columna es
+  -- lo que permite que la cifra sea interpretable en vez de engañosa: el
+  -- detalle la enseña. Si algún día se quiere filtrar, se filtra por aquí.
+  status                text,
+  coste_vehiculo_intermedio numeric(18,2),
   zoho_modified_at      timestamptz,
   raw                   jsonb NOT NULL DEFAULT '{}'::jsonb,
   sync_id               uuid,
@@ -235,6 +267,9 @@ CREATE TABLE IF NOT EXISTS public.inv_flujos (
   -- El literal de Zoho, sin tocar, para poder auditar la normalización.
   tipo_zoho          text,
   importe            numeric(18,2) NOT NULL DEFAULT 0,
+  -- Retención practicada, aparte del monto. Se guarda pero no entra en los
+  -- KPIs: es un dato fiscal, no un flujo hacia el inversor.
+  retencion          numeric(18,2),
   moneda             text NOT NULL DEFAULT 'EUR',
   fecha              date,
   concepto           text,
@@ -315,54 +350,102 @@ GRANT ALL ON public.inv_sync_log         TO service_role;
 -- resuelve preguntándole a Zoho. Aquí solo se declara QUÉ hace falta y qué es
 -- imprescindible. ON CONFLICT DO NOTHING para no pisar un mapeo ya resuelto si
 -- la migración se vuelve a pasar.
-INSERT INTO public.inv_campo_catalogo (modulo, destino, tipo, obligatorio, notas) VALUES
-  ('Cuentas_de_Inversi_n', 'nombre',               'text',        true,  NULL),
-  ('Cuentas_de_Inversi_n', 'codigo',               'text',        false, NULL),
-  ('Cuentas_de_Inversi_n', 'estado',               'picklist',    false, NULL),
-  ('Cuentas_de_Inversi_n', 'tipo',                 'picklist',    false, NULL),
-  ('Cuentas_de_Inversi_n', 'fecha_alta',           'date',        false, NULL),
-  ('Cuentas_de_Inversi_n', 'capital_comprometido', 'number',      false,
-     '{"si_falta":"se deriva sumando inv_cuenta_promocion.importe_comprometido"}'::jsonb),
-  ('Cuentas_de_Inversi_n', 'moneda',               'picklist',    false, NULL),
+-- Los nombres API salen de preguntarle a Zoho (`/settings/fields`), no de
+-- adivinarlos, y se siembran ya resueltos porque el descubrimiento ya se hizo.
+-- Lo que quede a NULL es que NO EXISTE en el CRM: se deriva o se queda vacio, y
+-- esta dicho en cada caso. `npm run inversores:zoho-descubrir` sirve para
+-- revisarlos cuando alguien toque el CRM.
+--
+-- OJO con dos trampas que este mapeo ya esquiva:
+--
+--   * En `Promociones` las etiquetas estan CRUZADAS respecto a los api_name:
+--     `Name` se llama "Codigo de Promocion" y `C_digo_de_Promoci_n` se llama
+--     "Nombre Promocion". Quien se fie del api_name pondra el nombre en el
+--     codigo y al reves.
+--   * En `Inversi_n_vs_Promoci_n`, `Promociones_Invertidas_linking` NO es la
+--     promocion: su etiqueta es "Cuenta que invierte". La promocion es
+--     `Promociones_Invertidas_2`.
+INSERT INTO public.inv_campo_catalogo
+  (modulo, destino, zoho_api_name, zoho_label, tipo, obligatorio, notas) VALUES
+  -- Promociones ---------------------------------------------------------------
+  ('Promociones', 'codigo',    'Name',                'Codigo de Promocion', 'text',     false, NULL),
+  ('Promociones', 'nombre',    'C_digo_de_Promoci_n', 'Nombre Promocion',    'text',     true,  NULL),
+  ('Promociones', 'situacion', 'Estado_Ventas',       'Situacion',           'picklist', false, NULL),
+  ('Promociones', 'tipologia', 'Tipo_de_proyecto',    'Tipo de proyecto',    'picklist', false, NULL),
 
-  ('Contacts', 'nombre',           'text',  false, NULL),
-  ('Contacts', 'apellidos',        'text',  false, NULL),
-  ('Contacts', 'nombre_completo',  'text',  true,  NULL),
-  ('Contacts', 'email',            'email', true,  NULL),
-  ('Contacts', 'email_secundario', 'email', false, NULL),
-  ('Contacts', 'telefono',         'text',  false, NULL),
+  -- Cuentas de inversion -------------------------------------------------------
+  ('Cuentas_de_Inversi_n', 'nombre',   'Name',           'Cuenta de Inversion Name', 'text',     true,  NULL),
+  ('Cuentas_de_Inversi_n', 'tipo',     'Tipo_de_cuenta', 'Tipo de cuenta',           'picklist', false, NULL),
+  ('Cuentas_de_Inversi_n', 'email',    'Email',          'Email',                    'email',    false, NULL),
+  ('Cuentas_de_Inversi_n', 'telefono', 'Tel_fono_M_vil', 'Telefono Movil',           'text',     false, NULL),
+  ('Cuentas_de_Inversi_n', 'moneda',   'Currency',       'Currency',                 'picklist', false, NULL),
+  ('Cuentas_de_Inversi_n', 'codigo',   NULL, NULL, 'text', false,
+     '{"sin_campo":"Cuentas_de_Inversi_n no tiene codigo propio"}'::jsonb),
+  ('Cuentas_de_Inversi_n', 'estado',   NULL, NULL, 'picklist', false,
+     '{"sin_campo":"solo existe Record_Status__s (Trash/Available/Draft), interno de Zoho"}'::jsonb),
+  ('Cuentas_de_Inversi_n', 'fecha_alta', NULL, NULL, 'date', false,
+     '{"sin_campo":"Fecha_de_nacimiento es del titular, NO el alta de la cuenta"}'::jsonb),
+  ('Cuentas_de_Inversi_n', 'capital_comprometido', NULL, NULL, 'number', false,
+     '{"sin_campo":"se deriva sumando inv_cuenta_promocion.importe_comprometido"}'::jsonb),
 
-  ('Inversi_n_vs_Contactos', 'cuenta_zoho_id',    'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Contactos', 'cuenta_nombre',     'lookup_nombre', false, NULL),
-  ('Inversi_n_vs_Contactos', 'contacto_zoho_id',  'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Contactos', 'contacto_nombre',   'lookup_nombre', false, NULL),
-  ('Inversi_n_vs_Contactos', 'contacto_email',    'email',         false,
-     '{"si_falta":"se resuelve bajando el modulo Contacts"}'::jsonb),
-  ('Inversi_n_vs_Contactos', 'contacto_telefono', 'text',          false, NULL),
-  ('Inversi_n_vs_Contactos', 'rol',               'picklist',      false, NULL),
-  ('Inversi_n_vs_Contactos', 'participacion',     'number',        false, NULL),
+  -- Inversion vs Contactos ------------------------------------------------------
+  ('Inversi_n_vs_Contactos', 'cuenta_zoho_id',         'Cuentas_de_Inversi_n',   'Cuentas de Inversion',   'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Contactos', 'cuenta_nombre',          'Cuentas_de_Inversi_n',   'Cuentas de Inversion',   'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Contactos', 'contacto_zoho_id',       'Contactos_asociados',    'Contactos asociados',    'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Contactos', 'contacto_nombre',        'Contactos_asociados',    'Contactos asociados',    'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Contactos', 'contacto_email',         'Email',                  'Email',                  'email',         false, NULL),
+  ('Inversi_n_vs_Contactos', 'es_principal',           'Contacto_principal',     'Contacto principal',     'bool',          false, NULL),
+  ('Inversi_n_vs_Contactos', 'es_secundario',          'Contacto_secundario',    'Contacto secundario',    'bool',          false, NULL),
+  ('Inversi_n_vs_Contactos', 'es_representante_legal', 'Representante_legal',    'Representante legal',    'bool',          false, NULL),
+  ('Inversi_n_vs_Contactos', 'es_abogado',             'Abogado',                'Abogado',                'bool',          false, NULL),
+  ('Inversi_n_vs_Contactos', 'es_intermediario',       'Intermediario',          'Intermediario',          'bool',          false, NULL),
+  ('Inversi_n_vs_Contactos', 'concepto_representante', 'Concepto_representante', 'Concepto representante', 'picklist',      false, NULL),
+  ('Inversi_n_vs_Contactos', 'contacto_telefono', NULL, NULL, 'text', false,
+     '{"sin_campo":"el telefono esta en la cuenta (Tel_fono_M_vil), no en el enlace"}'::jsonb),
+  ('Inversi_n_vs_Contactos', 'rol', NULL, NULL, 'text', false,
+     '{"derivado":"se compone en logic/ a partir de las cinco casillas"}'::jsonb),
+  ('Inversi_n_vs_Contactos', 'participacion', NULL, NULL, 'number', false,
+     '{"sin_campo":"el CRM no guarda el porcentaje de cada contacto en la cuenta"}'::jsonb),
 
-  ('Promociones', 'codigo',    'text',     false, NULL),
-  ('Promociones', 'nombre',    'text',     true,  NULL),
-  ('Promociones', 'situacion', 'picklist', false, NULL),
-  ('Promociones', 'tipologia', 'picklist', false, NULL),
+  -- Suscripcion a proyectos (Inversion vs Promocion) ----------------------------
+  ('Inversi_n_vs_Promoci_n', 'cuenta_zoho_id',            'Promociones_Invertidas_linking', 'Cuenta que invierte',       'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Promoci_n', 'cuenta_nombre',             'Promociones_Invertidas_linking', 'Cuenta que invierte',       'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'promocion_zoho_id',         'Promociones_Invertidas_2',       'Promocion Invertida',       'lookup_id',     true,  NULL),
+  ('Inversi_n_vs_Promoci_n', 'promocion_nombre',          'Promociones_Invertidas_2',       'Promocion Invertida',       'lookup_nombre', false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'importe_comprometido',      'Capital_Invertido',              'Capital suscrito',          'number',        false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'fecha',                     'Fecha',                          'Fecha',                     'date',          false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'coste_vehiculo_intermedio', 'Coste_veh_culo_intermedio',      'Coste vehiculo intermedio', 'number',        false, NULL),
+  ('Inversi_n_vs_Promoci_n', 'status',                    'Status',                         'Status',                    'picklist',      false,
+     '{"embudo":["Por contactar","Dossier + NDA","Reunion","LOI + Pack Inversor","Doc firmada","PBC","Ganado"],"decision":"por encargo se cuentan TODAS las filas en los totales; el detalle ensena el status"}'::jsonb),
+  ('Inversi_n_vs_Promoci_n', 'importe_aportado', NULL, NULL, 'number', false,
+     '{"sin_campo":"se deriva de los flujos de esa cuenta en esa promocion"}'::jsonb),
+  ('Inversi_n_vs_Promoci_n', 'participacion', NULL, NULL, 'number', false,
+     '{"sin_campo":"no existe en el CRM"}'::jsonb),
 
-  ('Inversi_n_vs_Promoci_n', 'cuenta_zoho_id',       'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Promoci_n', 'cuenta_nombre',        'lookup_nombre', false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'promocion_zoho_id',    'lookup_id',     true,  NULL),
-  ('Inversi_n_vs_Promoci_n', 'promocion_nombre',     'lookup_nombre', false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'importe_comprometido', 'number',        false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'importe_aportado',     'number',        false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'participacion',        'number',        false, NULL),
-  ('Inversi_n_vs_Promoci_n', 'fecha',                'date',          false, NULL),
+  -- Movimientos - A/R (Aportes y Repartos) --------------------------------------
+  ('Aportes_Repartos', 'cuenta_zoho_id',    'Cuenta_de_inversi_n', 'Cuenta de inversion', 'lookup_id', true,  NULL),
+  ('Aportes_Repartos', 'promocion_zoho_id', 'Promoci_n',           'Promocion',           'lookup_id', false, NULL),
+  ('Aportes_Repartos', 'importe',           'Monto',               'Monto',               'number',    true,  NULL),
+  ('Aportes_Repartos', 'retencion',         'Retenci_n',           'Retencion',           'number',    false, NULL),
+  ('Aportes_Repartos', 'fecha',             'Fecha',               'Fecha',               'date',      true,  NULL),
+  -- Los siete valores del desplegable, clasificados a mano. "Llamada de capital"
+  -- es la PETICION de fondos, no el ingreso, asi que no suma como aporte; el
+  -- impuesto y el fee no son flujos hacia el inversor. Los tres van a
+  -- "desconocido": se sincronizan y se ven, pero no entran en los KPIs.
+  ('Aportes_Repartos', 'tipo_zoho',         'Tipo_de_movimiento',  'Tipo de movimiento',  'picklist',  true,
+     '{"normaliza":{"Aporte de capital":"aporte","Llamada de capital":"desconocido","Reparto de capital":"reparto","Reparto de beneficios":"reparto","Impuesto de sociedades":"desconocido","Fee de exito":"desconocido"}}'::jsonb),
+  ('Aportes_Repartos', 'concepto', NULL, NULL, 'text', false,
+     '{"sin_campo":"Movimientos - A/R no tiene campo de concepto"}'::jsonb),
 
-  ('Aportes_Repartos', 'cuenta_zoho_id',    'lookup_id', true,  NULL),
-  ('Aportes_Repartos', 'promocion_zoho_id', 'lookup_id', false, NULL),
-  ('Aportes_Repartos', 'tipo_zoho',         'picklist',  true,
-     '{"normaliza":{"Aporte":"aporte","Aportación":"aporte","Reparto":"reparto","Distribución":"reparto"}}'::jsonb),
-  ('Aportes_Repartos', 'importe',           'number',    true,  NULL),
-  ('Aportes_Repartos', 'fecha',             'date',      true,  NULL),
-  ('Aportes_Repartos', 'concepto',          'text',      false, NULL)
+  -- Contacts: NO se usa. El enlace ya trae el correo, asi que no hay motivo para
+  -- copiar la agenda del CRM. Las filas quedan sin resolver a proposito y
+  -- `validarMapeo` salta el modulo entero.
+  ('Contacts', 'nombre_completo',  NULL, NULL, 'text',  true,  NULL),
+  ('Contacts', 'email',            NULL, NULL, 'email', true,  NULL),
+  ('Contacts', 'nombre',           NULL, NULL, 'text',  false, NULL),
+  ('Contacts', 'apellidos',        NULL, NULL, 'text',  false, NULL),
+  ('Contacts', 'email_secundario', NULL, NULL, 'email', false, NULL),
+  ('Contacts', 'telefono',         NULL, NULL, 'text',  false, NULL)
 ON CONFLICT (modulo, destino) DO NOTHING;
 
 -- =============================================================================

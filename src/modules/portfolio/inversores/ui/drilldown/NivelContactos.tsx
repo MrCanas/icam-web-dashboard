@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { fmtEurosCompact, fmtFechaCorta, fmtPct } from "@/lib/formatters";
+import { fmtEurosCompact, fmtFechaCorta } from "@/lib/formatters";
 import type { CuentaInversion } from "@/modules/portfolio/inversores/types";
 
 function euros(valor: number | null): string {
@@ -78,8 +78,7 @@ export function NivelContactos({ cuenta }: { cuenta: CuentaInversion }) {
                 <tr className="border-b border-subtle text-left text-text-muted">
                   <th scope="col" className="py-2 pr-3">Nombre</th>
                   <th scope="col" className="py-2 pr-3">Correo</th>
-                  <th scope="col" className="py-2 pr-3">Rol</th>
-                  <th scope="col" className="py-2 text-right">Participación</th>
+                  <th scope="col" className="py-2">Rol</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,10 +100,7 @@ export function NivelContactos({ cuenta }: { cuenta: CuentaInversion }) {
                         <span className="text-text-muted">sin correo en Zoho</span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{contacto.rol ?? "—"}</td>
-                    <td className="py-2 text-right tabular-nums">
-                      {contacto.participacion === null ? "—" : fmtPct(contacto.participacion)}
-                    </td>
+                    <td className="py-2">{contacto.rol ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -124,6 +120,11 @@ export function NivelContactos({ cuenta }: { cuenta: CuentaInversion }) {
               <thead>
                 <tr className="border-b border-subtle text-left text-text-muted">
                   <th scope="col" className="py-2 pr-3">Promoción</th>
+                  {/* El estado en el embudo comercial. Está aquí a propósito:
+                      los totales cuentan todas las suscripciones, incluidas las
+                      que solo van por «Dossier + NDA», y sin esta columna no
+                      habría forma de saberlo desde la pantalla. */}
+                  <th scope="col" className="py-2 pr-3">Estado</th>
                   <th scope="col" className="py-2 pr-3">Situación</th>
                   <th scope="col" className="py-2 pr-3 text-right">Comprometido</th>
                   <th scope="col" className="py-2 pr-3 text-right">Aportado</th>
@@ -137,6 +138,7 @@ export function NivelContactos({ cuenta }: { cuenta: CuentaInversion }) {
                     className="border-b border-subtle/60 text-text-body last:border-b-0"
                   >
                     <td className="py-2 pr-3 font-medium text-icam-900">{promocion.nombre}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{promocion.status ?? "—"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{promocion.situacion ?? "—"}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">
                       {euros(promocion.comprometido)}

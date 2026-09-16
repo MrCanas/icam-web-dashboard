@@ -29,6 +29,8 @@ export interface InvCuentaRow extends InvFilaSync {
   estado: string | null;
   tipo: string | null;
   fecha_alta: string | null;
+  email: string | null;
+  telefono: string | null;
   capital_comprometido: number | null;
   moneda: string;
   propietario_zoho_id: string | null;
@@ -55,7 +57,20 @@ export interface InvCuentaContactoRow extends InvFilaSync {
   contacto_nombre: string | null;
   contacto_email: string | null;
   contacto_telefono: string | null;
+  /**
+   * Las cinco casillas del CRM. No son excluyentes: un representante legal
+   * puede ser además el contacto principal. El texto legible lo compone
+   * `rolDeContacto` en `logic/inversoresModel.ts`.
+   */
+  es_principal: boolean | null;
+  es_secundario: boolean | null;
+  es_representante_legal: boolean | null;
+  es_abogado: boolean | null;
+  es_intermediario: boolean | null;
+  concepto_representante: string | null;
+  /** Sin campo de origen: se deriva de las casillas. */
   rol: string | null;
+  /** Sin campo de origen en el CRM. Siempre null hoy. */
   participacion: number | null;
   zoho_modified_at: string | null;
 }
@@ -79,6 +94,15 @@ export interface InvCuentaPromocionRow extends InvFilaSync {
   importe_aportado: number | null;
   participacion: number | null;
   fecha: string | null;
+  /**
+   * El estado en el embudo comercial: «Por contactar», «Dossier + NDA»,
+   * «Reunión», «LOI + Pack Inversor», «Doc firmada», «PBC», «Ganado».
+   *
+   * Los totales cuentan TODAS las filas por decisión del encargo, así que esto
+   * es lo que hace la cifra interpretable: el detalle lo enseña.
+   */
+  status: string | null;
+  coste_vehiculo_intermedio: number | null;
   zoho_modified_at: string | null;
 }
 
@@ -91,6 +115,8 @@ export interface InvFlujoRow extends InvFilaSync {
   tipo: TipoFlujo;
   tipo_zoho: string | null;
   importe: number;
+  /** Retención fiscal, aparte del importe. No entra en los KPIs. */
+  retencion: number | null;
   moneda: string;
   fecha: string | null;
   concepto: string | null;
@@ -168,15 +194,16 @@ export interface ContactoInversor {
   nombre: string;
   email: string | null;
   telefono: string | null;
+  /** Compuesto a partir de las casillas del CRM: «Principal · Abogado». */
   rol: string | null;
-  /** Tanto por uno, no porcentaje: `fmtPct` ya multiplica. */
-  participacion: number | null;
 }
 
 export interface PromocionDeCuenta {
   zohoId: string;
   nombre: string;
   situacion: string | null;
+  /** Dónde está esa suscripción en el embudo comercial. */
+  status: string | null;
   comprometido: number | null;
   aportado: number;
   repartido: number;
@@ -189,6 +216,8 @@ export interface CuentaInversion {
   estado: string | null;
   tipo: string | null;
   fechaAlta: string | null;
+  email: string | null;
+  telefono: string | null;
   /** Lo firmado. Si Zoho no lo trae, se deriva de los enlaces con promociones. */
   comprometido: number | null;
   aportado: number;

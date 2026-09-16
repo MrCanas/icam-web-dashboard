@@ -6,17 +6,24 @@ página nunca llama a Zoho.
 
 ## 1. Los cinco módulos de Zoho
 
-| Módulo (nombre API) | Qué es | Tabla espejo |
+| Módulo (nombre API) | Etiqueta en el CRM | Tabla espejo |
 |---|---|---|
-| `Cuentas_de_Inversi_n` | El vehículo por el que se invierte | `inv_cuentas` |
-| `Inversi_n_vs_Contactos` | Enlace cuenta ↔ persona (de aquí salen los correos) | `inv_cuenta_contacto` |
-| `Inversi_n_vs_Promoci_n` | Enlace cuenta ↔ promoción | `inv_cuenta_promocion` |
-| `Aportes_Repartos` | Flujos de caja | `inv_flujos` |
-| `Promociones` | Las promociones | `inv_promociones` |
-| `Contacts` | Solo los contactos referenciados, y **solo si hacen falta** | `inv_contactos` |
+| `Cuentas_de_Inversi_n` | Cuentas de Inversión | `inv_cuentas` |
+| `Inversi_n_vs_Contactos` | Inversión vs Contactos | `inv_cuenta_contacto` |
+| `Inversi_n_vs_Promoci_n` | **Suscripción a proyectos** | `inv_cuenta_promocion` |
+| `Aportes_Repartos` | **Movimientos - A/R** | `inv_flujos` |
+| `Promociones` | Promociones | `inv_promociones` |
+| `Contacts` | Contacts — **no se usa** | `inv_contactos` |
 
-`Contacts` es condicional: si `Inversi_n_vs_Contactos` ya trae un campo de correo, no se copia
-nada del módulo de contactos. Lo decide `validarMapeo`, no una constante.
+**El CRM tiene módulos con nombres casi iguales que NO son estos.** Verificado sobre los 78
+módulos accesibles: existen también `Aportes_y_Repartos` («Aportes y Repartos»),
+`Promociones_Invertidas`, `Promociones_Invertidas1`, `Contacts_X_Promociones` y
+`Fondos_vs_Proyectos`. Por eso los nombres están escritos en `inv_campo_catalogo` y no se eligen
+a ojo.
+
+`Contacts` es condicional y **hoy no hace falta**: `Inversi_n_vs_Contactos` tiene su propio campo
+`Email`, así que no se copia la agenda del CRM. Lo decide `validarMapeo` en cada ejecución, no una
+constante. Sus filas del catálogo quedan sin resolver a propósito.
 
 > **`inv_promociones` y `pm_promociones` espejan el mismo módulo de Zoho.** Están separadas a
 > propósito: `pm_promociones` (migración 028) se puebla desde un export manual de Excel y es el
@@ -51,18 +58,64 @@ npx vercel env rm ZOHODESK_CLIENT_ID production
 npx vercel env add ZOHO_CLIENT_ID production
 ```
 
+## 2 bis. Cómo es el modelo de verdad (y dónde engaña)
+
+Cuatro cosas que no se deducen leyendo los nombres de los campos y que el mapeo ya esquiva:
+
+**1. En `Promociones` las etiquetas están cruzadas respecto a los `api_name`.**
+`Name` se llama «Código de Promoción» y `C_digo_de_Promoci_n` se llama «Nombre Promoción». Quien
+se fíe del `api_name` pondrá el nombre en el código y al revés.
+
+**2. `Inversi_n_vs_Promoci_n` es un EMBUDO COMERCIAL, no una lista de inversiones cerradas.**
+Su campo `Status` recorre *Por contactar → Dossier + NDA → Reunión → LOI + Pack Inversor → Doc
+firmada → PBC → Ganado*. **Por decisión del encargo se cuentan TODAS las filas** en los totales,
+así que el capital comprometido incluye pipeline. Para que la cifra sea interpretable y no
+engañosa, el `Status` se guarda y **se enseña en el detalle de cada cuenta**. Si algún día se
+quiere filtrar, se filtra por `inv_cuenta_promocion.status`.
+
+Y ojo con el otro nombre engañoso: en ese módulo `Promociones_Invertidas_linking` **no es la
+promoción**, su etiqueta es «Cuenta que invierte». La promoción es `Promociones_Invertidas_2`.
+
+**3. El papel de un contacto no es un desplegable, son cinco casillas** (`Contacto_principal`,
+`Contacto_secundario`, `Representante_legal`, `Abogado`, `Intermediario`) que pueden darse a la
+vez, más `Concepto_representante`. Se guardan las cinco y el texto legible lo compone
+`rolDeContacto` en `logic/inversoresModel.ts`. **No hay porcentaje de participación** por contacto
+en el CRM.
+
+**4. Lo que el CRM no tiene** y por tanto se deriva o se queda vacío:
+
+| Columna | Por qué |
+|---|---|
+| `inv_cuentas.capital_comprometido` | No existe. Se deriva sumando `inv_cuenta_promocion.importe_comprometido` |
+| `inv_cuentas.estado` | Solo existe `Record_Status__s` (Trash/Available/Draft), interno de Zoho |
+| `inv_cuentas.fecha_alta` | `Fecha_de_nacimiento` es del titular, **no** el alta de la cuenta |
+| `inv_cuenta_promocion.importe_aportado` | Se deriva de los flujos de esa cuenta en esa promoción |
+| `inv_flujos.concepto` | «Movimientos - A/R» no tiene campo de concepto |
+
+La cuenta lleva además `Total Inversión Promociones En Marcha` y `... Culminadas`, pero son campos
+que alguien mantiene a mano: se dejan en `raw` y no se usan como fuente.
+
 ## 3. Resolver el mapeo de campos
 
 Los nombres API de los campos **no están en el código**: viven en la tabla `inv_campo_catalogo`,
 igual que `pm_avance_fase_catalogo` para Avance de obra. El motivo es el mismo: los nombres los
 decide el CRM y congelarlos en un `const` convierte cualquier retoque en un despliegue urgente.
 
+**La migración 040 ya los siembra resueltos**, porque el descubrimiento se hizo contra el CRM real.
+Este script sirve para *revisarlos* cuando alguien toque Zoho, no para la puesta en marcha.
+
 ```bash
 npm run inversores:zoho-descubrir                # módulos, estado del mapeo y propuesta
 npm run inversores:zoho-descubrir -- --campos    # todos los campos de cada módulo
-npm run inversores:zoho-descubrir -- --aplicar   # guarda la propuesta
+npm run inversores:zoho-descubrir -- --aplicar   # guarda lo que falte por resolver
 npm run inversores:zoho-descubrir -- --muestra 3 # registros reales, ya mapeados
+npm run inversores:zoho-descubrir -- --forzar    # reevalúa también lo ya resuelto
 ```
+
+**Lo ya resuelto en la tabla no se toca sin `--forzar`.** No es una comodidad: contra el CRM real
+la heurística resolvió sola `participacion` → «Sharepoint doc inversión vs promoción» (un campo de
+tipo *website*, porque «Sharepoint» contiene «share») y `estado` → `Record_Status__s`. Dejarla
+sobrescribir el mapeo bueno sería cambiar un dato correcto por una conjetura, en silencio.
 
 Lee la salida así:
 
@@ -81,17 +134,35 @@ columnas de texto, lookups que llegan como `[object Object]`, fechas al revés).
 
 ### El diccionario de tipos de flujo
 
-`Aportes_Repartos.tipo_zoho` se normaliza a `aporte` / `reparto` con el mapa que vive en
-`inv_campo_catalogo.notas`:
+`Tipo_de_movimiento` tiene **siete valores** y no dos. La clasificación vive en
+`inv_campo_catalogo.notas` de `Aportes_Repartos.tipo_zoho`:
+
+| Valor en el CRM | Cuenta como | Por qué |
+|---|---|---|
+| Aporte de capital | `aporte` | Dinero que entra |
+| **Llamada de capital** | `desconocido` | Es la **petición** de fondos, no el ingreso |
+| Reparto de capital | `reparto` | Devolución del principal |
+| Reparto de beneficios | `reparto` | Retorno |
+| **Impuesto de sociedades** | `desconocido` | No es un flujo hacia el inversor |
+| **Fee de éxito** | `desconocido` | Ídem |
+
+Los tres marcados **se sincronizan y se ven en la tabla, pero no suman en los KPIs**. Perder una
+fila en silencio descuadraría los totales sin avisar; contarla mal los inflaría.
+
+Para cambiar la clasificación no hace falta desplegar:
 
 ```sql
 UPDATE inv_campo_catalogo
-SET notas = '{"normaliza":{"Aportación":"aporte","Reparto":"reparto"}}'::jsonb
+SET notas = '{"normaliza":{"Llamada de capital":"aporte"}}'::jsonb
 WHERE modulo = 'Aportes_Repartos' AND destino = 'tipo_zoho';
 ```
 
-Lo que no case cae en `desconocido`: la fila **se sincroniza igual** y se ve en la tabla, pero no
-suma en los KPIs. Perderla en silencio descuadraría los totales sin avisar.
+El diccionario manda sobre la heurística por raíz, y puede fijar `desconocido` explícitamente —que
+es justo lo que hace falta con «Llamada de capital», porque contiene la palabra «capital» y una
+heurística ingenua la contaría como aporte.
+
+El importe es `Monto`. `Retenci_n` se guarda aparte en `inv_flujos.retencion` y **no** entra en
+los KPIs: es un dato fiscal, no un flujo hacia el inversor.
 
 ## 4. Sincronizar
 

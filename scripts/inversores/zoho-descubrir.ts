@@ -13,6 +13,11 @@
  *   npm run inversores:zoho-descubrir -- --campos    # todos los campos de cada módulo
  *   npm run inversores:zoho-descubrir -- --muestra 3 # registros de ejemplo, ya mapeados
  *   npm run inversores:zoho-descubrir -- --aplicar   # guarda la propuesta
+ *   npm run inversores:zoho-descubrir -- --forzar    # reevalúa también lo ya resuelto
+ *
+ * Lo que ya tiene `zoho_api_name` en la tabla NO se toca sin `--forzar`: el
+ * mapeo bueno lo sembró la migración 040 mirando el CRM de verdad, y la
+ * heurística es un ayudante para lo que falta, no una autoridad.
  */
 import { cargarEnv, ficherosEnvPresentes } from "../pm/lib/env";
 import type { UserContext } from "@/lib/auth/currentUser";
@@ -58,9 +63,45 @@ function tabla(campos: ZohoCampo[]): void {
   }
 }
 
+/**
+ * Campos que Zoho pone en todos los módulos y que nunca son el dato de negocio.
+ *
+ * Sin este filtro la heurística resolvía sola `estado` → `Record_Status__s`
+ * («Record Status»: Trash/Available/Draft), que no significa nada para el
+ * portal pero casa con la pista de «status».
+ */
+const SISTEMA = new Set([
+  "Owner",
+  "Tag",
+  "Exchange_Rate",
+  "Currency",
+  "Record_Image",
+  "Unsubscribed_Mode",
+  "Unsubscribed_Time",
+  "id",
+  "Created_By",
+  "Modified_By",
+  "Created_Time",
+  "Modified_Time",
+  "Last_Activity_Time",
+]);
+
+function esCampoDeSistema(c: ZohoCampo): boolean {
+  // Los `__s` son los campos internos de la plataforma (Record_Status__s,
+  // Locked__s, Tag__s…). Ninguno es dato de negocio.
+  return c.api_name.endsWith("__s") || SISTEMA.has(c.api_name);
+}
+
 /** Candidatos de un campo nuestro entre los que Zoho dice tener. */
-function candidatos(pistas: readonly RegExp[], campos: ZohoCampo[]): ZohoCampo[] {
-  return campos.filter((c) => pistas.some((p) => p.test(c.field_label) || p.test(c.api_name)));
+function candidatos(
+  pistas: readonly RegExp[],
+  campos: ZohoCampo[],
+  columna: string,
+): ZohoCampo[] {
+  // `moneda` es la excepción: ahí el campo de sistema `Currency` SÍ es el dato.
+  const admisibles = columna === "moneda" ? campos : campos.filter((c) => !esCampoDeSistema(c));
+  if (pistas.length === 0) return [];
+  return admisibles.filter((c) => pistas.some((p) => p.test(c.field_label) || p.test(c.api_name)));
 }
 
 async function main(): Promise<void> {
@@ -82,8 +123,16 @@ async function main(): Promise<void> {
   const cfg = getZohoConfig({ conModulo: false });
   console.log(`centro de datos: ${cfg.apiDomain}`);
 
-  const yo = await usuarioActual(cfg);
-  if (yo) console.log(`token de: ${yo.full_name} <${yo.email}> · perfil ${yo.profile?.name ?? "?"}`);
+  // Saber a quién pertenece el token ayuda a explicar un 403 más adelante (el
+  // token hereda SUS permisos), pero /users pide el scope ZohoCRM.users.READ y
+  // el nuestro no lo incluye a propósito: no hace falta para leer módulos. Si
+  // no se puede, se sigue — informativo no es lo mismo que imprescindible.
+  try {
+    const yo = await usuarioActual(cfg);
+    if (yo) console.log(`token de: ${yo.full_name} <${yo.email}> · perfil ${yo.profile?.name ?? "?"}`);
+  } catch {
+    console.log("token de: (no se puede saber sin el scope ZohoCRM.users.READ)");
+  }
   console.log("");
 
   // 1. ¿Están los módulos que esperamos?
@@ -124,10 +173,23 @@ async function main(): Promise<void> {
   }
 
   // 3. La propuesta de mapeo.
+  //
+  // Lo ya resuelto en la tabla NO se toca salvo con --forzar. El mapeo bueno lo
+  // sembró la migración 040 tras mirar el CRM de verdad, y la heurística es un
+  // ayudante para lo que falta, no una autoridad: dejarla sobrescribir sería
+  // cambiar un mapeo correcto por una conjetura, en silencio.
+  const forzar = process.argv.includes("--forzar");
+  const yaResuelto = new Set(
+    (await listarCatalogo(CTX))
+      .filter((c) => c.zoho_api_name)
+      .map((c) => `${c.modulo}::${c.destino}`),
+  );
+
   console.log("\n\nMapeo propuesto contra inv_campo_catalogo:\n");
   const resoluciones: ResolucionCampo[] = [];
   let ambiguos = 0;
   let sinCandidato = 0;
+  let respetados = 0;
 
   for (const espejo of ESPEJOS) {
     const lista = campos.get(espejo.moduloZoho);
@@ -138,8 +200,15 @@ async function main(): Promise<void> {
     console.log(`\n  ${espejo.moduloZoho} → ${espejo.tabla}`);
 
     for (const columna of espejo.columnas) {
-      const posibles = candidatos(columna.pistas, lista);
       const marca = columna.obligatorio ? "*" : " ";
+
+      if (!forzar && yaResuelto.has(`${espejo.moduloZoho}::${columna.columna}`)) {
+        respetados += 1;
+        console.log(`   ${marca} · ${columna.columna.padEnd(22)} ya resuelto en la tabla`);
+        continue;
+      }
+
+      const posibles = candidatos(columna.pistas, lista, columna.columna);
 
       if (posibles.length === 0) {
         sinCandidato += 1;
@@ -173,8 +242,12 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n  (*) obligatorio · ${resoluciones.length} resueltos · ${ambiguos} ambiguos · ${sinCandidato} sin candidato`,
+    `\n  (*) obligatorio · ${respetados} ya en la tabla · ${resoluciones.length} propuestos · ` +
+      `${ambiguos} ambiguos · ${sinCandidato} sin candidato`,
   );
+  if (respetados > 0 && !forzar) {
+    console.log("  Lo ya resuelto no se toca. Con --forzar se reevalúa todo.");
+  }
   if (ambiguos + sinCandidato > 0) {
     console.log(
       "  Los ambiguos y los que no tienen candidato hay que ponerlos a mano en inv_campo_catalogo\n" +

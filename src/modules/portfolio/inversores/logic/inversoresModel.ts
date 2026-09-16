@@ -45,6 +45,40 @@ function suma(valores: readonly (number | null)[]): number {
   return valores.reduce<number>((acc, v) => acc + (v ?? 0), 0);
 }
 
+/**
+ * El papel de una persona en una cuenta, en texto.
+ *
+ * En el CRM no es un desplegable sino cinco casillas que pueden darse a la vez,
+ * así que aquí se componen en vez de elegir una. Vive en `logic/` y no en la
+ * base para poder cambiar la redacción sin una migración.
+ */
+export function rolDeContacto(enlace: {
+  es_principal: boolean | null;
+  es_secundario: boolean | null;
+  es_representante_legal: boolean | null;
+  es_abogado: boolean | null;
+  es_intermediario: boolean | null;
+  concepto_representante: string | null;
+  rol: string | null;
+}): string | null {
+  const partes: string[] = [];
+  if (enlace.es_principal) partes.push("Principal");
+  if (enlace.es_secundario) partes.push("Secundario");
+  if (enlace.es_representante_legal) {
+    partes.push(
+      enlace.concepto_representante
+        ? `Representante legal (${enlace.concepto_representante})`
+        : "Representante legal",
+    );
+  }
+  if (enlace.es_abogado) partes.push("Abogado");
+  if (enlace.es_intermediario) partes.push("Intermediario");
+
+  if (partes.length > 0) return partes.join(" · ");
+  // Por si algún día el CRM gana un campo de rol de verdad.
+  return enlace.rol;
+}
+
 function agrupar<T>(filas: readonly T[], clave: (f: T) => string | null): Map<string, T[]> {
   const mapa = new Map<string, T[]>();
   for (const fila of filas) {
@@ -92,6 +126,7 @@ export function construirModelo(espejos: Espejos): ModeloInversores {
         nombre:
           enlace.promocion_nombre ?? promocionPorId.get(id)?.nombre ?? "(promoción sin nombre)",
         situacion: promocionPorId.get(id)?.situacion ?? null,
+        status: enlace.status,
         comprometido: enlace.importe_comprometido,
         aportado:
           enlace.importe_aportado ??
@@ -112,8 +147,7 @@ export function construirModelo(espejos: Espejos): ModeloInversores {
           // para cuando el enlace no lo trae.
           email: enlace.contacto_email ?? ficha?.email ?? null,
           telefono: enlace.contacto_telefono ?? ficha?.telefono ?? null,
-          rol: enlace.rol,
-          participacion: enlace.participacion,
+          rol: rolDeContacto(enlace),
         };
       },
     );
@@ -132,6 +166,8 @@ export function construirModelo(espejos: Espejos): ModeloInversores {
       estado: fila.estado,
       tipo: fila.tipo,
       fechaAlta: fila.fecha_alta,
+      email: fila.email,
+      telefono: fila.telefono,
       comprometido: fila.capital_comprometido ?? comprometidoEnPromos,
       aportado,
       repartido,

@@ -147,9 +147,12 @@ export function normalizarTipoFlujo(
   const dic = notas?.normaliza;
   if (dic && typeof dic === "object" && !Array.isArray(dic)) {
     for (const [clave, valor] of Object.entries(dic as Record<string, unknown>)) {
-      if (plano(clave) === plano(literal) && (valor === "aporte" || valor === "reparto")) {
-        return valor;
-      }
+      if (plano(clave) !== plano(literal)) continue;
+      // El diccionario también puede FIJAR «desconocido», y hace falta que
+      // pueda: «Llamada de capital» es la petición de fondos y no el ingreso,
+      // pero la heurística de más abajo vería «capital» y podría contarlo como
+      // aporte. Lo que alguien ha decidido a mano manda sobre la raíz.
+      if (valor === "aporte" || valor === "reparto" || valor === "desconocido") return valor;
     }
   }
 

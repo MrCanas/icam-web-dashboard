@@ -108,6 +108,24 @@ test("sin diccionario, la heurística reconoce las raíces habituales", () => {
   assert.equal(normalizarTipoFlujo("Distribución", null), "reparto");
 });
 
+test("el diccionario puede FIJAR «desconocido» contra la heurística", () => {
+  // «Llamada de capital» es la petición de fondos, no el ingreso. Sin esto, una
+  // heurística que viera «capital» podría contarla como aporte e inflar lo
+  // aportado con dinero que aún no ha entrado.
+  const notas = {
+    normaliza: {
+      "Aporte de capital": "aporte",
+      "Llamada de capital": "desconocido",
+      "Reparto de beneficios": "reparto",
+      "Impuesto de sociedades": "desconocido",
+    },
+  };
+  assert.equal(normalizarTipoFlujo("Aporte de capital", notas), "aporte");
+  assert.equal(normalizarTipoFlujo("Llamada de capital", notas), "desconocido");
+  assert.equal(normalizarTipoFlujo("Reparto de beneficios", notas), "reparto");
+  assert.equal(normalizarTipoFlujo("Impuesto de sociedades", notas), "desconocido");
+});
+
 test("un valor nuevo del CRM cae en «desconocido» y no revienta", () => {
   // Es la válvula de escape: la fila se sincroniza y se ve, pero no suma en
   // los KPIs. Perderla en silencio descuadraría los totales sin avisar.

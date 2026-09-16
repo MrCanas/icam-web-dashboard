@@ -17,6 +17,7 @@ import {
   cuentasEnPromocion,
   cuentasEnTramo,
   cuentasEnTrimestre,
+  rolDeContacto,
   trimestreDe,
 } from "../inversoresModel";
 
@@ -32,6 +33,8 @@ function cuenta(p: Partial<InvCuentaRow> & { zoho_id: string; nombre: string }):
     estado: "Activa",
     tipo: null,
     fecha_alta: null,
+    email: null,
+    telefono: null,
     capital_comprometido: null,
     moneda: "EUR",
     propietario_zoho_id: null,
@@ -52,6 +55,12 @@ function enlaceContacto(
     contacto_nombre: null,
     contacto_email: null,
     contacto_telefono: null,
+    es_principal: null,
+    es_secundario: null,
+    es_representante_legal: null,
+    es_abogado: null,
+    es_intermediario: null,
+    concepto_representante: null,
     rol: null,
     participacion: null,
     zoho_modified_at: null,
@@ -72,6 +81,8 @@ function enlacePromocion(
     importe_aportado: null,
     participacion: null,
     fecha: null,
+    status: null,
+    coste_vehiculo_intermedio: null,
     zoho_modified_at: null,
     ...SYNC,
     ...p,
@@ -85,6 +96,7 @@ function flujo(p: Partial<InvFlujoRow> & { zoho_id: string }): InvFlujoRow {
     tipo: "aporte",
     tipo_zoho: null,
     importe: 0,
+    retencion: null,
     moneda: "EUR",
     fecha: null,
     concepto: null,
@@ -189,6 +201,56 @@ test("trimestreDe reparte los doce meses", () => {
 });
 
 // ---------------------------------------------------------------------------
+// El rol: cinco casillas, no un desplegable
+// ---------------------------------------------------------------------------
+
+const SIN_ROL = {
+  es_principal: null,
+  es_secundario: null,
+  es_representante_legal: null,
+  es_abogado: null,
+  es_intermediario: null,
+  concepto_representante: null,
+  rol: null,
+};
+
+test("las casillas del CRM se acumulan, no se excluyen", () => {
+  // Es el caso real: un representante legal puede ser además el principal.
+  assert.equal(
+    rolDeContacto({
+      ...SIN_ROL,
+      es_principal: true,
+      es_representante_legal: true,
+      concepto_representante: "Administrador único",
+    }),
+    "Principal · Representante legal (Administrador único)",
+  );
+});
+
+test("sin ninguna casilla marcada, el rol es null y no una cadena vacía", () => {
+  assert.equal(rolDeContacto(SIN_ROL), null);
+  assert.equal(rolDeContacto({ ...SIN_ROL, es_abogado: false }), null);
+});
+
+test("el rol de la cuenta llega hasta el contacto del modelo", () => {
+  const modelo = construirModelo(
+    espejos({
+      cuentas: [cuenta({ zoho_id: "C1", nombre: "Uno" })],
+      cuentaContacto: [
+        enlaceContacto({
+          zoho_id: "CC1",
+          cuenta_zoho_id: "C1",
+          contacto_zoho_id: "K1",
+          contacto_nombre: "Ana",
+          es_intermediario: true,
+        }),
+      ],
+    }),
+  );
+  assert.equal(modelo.cuentas[0].contactos[0].rol, "Intermediario");
+});
+
+// ---------------------------------------------------------------------------
 // Modelo
 // ---------------------------------------------------------------------------
 
@@ -243,6 +305,8 @@ test("el pendiente nunca es negativo", () => {
       estado: null,
       tipo: null,
       fechaAlta: null,
+      email: null,
+      telefono: null,
       comprometido: 100_000,
       aportado: 150_000,
       repartido: 0,
