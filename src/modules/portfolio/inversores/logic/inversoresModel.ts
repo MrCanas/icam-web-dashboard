@@ -1,6 +1,7 @@
 import type { Espejos } from "@/modules/portfolio/inversores/data/inversoresRepository";
 import type {
   ContactoInversor,
+  InvFlujoRow,
   CuentaInversion,
   KpisInversores,
   ModeloInversores,
@@ -183,7 +184,11 @@ export function construirModelo(espejos: Espejos): ModeloInversores {
     cuentas,
     kpis: calcularKpis(cuentas),
     porPromocion: agregarPorPromocion(cuentas),
-    porTrimestre: agregarPorTrimestre(espejos),
+    // Solo los flujos de cuentas que están en el modelo. Sin este filtro, la
+    // gráfica por trimestre sumaría flujos que los KPIs no cuentan —los de
+    // cuentas excluidas y los que en Zoho no cuelgan de ninguna cuenta— y dos
+    // vistas del mismo dato dirían cosas distintas.
+    porTrimestre: agregarPorTrimestre(espejos.flujos, new Set(cuentas.map((c) => c.zohoId))),
     tramos: agregarPorTramo(cuentas),
     topCuentas: [...cuentas].sort((a, b) => capitalDe(b) - capitalDe(a)).slice(0, 10),
   };
@@ -246,11 +251,16 @@ export function agregarPorPromocion(cuentas: readonly CuentaInversion[]): PuntoP
   return [...acc.values()].sort((a, b) => b.comprometido - a.comprometido || b.aportado - a.aportado);
 }
 
-export function agregarPorTrimestre(espejos: Espejos): PuntoTrimestre[] {
+export function agregarPorTrimestre(
+  flujos: readonly InvFlujoRow[],
+  /** Cuentas que están en el modelo. Un flujo de otra cuenta no cuenta. */
+  cuentasValidas: ReadonlySet<string>,
+): PuntoTrimestre[] {
   const acc = new Map<string, { aportes: number; repartos: number; cuentas: Set<string> }>();
 
-  for (const flujo of espejos.flujos) {
+  for (const flujo of flujos) {
     if (!flujo.fecha || flujo.tipo === "desconocido") continue;
+    if (!flujo.cuenta_zoho_id || !cuentasValidas.has(flujo.cuenta_zoho_id)) continue;
     const periodo = trimestreDe(flujo.fecha);
     if (!periodo) continue;
 

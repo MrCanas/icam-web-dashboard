@@ -12,6 +12,21 @@ interface Props {
 }
 
 /**
+ * «Repartido» y «Pendiente» están ocultos a la espera de validación.
+ *
+ * Los dos son correctos según su definición, pero esa definición no es la que
+ * se lee en la pantalla, y eso es un problema de la pantalla, no de quien la
+ * mira: «Pendiente» es comprometido − aportado, capital firmado que aún no se
+ * ha desembolsado, y NO capital pendiente de devolver al inversor. Puesto al
+ * lado de «Repartido» se lee como lo segundo. Mientras no se acuerde la
+ * redacción, es mejor no enseñarlos que enseñarlos mal.
+ *
+ * Para volver a mostrarlos, `true`. El cálculo sigue vivo y la tabla de abajo
+ * sigue enseñando las dos columnas, que es donde se están validando.
+ */
+const MOSTRAR_REPARTOS = false;
+
+/**
  * La fila de cifras de cabecera. Todas son pinchables.
  *
  * Regla del portal: un número sin referencia no es un KPI, así que el subtítulo
@@ -24,7 +39,11 @@ export function KpisInversores({ kpis, cuentas, onAbrir }: Props) {
   const conPendiente = cuentas.filter((c) => (c.comprometido ?? 0) > c.aportado);
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 sm:gap-4 xl:grid-cols-5">
+    <div
+      className={`grid grid-cols-2 gap-3 md:grid-cols-3 sm:gap-4 ${
+        MOSTRAR_REPARTOS ? "xl:grid-cols-5" : ""
+      }`}
+    >
       <KPICard
         title="Comprometido"
         value={fmtEurosCompact(kpis.comprometido)}
@@ -56,32 +75,38 @@ export function KpisInversores({ kpis, cuentas, onAbrir }: Props) {
           })
         }
       />
-      <KPICard
-        title="Repartido"
-        value={fmtEurosCompact(kpis.repartido)}
-        subtitle={kpis.dpi === null ? "Sin aportaciones todavía" : `DPI ${fmtMult(kpis.dpi)}`}
-        actionLabel={`Ver las ${fmtInt(conRepartos.length)} cuentas que han recibido repartos`}
-        onClick={() =>
-          onAbrir({
-            titulo: "Cuentas con repartos",
-            subtitulo: `${fmtEurosCompact(kpis.repartido)} devueltos`,
-            cuentas: conRepartos,
-          })
-        }
-      />
-      <KPICard
-        title="Pendiente"
-        value={fmtEurosCompact(kpis.pendiente)}
-        subtitle={`Por desembolsar en ${fmtInt(conPendiente.length)} cuentas`}
-        actionLabel={`Ver las ${fmtInt(conPendiente.length)} cuentas con desembolso pendiente`}
-        onClick={() =>
-          onAbrir({
-            titulo: "Cuentas con desembolso pendiente",
-            subtitulo: `${fmtEurosCompact(kpis.pendiente)} sin desembolsar`,
-            cuentas: conPendiente,
-          })
-        }
-      />
+      {MOSTRAR_REPARTOS ? (
+        <>
+          <KPICard
+            title="Repartido"
+            value={fmtEurosCompact(kpis.repartido)}
+            subtitle={
+              kpis.dpi === null ? "Sin aportaciones todavía" : `DPI ${fmtMult(kpis.dpi)}`
+            }
+            actionLabel={`Ver las ${fmtInt(conRepartos.length)} cuentas que han recibido repartos`}
+            onClick={() =>
+              onAbrir({
+                titulo: "Cuentas con repartos",
+                subtitulo: `${fmtEurosCompact(kpis.repartido)} devueltos`,
+                cuentas: conRepartos,
+              })
+            }
+          />
+          <KPICard
+            title="Pendiente"
+            value={fmtEurosCompact(kpis.pendiente)}
+            subtitle={`Por desembolsar en ${fmtInt(conPendiente.length)} cuentas`}
+            actionLabel={`Ver las ${fmtInt(conPendiente.length)} cuentas con desembolso pendiente`}
+            onClick={() =>
+              onAbrir({
+                titulo: "Cuentas con desembolso pendiente",
+                subtitulo: `${fmtEurosCompact(kpis.pendiente)} sin desembolsar`,
+                cuentas: conPendiente,
+              })
+            }
+          />
+        </>
+      ) : null}
       <KPICard
         title="Inversores"
         value={fmtInt(kpis.numInversores)}

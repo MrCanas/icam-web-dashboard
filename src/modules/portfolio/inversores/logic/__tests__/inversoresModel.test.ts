@@ -330,7 +330,8 @@ test("el DPI es null si todavía no se ha aportado nada", () => {
 // ---------------------------------------------------------------------------
 
 test("los repartos van en negativo en la serie y el acumulado los resta", () => {
-  const puntos = agregarPorTrimestre(escenario());
+  const e = escenario();
+  const puntos = agregarPorTrimestre(e.flujos, new Set(e.cuentas.map((c) => c.zoho_id)));
   const t1 = puntos.find((p) => p.periodo === "2025-T1");
   const t2026 = puntos.find((p) => p.periodo === "2026-T1");
 
@@ -389,6 +390,19 @@ test("la promoción agrega el comprometido de todas sus cuentas", () => {
   assert.equal(p1?.aportado, 500_000);
   assert.equal(p1?.pendiente, 400_000);
   assert.equal(p1?.numCuentas, 2);
+});
+
+test("la serie por trimestre ignora los flujos sin cuenta en el modelo", () => {
+  // En Zoho hay movimientos que no cuelgan de ninguna cuenta, y otros que
+  // cuelgan de una cuenta excluida. Si entraran aquí, la gráfica sumaría más
+  // que los KPIs y las dos vistas del mismo dato dirían cosas distintas.
+  const e = escenario();
+  e.flujos.push(
+    flujo({ zoho_id: "F9", cuenta_zoho_id: null, tipo: "aporte", importe: 9_000_000, fecha: "2025-02-11" }),
+    flujo({ zoho_id: "F10", cuenta_zoho_id: "EXCLUIDA", tipo: "aporte", importe: 5_000_000, fecha: "2025-02-12" }),
+  );
+  const puntos = agregarPorTrimestre(e.flujos, new Set(e.cuentas.map((c) => c.zoho_id)));
+  assert.equal(puntos.find((p) => p.periodo === "2025-T1")?.aportes, 100_000);
 });
 
 test("sin datos, el modelo no revienta", () => {

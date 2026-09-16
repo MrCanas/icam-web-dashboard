@@ -49,14 +49,14 @@ async function leerTodo<T>(
   supabase: ReturnType<typeof getInversoresReadSupabase>,
   tabla: string,
   columnas: string,
+  /** Filtros extra por igualdad, además de `borrado_at IS NULL`. */
+  donde: Record<string, unknown> = {},
 ): Promise<{ filas: T[]; sinTabla: boolean }> {
   const filas: T[] = [];
   for (let desde = 0; ; desde += PAGINA) {
-    const { data, error } = await supabase
-      .from(tabla)
-      .select(columnas)
-      .is("borrado_at", null)
-      .range(desde, desde + PAGINA - 1);
+    let consulta = supabase.from(tabla).select(columnas).is("borrado_at", null);
+    for (const [col, valor] of Object.entries(donde)) consulta = consulta.eq(col, valor);
+    const { data, error } = await consulta.range(desde, desde + PAGINA - 1);
 
     if (error) {
       if (isMissingTableError(error)) return { filas: [], sinTabla: true };
@@ -73,7 +73,10 @@ export async function cargarEspejos(ctx: UserContext): Promise<Espejos> {
 
   const [cuentas, contactos, cuentaContacto, promociones, cuentaPromocion, flujos] =
     await Promise.all([
-      leerTodo<InvCuentaRow>(supabase, "inv_cuentas", "*"),
+      // Las cuentas marcadas como prueba o técnicas no salen de aquí. Se filtra
+      // en la lectura y no en `logic/` para que no haya forma de que una
+      // consulta nueva se las cuele sin querer: si no llegan, no cuentan.
+      leerTodo<InvCuentaRow>(supabase, "inv_cuentas", "*", { excluida: false }),
       leerTodo<InvContactoRow>(supabase, "inv_contactos", "*"),
       leerTodo<InvCuentaContactoRow>(supabase, "inv_cuenta_contacto", "*"),
       leerTodo<InvPromocionRow>(supabase, "inv_promociones", "*"),

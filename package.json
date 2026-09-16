@@ -56,6 +56,7 @@
     "inversores:zoho-descubrir": "tsx scripts/inversores/zoho-descubrir.ts",
     "inversores:sync": "tsx scripts/inversores/sync.ts",
     "inversores:apply-migration-040": "tsx scripts/inversores/apply-migration-040.ts",
+    "inversores:apply-migration-041": "tsx scripts/inversores/apply-migration-041.ts",
     "inversores:check-scripts": "tsc --noEmit -p scripts/inversores/tsconfig.json",
     "test": "tsx --test \"src/**/__tests__/*.test.ts\"",
     "check": "tsc --noEmit && npm run pm:check-scripts && npm run inversores:check-scripts && npm run corporativo:check-scripts && npm run lint && npm test",
