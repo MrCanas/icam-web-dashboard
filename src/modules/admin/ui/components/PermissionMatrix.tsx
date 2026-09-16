@@ -125,10 +125,26 @@ export function PermissionMatrix({
                           }
                         />
                         {route.label}
+                        {route.deniedByDefault ? (
+                          <span
+                            title="Página restringida: nace denegada para todo el mundo y solo se abre marcándola aquí."
+                            className="rounded bg-icam-gold/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-icam-900"
+                          >
+                            restringida
+                          </span>
+                        ) : null}
                       </label>
                     );
                   })}
                 </div>
+                {routes.some((route) => route.deniedByDefault) ? (
+                  // Las demás páginas se marcan para QUITAR acceso; estas, para
+                  // DARLO. Sin decirlo, la casilla se lee al revés de lo que hace.
+                  <p className="mt-2 text-xs text-text-muted">
+                    Las páginas <strong>restringidas</strong> nacen denegadas para todo el mundo:
+                    marcar la casilla es concederlas a esta persona.
+                  </p>
+                ) : null}
                 {visibleCount === 0 ? (
                   <p className="mt-2 text-xs text-amber-700">
                     Sin páginas visibles esta zona no será accesible.

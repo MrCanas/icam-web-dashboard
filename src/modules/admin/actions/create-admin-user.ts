@@ -14,6 +14,7 @@ import {
   validateZoneAssignment,
 } from "@/modules/admin/logic/validate-user-input";
 import type { AdminResult, UserPermissionsInput } from "@/modules/admin/types";
+import { RUTAS_DENEGADAS_POR_DEFECTO } from "@/registry/routes";
 
 export interface CreateAdminUserInput extends UserPermissionsInput {
   email: string;
@@ -43,7 +44,21 @@ export async function createAdminUserAction(
   const zones = validateZoneAssignment(input.zones);
   if (!zones) return { ok: false, error: "Permisos de zona no válidos." };
 
-  const deniedRouteKeys = sanitizeRouteDenies(input.deniedRouteKeys, zones);
+  // Las rutas marcadas `deniedByDefault` se deniegan siempre al crear, aunque el
+  // formulario no las traiga. Sin esto, el modelo de denylist las abriría solas:
+  // la migración que introduce una página sensible siembra las denegaciones de
+  // los usuarios que existían ese día, y el siguiente que se dé de alta entraría
+  // viendo lo que a todos los demás se les ha negado.
+  //
+  // Se añaden DESPUÉS de `sanitizeRouteDenies` y sin filtrar por zona concedida
+  // a propósito: una denegación de una zona que el usuario no tiene es
+  // inofensiva, pero es justo la que hace falta el día que se le conceda.
+  const deniedRouteKeys = [
+    ...new Set([
+      ...sanitizeRouteDenies(input.deniedRouteKeys, zones),
+      ...RUTAS_DENEGADAS_POR_DEFECTO,
+    ]),
+  ];
 
   try {
     const existing = await resolveAuthUserIdByEmail(email);
