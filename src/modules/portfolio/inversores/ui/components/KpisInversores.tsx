@@ -12,19 +12,23 @@ interface Props {
 }
 
 /**
- * «Repartido» y «Pendiente» están ocultos a la espera de validación.
+ * «Aportado», «Repartido» y «Pendiente» están ocultos mientras se validan.
  *
- * Los dos son correctos según su definición, pero esa definición no es la que
- * se lee en la pantalla, y eso es un problema de la pantalla, no de quien la
+ * Los tres son correctos según su definición, pero la definición no es la que
+ * se lee en la pantalla, y eso es un problema de la pantalla y no de quien la
  * mira: «Pendiente» es comprometido − aportado, capital firmado que aún no se
- * ha desembolsado, y NO capital pendiente de devolver al inversor. Puesto al
- * lado de «Repartido» se lee como lo segundo. Mientras no se acuerde la
- * redacción, es mejor no enseñarlos que enseñarlos mal.
+ * ha desembolsado, y NO capital pendiente de devolver al inversor; al lado de
+ * «Repartido» se lee como lo segundo. Y «Aportado» sale de un módulo distinto
+ * al de «Comprometido», así que los 46,8 M€ de diferencia son reales pero no se
+ * explican solos.
+ *
+ * Mejor no enseñarlos que enseñarlos mal: un número en un KPI se cita en una
+ * reunión, y para entonces ya nadie recuerda la salvedad.
  *
  * Para volver a mostrarlos, `true`. El cálculo sigue vivo y la tabla de abajo
- * sigue enseñando las dos columnas, que es donde se están validando.
+ * sigue enseñando las columnas, que es donde se están validando.
  */
-const MOSTRAR_REPARTOS = false;
+const MOSTRAR_EN_VALIDACION = false;
 
 /**
  * La fila de cifras de cabecera. Todas son pinchables.
@@ -40,8 +44,8 @@ export function KpisInversores({ kpis, cuentas, onAbrir }: Props) {
 
   return (
     <div
-      className={`grid grid-cols-2 gap-3 md:grid-cols-3 sm:gap-4 ${
-        MOSTRAR_REPARTOS ? "xl:grid-cols-5" : ""
+      className={`grid grid-cols-2 gap-3 sm:gap-4 ${
+        MOSTRAR_EN_VALIDACION ? "md:grid-cols-3 xl:grid-cols-5" : "md:grid-cols-2"
       }`}
     >
       <KPICard
@@ -58,25 +62,25 @@ export function KpisInversores({ kpis, cuentas, onAbrir }: Props) {
           })
         }
       />
-      <KPICard
-        title="Aportado"
-        value={fmtEurosCompact(kpis.aportado)}
-        subtitle={
-          kpis.comprometido > 0
-            ? `${fmtPct(kpis.aportado / kpis.comprometido)} de lo comprometido`
-            : "Sin compromiso registrado"
-        }
-        actionLabel={`Ver las ${fmtInt(conAportes.length)} cuentas que han aportado`}
-        onClick={() =>
-          onAbrir({
-            titulo: "Cuentas que han aportado",
-            subtitulo: `${fmtEurosCompact(kpis.aportado)} en total`,
-            cuentas: conAportes,
-          })
-        }
-      />
-      {MOSTRAR_REPARTOS ? (
+      {MOSTRAR_EN_VALIDACION ? (
         <>
+          <KPICard
+            title="Aportado"
+            value={fmtEurosCompact(kpis.aportado)}
+            subtitle={
+              kpis.comprometido > 0
+                ? `${fmtPct(kpis.aportado / kpis.comprometido)} de lo comprometido`
+                : "Sin compromiso registrado"
+            }
+            actionLabel={`Ver las ${fmtInt(conAportes.length)} cuentas que han aportado`}
+            onClick={() =>
+              onAbrir({
+                titulo: "Cuentas que han aportado",
+                subtitulo: `${fmtEurosCompact(kpis.aportado)} en total`,
+                cuentas: conAportes,
+              })
+            }
+          />
           <KPICard
             title="Repartido"
             value={fmtEurosCompact(kpis.repartido)}
