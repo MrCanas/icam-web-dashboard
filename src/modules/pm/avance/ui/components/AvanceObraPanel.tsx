@@ -16,11 +16,6 @@ import { AvanceFaseRow } from "./AvanceFaseRow";
 interface AvanceObraPanelProps {
   data: PmAvanceProyecto;
   hasWriteAccess: boolean;
-  /**
-   * Se llama tras guardar. Lo usa el acta, que carga el avance con una server
-   * action y no se entera del `router.refresh()`.
-   */
-  onSaved?: () => void;
 }
 
 type Valores = Record<string, number | null>;
@@ -42,7 +37,7 @@ function valoresDe(data: PmAvanceProyecto): Valores {
  * desde este panel, el paso de aprobación de la bandeja de salida — «Guardar»
  * hace las dos cosas de un golpe (ver `guardarAvanceZoho`).
  */
-export function AvanceObraPanel({ data, hasWriteAccess, onSaved }: AvanceObraPanelProps) {
+export function AvanceObraPanel({ data, hasWriteAccess }: AvanceObraPanelProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const { promocion, general, fases, pendientes } = data;
@@ -108,7 +103,6 @@ export function AvanceObraPanel({ data, hasWriteAccess, onSaved }: AvanceObraPan
       }
       setAviso(partes.length > 0 ? partes.join(" ") : "No había nada nuevo que enviar a Zoho.");
       router.refresh();
-      onSaved?.();
     });
   };
 

@@ -1,12 +1,4 @@
 import type { ActasActaQueryInput, ActasActaViewData } from "@/modules/pm/actas/types";
-import type { AvanceActa } from "@/modules/pm/avance/logic/avance-a-fecha";
-
-/** Primera sección del PDF cuando el proyecto tiene promoción de Zoho. */
-export interface ActaPdfAvance {
-  promocionCodigo: string;
-  promocionNombre: string | null;
-  acta: AvanceActa;
-}
 
 export interface ActaPdfProps {
   projectCode: string;
@@ -16,16 +8,9 @@ export interface ActaPdfProps {
   generatedAt: Date;
   filterLines: string[];
   viewData: ActasActaViewData;
-  avance?: ActaPdfAvance | null;
 }
 
-export type ActaExportPdfBody = Omit<ActasActaQueryInput, "projectId"> & {
-  /**
-   * Activo PM desde el que se exporta. Solo sirve para incluir el avance de
-   * obra; el servidor comprueba que de verdad apunta a este proyecto de actas.
-   */
-  pmActivoId?: string;
-};
+export type ActaExportPdfBody = Omit<ActasActaQueryInput, "projectId">;
 
 export function actaPdfFilename(
   code: string,

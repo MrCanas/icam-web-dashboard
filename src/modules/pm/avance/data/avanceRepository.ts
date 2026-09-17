@@ -3,9 +3,8 @@ import { isMissingTableError } from "@/lib/db/pgErrors";
 import { getPmReadSupabase } from "@/modules/pm/data/readClient";
 import { hayCambioVsZoho } from "@/modules/pm/avance/logic/avance-obra";
 import {
-  construirAvanceActa,
-  cortesDelActa,
-  type AvanceActa,
+  avanceProyectoAFecha,
+  finDelDia,
 } from "@/modules/pm/avance/logic/avance-a-fecha";
 import type {
   PmAvanceFase,
@@ -155,46 +154,36 @@ export async function fetchAvanceObraProyecto(
 }
 
 // ---------------------------------------------------------------------------
-// Avance dentro de un acta
+// Avance a una fecha (snapshot del Operativo de actas)
 // ---------------------------------------------------------------------------
 
-export interface AvanceActaResult extends AvanceProyectoResult {
-  /** Valores al empezar y al terminar el periodo del acta. */
-  acta: AvanceActa | null;
-  /** Cambios con fecha dentro del periodo, del más reciente al más antiguo. */
-  historicoPeriodo: PmAvanceProyecto["historico"];
-}
-
 /**
- * El avance de un proyecto tal y como lo cuenta un acta `dateFrom`–`dateTo`.
+ * El avance de un proyecto tal y como estaba al final del día `fechaYmd`.
  *
- * Reutiliza `fetchAvanceObraProyecto` (vigente, fases, bandeja) y añade el
- * histórico completo hasta el final del periodo: el de la pestaña va capado a
+ * Reutiliza `fetchAvanceObraProyecto` y reconstruye los porcentajes con el
+ * histórico completo hasta esa fecha: el de la pestaña va capado a
  * HISTORICO_LIMITE y con eso no se puede reconstruir un valor antiguo.
  */
-export async function fetchAvanceObraActa(
+export async function fetchAvanceObraAFecha(
   ctx: UserContext,
   idActivo: string,
-  dateFrom: string,
-  dateTo: string,
-): Promise<AvanceActaResult> {
+  fechaYmd: string,
+): Promise<AvanceProyectoResult> {
   const base = await fetchAvanceObraProyecto(ctx, idActivo);
-  if (!base.data) return { ...base, acta: null, historicoPeriodo: [] };
+  if (!base.data) return base;
 
-  const cortes = cortesDelActa(dateFrom, dateTo);
+  const corte = finDelDia(fechaYmd);
   const supabase = await getPmReadSupabase(ctx);
   const { data: filas, error } = await supabase
     .from("pm_avance_obra_historico")
     .select("*")
     .eq("promocion_id", base.data.promocion.id)
-    .lte("cambiado_at", new Date(cortes.hasta).toISOString())
-    .order("cambiado_at", { ascending: true });
+    .lte("cambiado_at", new Date(corte).toISOString())
+    .order("cambiado_at", { ascending: false });
 
   if (error) {
-    if (isMissingTableError(error)) {
-      return { ...VACIO, migracionPendiente: true, acta: null, historicoPeriodo: [] };
-    }
-    return { ...VACIO, error: error.message, acta: null, historicoPeriodo: [] };
+    if (isMissingTableError(error)) return { ...VACIO, migracionPendiente: true };
+    return { ...VACIO, error: error.message };
   }
 
   const nombreFase = new Map(
@@ -211,10 +200,11 @@ export async function fetchAvanceObraActa(
 
   return {
     ...base,
-    acta: construirAvanceActa(base.data, cambios, cortes),
-    historicoPeriodo: cambios
-      .filter((c) => new Date(c.cambiado_at).getTime() > cortes.desde)
-      .reverse(),
+    data: avanceProyectoAFecha(
+      { ...base.data, historico: cambios.slice(0, HISTORICO_LIMITE) },
+      cambios,
+      corte,
+    ),
   };
 }
 

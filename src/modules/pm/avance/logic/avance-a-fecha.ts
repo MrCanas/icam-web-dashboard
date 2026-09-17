@@ -1,6 +1,6 @@
 /**
- * Avance de obra visto desde un acta: qué porcentaje tenía cada fase al
- * empezar y al terminar el periodo del acta.
+ * Avance de obra a una fecha pasada: el que se enseña en el Operativo de actas
+ * cuando se consulta un snapshot histórico (`?asOf=YYYY-MM-DD`).
  *
  * Solo se guarda el valor vigente (`pm_avance_obra`) y un histórico append-only
  * de cambios (`pm_avance_obra_historico`), así que el valor a una fecha se
@@ -50,72 +50,39 @@ export function porcentajeAFecha(
   return deLaFase[0]!.c.porcentaje_anterior;
 }
 
-/**
- * Instantes de corte de un acta `YYYY-MM-DD`–`YYYY-MM-DD`: justo antes de que
- * empiece el primer día y al final del último. Misma convención de hora local
- * que `toIsoRangeBounds` de actas, para que avance y entradas corten igual.
- */
-export function cortesDelActa(
-  dateFrom: string,
-  dateTo: string,
-): { desde: number; hasta: number } {
-  return {
-    desde: new Date(`${dateFrom}T00:00:00`).getTime() - 1,
-    hasta: new Date(`${dateTo}T23:59:59.999`).getTime(),
-  };
+/** Final del día `YYYY-MM-DD` (UTC, como el snapshot de actas). */
+export function finDelDia(fechaYmd: string): number {
+  return new Date(`${fechaYmd}T23:59:59.999Z`).getTime();
 }
 
-export interface AvanceActaFila {
-  faseId: string;
-  nombre: string;
-  /** Valor al empezar el periodo. */
-  desde: number | null;
-  /** Valor al terminar el periodo. */
-  hasta: number | null;
-  /** hasta − desde; null si falta cualquiera de los dos. */
-  delta: number | null;
-}
-
-export interface AvanceActa {
-  general: AvanceActaFila | null;
-  fases: AvanceActaFila[];
-}
-
-function redondea(v: number): number {
-  return Math.round(v * 100) / 100;
-}
-
-function fila(
+function aFecha(
   valor: PmAvanceFaseValor,
   cambios: readonly CambioAvance[],
-  cortes: { desde: number; hasta: number },
-): AvanceActaFila {
-  const desde = porcentajeAFecha(cambios, valor.fase.id, cortes.desde, valor.porcentaje);
-  const hasta = porcentajeAFecha(cambios, valor.fase.id, cortes.hasta, valor.porcentaje);
+  corte: number,
+): PmAvanceFaseValor {
   return {
-    faseId: valor.fase.id,
-    nombre: valor.fase.nombre,
-    desde,
-    hasta,
-    delta: desde === null || hasta === null ? null : redondea(hasta - desde),
+    ...valor,
+    porcentaje: porcentajeAFecha(cambios, valor.fase.id, corte, valor.porcentaje),
+    // En un snapshot no hay nada pendiente de comunicar: no aplica.
+    pendiente: false,
   };
 }
 
-export function construirAvanceActa(
-  data: Pick<PmAvanceProyecto, "general" | "fases">,
+/**
+ * El mismo `PmAvanceProyecto` con los porcentajes reconstruidos al corte, para
+ * pintarlo con los mismos componentes que el vigente (en solo lectura).
+ * El histórico se recorta a los cambios hasta el corte y la bandeja se vacía.
+ */
+export function avanceProyectoAFecha(
+  data: PmAvanceProyecto,
   cambios: readonly CambioAvance[],
-  cortes: { desde: number; hasta: number },
-): AvanceActa {
+  corte: number,
+): PmAvanceProyecto {
   return {
-    general: data.general ? fila(data.general, cambios, cortes) : null,
-    fases: data.fases.map((f) => fila(f, cambios, cortes)),
+    ...data,
+    general: data.general ? aFecha(data.general, cambios, corte) : null,
+    fases: data.fases.map((f) => aFecha(f, cambios, corte)),
+    historico: data.historico.filter((h) => new Date(h.cambiado_at).getTime() <= corte),
+    pendientes: [],
   };
-}
-
-/** Texto del delta: «+12,5 pp», «−3 pp», «=» o «—». */
-export function fmtDelta(v: number | null): string {
-  if (v === null || v === undefined) return "—";
-  if (v === 0) return "=";
-  const abs = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Math.abs(v));
-  return `${v > 0 ? "+" : "−"}${abs} pp`;
 }

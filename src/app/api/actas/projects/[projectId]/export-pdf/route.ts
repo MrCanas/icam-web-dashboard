@@ -1,19 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUser, type UserContext } from "@/lib/auth/currentUser";
+import { getCurrentUser } from "@/lib/auth/currentUser";
 import { readAccessResponse } from "@/lib/auth/api-guard";
-import { canAccessRouteKey } from "@/lib/auth/permissions";
 import { fetchActasActaView } from "@/modules/pm/actas/data/actaRepository";
-import { fetchActasLinkForPmActivo } from "@/modules/pm/actas/data/actasRepository";
 import { getActasReadSupabase } from "@/modules/pm/actas/data/readClient";
 import {
   actaPdfFilename,
   buildActaPdfFilterLines,
   type ActaExportPdfBody,
-  type ActaPdfAvance,
 } from "@/modules/pm/actas/pdf/acta-pdf-types";
 import { renderActaPdfBuffer } from "@/modules/pm/actas/pdf/render-acta-pdf";
-import { fetchAvanceObraActa } from "@/modules/pm/avance/data/avanceRepository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,35 +46,6 @@ function parseBody(raw: unknown): ActaExportPdfBody | { error: string } {
     categoryIds: categoryIds?.length ? categoryIds : undefined,
     authorIds: authorIds?.length ? authorIds : undefined,
     onlyWithStatusChange: body.onlyWithStatusChange === true,
-    pmActivoId:
-      typeof body.pmActivoId === "string" && body.pmActivoId.trim()
-        ? body.pmActivoId.trim()
-        : undefined,
-  };
-}
-
-/**
- * Avance de obra para la primera sección del PDF. Devuelve null (y el PDF sale
- * sin la sección) si no aplica: sin activo, sin permiso de pm.avance_obra, el
- * activo no es el de este proyecto de actas, o no hay promoción emparejada.
- */
-async function loadAvance(
-  ctx: UserContext,
-  projectCode: string,
-  input: ActaExportPdfBody,
-): Promise<ActaPdfAvance | null> {
-  if (!input.pmActivoId || !canAccessRouteKey(ctx, "pm.avance_obra")) return null;
-
-  const link = await fetchActasLinkForPmActivo(ctx, input.pmActivoId);
-  if (link?.code !== projectCode) return null;
-
-  const r = await fetchAvanceObraActa(ctx, input.pmActivoId, input.dateFrom, input.dateTo);
-  if (r.error) console.warn("[export-pdf] avance de obra:", r.error);
-  if (!r.data || !r.acta) return null;
-  return {
-    promocionCodigo: r.data.promocion.codigo_promocion,
-    promocionNombre: r.data.promocion.nombre,
-    acta: r.acta,
   };
 }
 
@@ -146,8 +113,6 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const avance = await loadAvance(ctx, project.code as string, parsed);
-
   try {
     const filterLines = buildActaPdfFilterLines(parsed, viewData);
     const pdfBuffer = await renderActaPdfBuffer({
@@ -158,7 +123,6 @@ export async function POST(request: Request, context: RouteContext) {
       generatedAt: new Date(),
       filterLines,
       viewData,
-      avance,
     });
 
     const filename = actaPdfFilename(

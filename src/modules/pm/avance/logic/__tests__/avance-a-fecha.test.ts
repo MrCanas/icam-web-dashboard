@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  construirAvanceActa,
-  fmtDelta,
+  avanceProyectoAFecha,
+  finDelDia,
   porcentajeAFecha,
   type CambioAvance,
 } from "../avance-a-fecha";
-import type { PmAvanceFase, PmAvanceFaseValor } from "../../types";
+import type { PmAvanceFase, PmAvanceFaseValor, PmAvanceProyecto } from "../../types";
 
 const t = (iso: string) => new Date(iso).getTime();
 
@@ -56,23 +56,30 @@ function valor(id: string, porcentaje: number | null, esGeneral = false): PmAvan
     zoho_api_name: null,
     activo: true,
   };
-  return { fase, porcentaje, porcentajeZoho: porcentaje, origen: "app", pendiente: false };
+  return { fase, porcentaje, porcentajeZoho: porcentaje, origen: "app", pendiente: true };
 }
 
-test("construirAvanceActa: desde, hasta y delta por fase", () => {
-  const acta = construirAvanceActa(
-    { general: valor("C", 5, true), fases: [valor("A", 40), valor("B", 0)] },
-    cambios,
-    { desde: t("2026-01-31T23:59:59Z"), hasta: t("2026-03-10T23:59:59Z") },
-  );
-  assert.deepEqual(acta.general, { faseId: "C", nombre: "Fase C", desde: 5, hasta: 5, delta: 0 });
-  assert.deepEqual(acta.fases[0], { faseId: "A", nombre: "Fase A", desde: 10, hasta: 40, delta: 30 });
-  assert.deepEqual(acta.fases[1], { faseId: "B", nombre: "Fase B", desde: null, hasta: 0, delta: null });
-});
+test("avanceProyectoAFecha: reconstruye fases, recorta histórico y vacía la bandeja", () => {
+  const data = {
+    general: valor("C", 5, true),
+    fases: [valor("A", 40), valor("B", 0)],
+    historico: cambios.map((c, i) => ({
+      ...c,
+      id: String(i),
+      promocion_id: "p",
+      origen: "app" as const,
+      cambiado_por: null,
+      cambiado_por_email: null,
+      fase_nombre: c.fase_id,
+    })),
+    pendientes: [],
+  } as unknown as PmAvanceProyecto;
 
-test("fmtDelta", () => {
-  assert.equal(fmtDelta(null), "—");
-  assert.equal(fmtDelta(0), "=");
-  assert.equal(fmtDelta(12.5), "+12,5 pp");
-  assert.equal(fmtDelta(-3), "−3 pp");
+  const r = avanceProyectoAFecha(data, cambios, finDelDia("2026-03-01"));
+  assert.equal(r.general?.porcentaje, 5);
+  assert.equal(r.fases[0]?.porcentaje, 20);
+  assert.equal(r.fases[1]?.porcentaje, 0);
+  assert.equal(r.fases[0]?.pendiente, false);
+  assert.equal(r.historico.length, 2);
+  assert.deepEqual(r.pendientes, []);
 });

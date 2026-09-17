@@ -11,13 +11,14 @@ export const AVANCE_OBRA_HUB_PATH = "/dashboard/pm/avance-obra";
 export const AVANCE_OBRA_ROUTE_PATTERN = "/dashboard/pm/proyecto/[id]/avance-obra";
 
 /**
- * El avance de un proyecto vive ahora como primera sección de su acta. La ruta
- * /avance-obra sigue viva como rescate, pero los enlaces apuntan aquí.
+ * El avance de un proyecto vive ahora como primera categoría del Operativo de
+ * sus actas. La ruta /avance-obra sigue viva como rescate, pero los enlaces
+ * apuntan aquí.
  */
 export const AVANCE_EN_ACTA_ROUTE_PATTERN = "/dashboard/pm/proyecto/[id]/actas";
 
 export function avanceEnActaPath(idActivo: string): string {
-  return `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}/actas?tab=acta`;
+  return `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}/actas`;
 }
 
 export function avanceObraProyectoPath(idActivo: string): string {
