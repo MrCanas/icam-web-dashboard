@@ -2,6 +2,27 @@ import { SignJWT, jwtVerify } from "jose";
 
 const ALGORITHM = "HS256";
 
+/** Cookie de sesión del portal. */
+export const SESSION_COOKIE_NAME = "icam-auth";
+
+/** Vida de la sesión: 7 días, renovados mientras el usuario siga usando el portal. */
+export const SESSION_MAX_AGE_S = 60 * 60 * 24 * 7;
+
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  maxAge: SESSION_MAX_AGE_S,
+  path: "/",
+};
+
+/**
+ * Por debajo de este tiempo restante, el proxy emite una sesión nueva. Sin
+ * renovación la sesión caducaba a los 7 días exactos del login aunque el
+ * usuario estuviera trabajando, y sus guardados fallaban a mitad de uso.
+ */
+export const SESSION_RENEW_BELOW_S = 60 * 60 * 24 * 3;
+
 function getJwtSecret(): Uint8Array {
   const raw = process.env.AUTH_JWT_SECRET?.trim();
   if (!raw || raw.length < 32) {
@@ -30,7 +51,7 @@ export async function signSessionToken(
 
 export async function verifySessionToken(
   token: string,
-): Promise<{ user_id: string } | null> {
+): Promise<{ user_id: string; exp: number | null } | null> {
   if (!token || token === "authenticated") {
     return null;
   }
@@ -41,7 +62,7 @@ export async function verifySessionToken(
     });
     const user_id = typeof payload.sub === "string" ? payload.sub : null;
     if (!user_id) return null;
-    return { user_id };
+    return { user_id, exp: typeof payload.exp === "number" ? payload.exp : null };
   } catch {
     return null;
   }
