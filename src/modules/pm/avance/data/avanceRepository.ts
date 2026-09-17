@@ -2,6 +2,10 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { isMissingTableError } from "@/lib/db/pgErrors";
 import { getPmReadSupabase } from "@/modules/pm/data/readClient";
 import { hayCambioVsZoho } from "@/modules/pm/avance/logic/avance-obra";
+import {
+  avanceProyectoAFecha,
+  finDelDia,
+} from "@/modules/pm/avance/logic/avance-a-fecha";
 import type {
   PmAvanceFase,
   PmAvanceFaseValor,
@@ -146,6 +150,61 @@ export async function fetchAvanceObraProyecto(
     sinPromocion: false,
     migracionPendiente: false,
     error: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Avance a una fecha (snapshot del Operativo de actas)
+// ---------------------------------------------------------------------------
+
+/**
+ * El avance de un proyecto tal y como estaba al final del día `fechaYmd`.
+ *
+ * Reutiliza `fetchAvanceObraProyecto` y reconstruye los porcentajes con el
+ * histórico completo hasta esa fecha: el de la pestaña va capado a
+ * HISTORICO_LIMITE y con eso no se puede reconstruir un valor antiguo.
+ */
+export async function fetchAvanceObraAFecha(
+  ctx: UserContext,
+  idActivo: string,
+  fechaYmd: string,
+): Promise<AvanceProyectoResult> {
+  const base = await fetchAvanceObraProyecto(ctx, idActivo);
+  if (!base.data) return base;
+
+  const corte = finDelDia(fechaYmd);
+  const supabase = await getPmReadSupabase(ctx);
+  const { data: filas, error } = await supabase
+    .from("pm_avance_obra_historico")
+    .select("*")
+    .eq("promocion_id", base.data.promocion.id)
+    .lte("cambiado_at", new Date(corte).toISOString())
+    .order("cambiado_at", { ascending: false });
+
+  if (error) {
+    if (isMissingTableError(error)) return { ...VACIO, migracionPendiente: true };
+    return { ...VACIO, error: error.message };
+  }
+
+  const nombreFase = new Map(
+    [base.data.general, ...base.data.fases]
+      .filter((f): f is PmAvanceFaseValor => f !== null)
+      .map((f) => [f.fase.id, f.fase.nombre]),
+  );
+  const cambios = ((filas ?? []) as PmAvanceHistorico[]).map((h) => ({
+    ...h,
+    porcentaje_anterior: numero(h.porcentaje_anterior),
+    porcentaje_nuevo: numero(h.porcentaje_nuevo),
+    fase_nombre: nombreFase.get(h.fase_id) ?? "—",
+  }));
+
+  return {
+    ...base,
+    data: avanceProyectoAFecha(
+      { ...base.data, historico: cambios.slice(0, HISTORICO_LIMITE) },
+      cambios,
+      corte,
+    ),
   };
 }
 

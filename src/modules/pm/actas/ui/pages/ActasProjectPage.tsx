@@ -31,6 +31,8 @@ interface ActasProjectPageProps {
    * cae a la base por código, /dashboard/pm/actas/<code>.
    */
   basePath?: string;
+  /** Activo PM detrás del proyecto: abre el Operativo con «Avance de obra» como primera categoría. */
+  pmActivoId?: string;
 }
 
 export function ActasProjectPage({
@@ -39,6 +41,7 @@ export function ActasProjectPage({
   activeTab,
   asOfParam,
   basePath,
+  pmActivoId,
 }: ActasProjectPageProps) {
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
@@ -83,6 +86,7 @@ export function ActasProjectPage({
                 projectId={project.id}
                 projectCode={project.code}
                 asOfParam={asOfParam}
+                pmActivoId={pmActivoId}
               />
             </Suspense>
           ) : validTab === "completados" ? (

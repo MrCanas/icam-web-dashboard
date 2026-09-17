@@ -11,6 +11,7 @@ import { validatePorcentaje } from "@/modules/pm/avance/logic/avance-obra";
 import { pushAvance, zohoVariablesQueFaltan } from "@/modules/pm/avance/data/zohoClient";
 import {
   AVANCE_OBRA_HUB_PATH,
+  AVANCE_EN_ACTA_ROUTE_PATTERN,
   AVANCE_OBRA_ROUTE_PATTERN,
 } from "@/modules/pm/avance/logic/avance-paths";
 
@@ -81,6 +82,7 @@ export async function guardarAvanceZoho(
   );
 
   revalidatePath(AVANCE_OBRA_ROUTE_PATTERN, "page");
+  revalidatePath(AVANCE_EN_ACTA_ROUTE_PATTERN, "page");
   revalidatePath(AVANCE_OBRA_HUB_PATH);
 
   if (resultado.error) return { ok: false, error: resultado.error.message };

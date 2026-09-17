@@ -120,6 +120,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       activeTab={activeTab}
       asOfParam={asOf}
       basePath={actasProjectBasePathForPmActivo(idActivo)}
+      pmActivoId={idActivo}
     />
   );
 }

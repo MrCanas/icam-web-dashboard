@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useOptimistic, useState, useTransition } from "react";
 
 import { deleteCategory } from "@/modules/pm/actas/actions/delete-category";
 import {
@@ -31,6 +31,11 @@ type ActasOperativoBoardProps = {
   currentAuthUserId: string | null;
   isPmAdmin?: boolean;
   hasWriteAccess?: boolean;
+  /**
+   * Grupo fijo que va antes que las categorías (hoy, «Avance de obra»). Queda
+   * fuera del drag & drop: no es una categoría de la base de datos.
+   */
+  leadingGroup?: ReactNode;
 } & (
   | { mode: "live" }
   | { mode: "historical"; asOfDate: string }
@@ -45,6 +50,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
     mode,
     isPmAdmin = false,
     hasWriteAccess = true,
+    leadingGroup,
   } = props;
   const asOfDate = mode === "historical" ? props.asOfDate : undefined;
   const readOnly = mode === "historical";
@@ -94,8 +100,9 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
 
   if (categories.length === 0) {
     return (
-      <div className="rounded-b-lg border border-t-0 border-subtle/50 bg-card p-8 text-center">
-        <p className="text-sm text-text-muted">
+      <div className="flex flex-col gap-3 rounded-b-lg border border-t-0 border-subtle/50 bg-card p-4">
+        {leadingGroup}
+        <p className="p-4 text-center text-sm text-text-muted">
           Este proyecto no tiene categorías operativas todavía.
         </p>
       </div>
@@ -134,6 +141,7 @@ export function ActasOperativoBoard(props: ActasOperativoBoardProps) {
 
   const board = (
     <div className="relative flex flex-col gap-3 rounded-b-lg border border-t-0 border-subtle/50 bg-page/40 p-4">
+      {leadingGroup}
       {enableDragDrop ? (
         <ActasOperativoDndProvider
           projectId={projectId}

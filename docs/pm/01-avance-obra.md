@@ -4,7 +4,10 @@ Pestaña de proyecto que responde **cuánto llevamos construido**, con origen en
 Promociones de Zoho CRM. Planificación responde el *cuándo* (fechas de hito); esto responde
 el *cuánto*.
 
-- Pestaña del proyecto: `/dashboard/pm/proyecto/<id_activo>/avance-obra`
+- En el proyecto: **primera categoría del Operativo de actas**, `/dashboard/pm/proyecto/<id_activo>/actas`.
+  Se edita ahí (editor/admin). Con `?asOf=YYYY-MM-DD` (snapshot histórico) se muestra reconstruido a
+  esa fecha desde `pm_avance_obra_historico`, de solo lectura.
+- Ruta antigua, fuera del menú y viva como rescate: `/dashboard/pm/proyecto/<id_activo>/avance-obra`
 - Hub y bandeja de salida hacia Zoho: `/dashboard/pm/avance-obra` (rueda de Configuración)
 - Emparejamiento activo ↔ promoción: `/dashboard/pm/proyectos`, columna «Promoción (Zoho)»
 - Route key de permisos: `pm.avance_obra`

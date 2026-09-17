@@ -8,6 +8,7 @@ import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-val
 import { validatePorcentaje } from "@/modules/pm/avance/logic/avance-obra";
 import {
   AVANCE_OBRA_HUB_PATH,
+  AVANCE_EN_ACTA_ROUTE_PATTERN,
   AVANCE_OBRA_ROUTE_PATTERN,
 } from "@/modules/pm/avance/logic/avance-paths";
 
@@ -75,6 +76,7 @@ export async function updateAvanceFase(
   };
 
   revalidatePath(AVANCE_OBRA_ROUTE_PATTERN, "page");
+  revalidatePath(AVANCE_EN_ACTA_ROUTE_PATTERN, "page");
   revalidatePath(AVANCE_OBRA_HUB_PATH);
 
   return {
