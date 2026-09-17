@@ -8,6 +8,7 @@ import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeCli
 import { validateUuid } from "@/modules/pm/planificacion/logic/planificacion-validation";
 import {
   AVANCE_OBRA_HUB_PATH,
+  AVANCE_EN_ACTA_ROUTE_PATTERN,
   AVANCE_OBRA_ROUTE_PATTERN,
 } from "@/modules/pm/avance/logic/avance-paths";
 
@@ -85,6 +86,7 @@ async function transicion(
 
   revalidatePath(AVANCE_OBRA_HUB_PATH);
   revalidatePath(AVANCE_OBRA_ROUTE_PATTERN, "page");
+  revalidatePath(AVANCE_EN_ACTA_ROUTE_PATTERN, "page");
   return { ok: true };
 }
 

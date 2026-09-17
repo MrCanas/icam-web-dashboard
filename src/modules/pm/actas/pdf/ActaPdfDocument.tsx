@@ -13,7 +13,7 @@ import {
   formatActaRangeDate,
 } from "@/modules/pm/actas/logic/actas-time";
 
-import type { ActaPdfProps } from "./acta-pdf-types";
+import type { ActaPdfAvance, ActaPdfProps } from "./acta-pdf-types";
 
 const styles = StyleSheet.create({
   page: {
@@ -107,7 +107,103 @@ const styles = StyleSheet.create({
     color: "#555",
     textAlign: "center",
   },
+  avanceTitle: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  avanceSubtitle: {
+    fontSize: 9,
+    color: "#555",
+    marginBottom: 12,
+  },
+  avanceRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e0e0e0",
+    paddingVertical: 5,
+  },
+  avanceHeaderRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#999",
+    paddingBottom: 4,
+  },
+  avanceCellFase: { flex: 3, fontSize: 10 },
+  avanceCellNum: { flex: 1, fontSize: 10, textAlign: "right" },
+  avanceHeaderText: { fontFamily: "Helvetica-Bold", fontSize: 9, color: "#333" },
+  avanceNote: { fontSize: 8, color: "#666", marginTop: 10 },
 });
+
+// Helvetica estándar (WinAnsi) no trae «−» ni «Δ»: en el PDF, guion y «Var.».
+function pdfPorcentaje(v: number | null): string {
+  if (v === null || v === undefined) return "-";
+  return `${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(v)} %`;
+}
+
+function pdfDelta(v: number | null): string {
+  if (v === null || v === undefined) return "-";
+  if (v === 0) return "=";
+  const abs = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Math.abs(v));
+  return `${v > 0 ? "+" : "-"}${abs} pp`;
+}
+
+function AvancePage({
+  avance,
+  projectCode,
+  dateFrom,
+  dateTo,
+}: {
+  avance: ActaPdfAvance;
+  projectCode: string;
+  dateFrom: string;
+  dateTo: string;
+}) {
+  const filas = [
+    ...(avance.acta.general ? [{ ...avance.acta.general, destacado: true }] : []),
+    ...avance.acta.fases.map((f) => ({ ...f, destacado: false })),
+  ];
+  return (
+    <Page size="A4" style={styles.page} wrap>
+      <Text style={styles.avanceTitle}>Avance de obra</Text>
+      <Text style={styles.avanceSubtitle}>
+        Promoción {avance.promocionCodigo}
+        {avance.promocionNombre ? ` · ${avance.promocionNombre}` : ""}
+      </Text>
+      <View style={styles.avanceHeaderRow}>
+        <Text style={[styles.avanceCellFase, styles.avanceHeaderText]}>Fase</Text>
+        <Text style={[styles.avanceCellNum, styles.avanceHeaderText]}>
+          {formatActaRangeDate(dateFrom)}
+        </Text>
+        <Text style={[styles.avanceCellNum, styles.avanceHeaderText]}>
+          {formatActaRangeDate(dateTo)}
+        </Text>
+        <Text style={[styles.avanceCellNum, styles.avanceHeaderText]}>Var.</Text>
+      </View>
+      {filas.map((f) => (
+        <View key={f.faseId} style={styles.avanceRow} wrap={false}>
+          <Text
+            style={[
+              styles.avanceCellFase,
+              f.destacado ? { fontFamily: "Helvetica-Bold" } : {},
+            ]}
+          >
+            {f.nombre}
+          </Text>
+          <Text style={styles.avanceCellNum}>{pdfPorcentaje(f.desde)}</Text>
+          <Text style={styles.avanceCellNum}>{pdfPorcentaje(f.hasta)}</Text>
+          <Text style={styles.avanceCellNum}>{pdfDelta(f.delta)}</Text>
+        </View>
+      ))}
+      <Text style={styles.avanceNote}>
+        «-» es sin dato en Zoho, no 0 %. «Avance general» es el valor que reporta Zoho, no la
+        media de las fases.
+      </Text>
+      <PageFooter projectCode={projectCode} />
+    </Page>
+  );
+}
 
 function PageFooter({ projectCode }: { projectCode: string }) {
   return (
@@ -133,6 +229,7 @@ export function ActaPdfDocument({
   generatedAt,
   filterLines,
   viewData,
+  avance,
 }: ActaPdfProps) {
   const totalEntries = viewData.totalEntryCount;
 
@@ -169,6 +266,15 @@ export function ActaPdfDocument({
         ) : null}
         <PageFooter projectCode={projectCode} />
       </Page>
+
+      {avance ? (
+        <AvancePage
+          avance={avance}
+          projectCode={projectCode}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+        />
+      ) : null}
 
       {viewData.categories.map((category) => {
         const groupStyle = getCategoryGroupStyle(

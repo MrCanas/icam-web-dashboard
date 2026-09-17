@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/currentUser";
 import { getUserRole } from "@/lib/auth/permissions";
 import { fetchAvanceHubData } from "@/modules/pm/avance/data/avanceRepository";
 import { zohoVariablesQueFaltan } from "@/modules/pm/avance/data/zohoClient";
-import { avanceObraExportPath, avanceObraProyectoPath } from "@/modules/pm/avance/logic/avance-paths";
+import { avanceEnActaPath, avanceObraExportPath } from "@/modules/pm/avance/logic/avance-paths";
 import { fmtPorcentaje } from "@/modules/pm/avance/logic/avance-obra";
 import { EnviarAZohoButton } from "@/modules/pm/avance/ui/components/EnviarAZohoButton";
 import { ZohoOutboxTable } from "@/modules/pm/avance/ui/components/ZohoOutboxTable";
@@ -178,7 +178,7 @@ export default async function AvanceObraHubPage() {
                         <span key={id}>
                           {i > 0 ? ", " : null}
                           <Link
-                            href={avanceObraProyectoPath(id)}
+                            href={avanceEnActaPath(id)}
                             className="text-icam-900 underline"
                           >
                             {id}

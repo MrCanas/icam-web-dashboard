@@ -9,6 +9,7 @@ import { pushAvance, zohoVariablesQueFaltan } from "@/modules/pm/avance/data/zoh
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
 import {
   AVANCE_OBRA_HUB_PATH,
+  AVANCE_EN_ACTA_ROUTE_PATTERN,
   AVANCE_OBRA_ROUTE_PATTERN,
 } from "@/modules/pm/avance/logic/avance-paths";
 
@@ -121,6 +122,7 @@ export async function enviarAZoho(): Promise<EnviarAZohoResult> {
 
   revalidatePath(AVANCE_OBRA_HUB_PATH);
   revalidatePath(AVANCE_OBRA_ROUTE_PATTERN, "page");
+  revalidatePath(AVANCE_EN_ACTA_ROUTE_PATTERN, "page");
 
   if (!resultado.ok) return { ok: false, error: resultado.error, enviados };
   return { ok: true, enviados, promociones: porRegistro.size };

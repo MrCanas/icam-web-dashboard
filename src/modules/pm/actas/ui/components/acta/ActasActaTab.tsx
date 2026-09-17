@@ -26,11 +26,18 @@ import type {
   ActasActaViewData,
 } from "@/modules/pm/actas/types";
 
+import { ActaAvanceObraSection } from "@/modules/pm/avance/ui/components/ActaAvanceObraSection";
+
 import { ActasActaCategoryBlock } from "./ActasActaCategoryBlock";
 
 interface ActasActaTabProps {
   projectId: string;
   projectCode: string;
+  /**
+   * Activo PM del proyecto. Solo llega desde /proyecto/<id>/actas: con él, el
+   * acta abre con la sección de Avance de obra. La ruta por código no lo pasa.
+   */
+  pmActivoId?: string;
 }
 
 const RANGE_OPTIONS: { value: ActasActaRangePreset; label: string }[] = [
@@ -40,7 +47,11 @@ const RANGE_OPTIONS: { value: ActasActaRangePreset; label: string }[] = [
   { value: "custom", label: "Personalizado" },
 ];
 
-export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
+export function ActasActaTab({
+  projectId,
+  projectCode,
+  pmActivoId,
+}: ActasActaTabProps) {
   const basePath = useActasBasePath();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -186,6 +197,7 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
                 : undefined,
             authorIds: authorKeysToIds(urlState.authorKeys),
             onlyWithStatusChange: urlState.onlyWithStatusChange,
+            pmActivoId,
           }),
         },
       );
@@ -418,6 +430,16 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
           ) : null}
         </div>
       </header>
+
+      {pmActivoId ? (
+        <div className="border-b border-subtle/40 p-4">
+          <ActaAvanceObraSection
+            idActivo={pmActivoId}
+            dateFrom={bounds.dateFrom}
+            dateTo={bounds.dateTo}
+          />
+        </div>
+      ) : null}
 
       <div className="p-4 relative">
         {pending ? (

@@ -31,6 +31,8 @@ interface ActasProjectPageProps {
    * cae a la base por código, /dashboard/pm/actas/<code>.
    */
   basePath?: string;
+  /** Activo PM detrás del proyecto: activa la sección de Avance de obra en el acta. */
+  pmActivoId?: string;
 }
 
 export function ActasProjectPage({
@@ -39,6 +41,7 @@ export function ActasProjectPage({
   activeTab,
   asOfParam,
   basePath,
+  pmActivoId,
 }: ActasProjectPageProps) {
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
@@ -99,7 +102,11 @@ export function ActasProjectPage({
                 </section>
               }
             >
-              <ActasActaTab projectId={project.id} projectCode={project.code} />
+              <ActasActaTab
+                projectId={project.id}
+                projectCode={project.code}
+                pmActivoId={pmActivoId}
+              />
             </Suspense>
           ) : validTab === "historico" ? (
             <ActasHistoricoTabServer

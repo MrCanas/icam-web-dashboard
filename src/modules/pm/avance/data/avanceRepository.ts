@@ -2,6 +2,11 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { isMissingTableError } from "@/lib/db/pgErrors";
 import { getPmReadSupabase } from "@/modules/pm/data/readClient";
 import { hayCambioVsZoho } from "@/modules/pm/avance/logic/avance-obra";
+import {
+  construirAvanceActa,
+  cortesDelActa,
+  type AvanceActa,
+} from "@/modules/pm/avance/logic/avance-a-fecha";
 import type {
   PmAvanceFase,
   PmAvanceFaseValor,
@@ -146,6 +151,70 @@ export async function fetchAvanceObraProyecto(
     sinPromocion: false,
     migracionPendiente: false,
     error: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Avance dentro de un acta
+// ---------------------------------------------------------------------------
+
+export interface AvanceActaResult extends AvanceProyectoResult {
+  /** Valores al empezar y al terminar el periodo del acta. */
+  acta: AvanceActa | null;
+  /** Cambios con fecha dentro del periodo, del más reciente al más antiguo. */
+  historicoPeriodo: PmAvanceProyecto["historico"];
+}
+
+/**
+ * El avance de un proyecto tal y como lo cuenta un acta `dateFrom`–`dateTo`.
+ *
+ * Reutiliza `fetchAvanceObraProyecto` (vigente, fases, bandeja) y añade el
+ * histórico completo hasta el final del periodo: el de la pestaña va capado a
+ * HISTORICO_LIMITE y con eso no se puede reconstruir un valor antiguo.
+ */
+export async function fetchAvanceObraActa(
+  ctx: UserContext,
+  idActivo: string,
+  dateFrom: string,
+  dateTo: string,
+): Promise<AvanceActaResult> {
+  const base = await fetchAvanceObraProyecto(ctx, idActivo);
+  if (!base.data) return { ...base, acta: null, historicoPeriodo: [] };
+
+  const cortes = cortesDelActa(dateFrom, dateTo);
+  const supabase = await getPmReadSupabase(ctx);
+  const { data: filas, error } = await supabase
+    .from("pm_avance_obra_historico")
+    .select("*")
+    .eq("promocion_id", base.data.promocion.id)
+    .lte("cambiado_at", new Date(cortes.hasta).toISOString())
+    .order("cambiado_at", { ascending: true });
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return { ...VACIO, migracionPendiente: true, acta: null, historicoPeriodo: [] };
+    }
+    return { ...VACIO, error: error.message, acta: null, historicoPeriodo: [] };
+  }
+
+  const nombreFase = new Map(
+    [base.data.general, ...base.data.fases]
+      .filter((f): f is PmAvanceFaseValor => f !== null)
+      .map((f) => [f.fase.id, f.fase.nombre]),
+  );
+  const cambios = ((filas ?? []) as PmAvanceHistorico[]).map((h) => ({
+    ...h,
+    porcentaje_anterior: numero(h.porcentaje_anterior),
+    porcentaje_nuevo: numero(h.porcentaje_nuevo),
+    fase_nombre: nombreFase.get(h.fase_id) ?? "—",
+  }));
+
+  return {
+    ...base,
+    acta: construirAvanceActa(base.data, cambios, cortes),
+    historicoPeriodo: cambios
+      .filter((c) => new Date(c.cambiado_at).getTime() > cortes.desde)
+      .reverse(),
   };
 }
 
