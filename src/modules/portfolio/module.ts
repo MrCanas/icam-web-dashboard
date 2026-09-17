@@ -49,6 +49,20 @@ export const portfolioModule: ModuleDefinition = {
       label: "Overview PM",
       match: (p) => p.startsWith("/dashboard/portfolio/pm-overview"),
     },
+    {
+      // Key congelada, como la de `portfolio.overview`: es lo que guardan las
+      // denegaciones de permisos, y `app_user_route_deny` no tiene FK.
+      // Renombrarla dejaría denies huérfanos que `isKnownRouteKey` descarta,
+      // lo que ABRIRÍA la pestaña a quien la tenía cerrada.
+      //
+      // `deniedByDefault` porque aquí se ven nombres, correos y patrimonio de
+      // los inversores: nadie la ve hasta que se le concede a mano.
+      key: "portfolio.inversores",
+      path: "/dashboard/portfolio/inversores",
+      label: "Inversores",
+      match: (p) => p.startsWith("/dashboard/portfolio/inversores"),
+      deniedByDefault: true,
+    },
   ],
   actions: [
     { key: "portfolio.read", label: "Ver" },

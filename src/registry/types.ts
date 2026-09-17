@@ -9,6 +9,20 @@ export interface ModuleRoute {
    * registry: URL directa, permisos y PermissionMatrix siguen funcionando.
    */
   hiddenInNav?: boolean;
+  /**
+   * La ruta nace DENEGADA para todo el mundo y se concede a mano desde
+   * /dashboard/admin/usuarios.
+   *
+   * El modelo de permisos del portal es una denylist: sin esto, una ruta nueva
+   * la ve por defecto todo el que tenga la zona. Corporativas pudo resolverlo
+   * siendo una zona que nadie tenía concedida, pero una página sensible dentro
+   * de una zona ya repartida no tiene esa salida.
+   *
+   * La migración que introduce la ruta siembra las denegaciones de los usuarios
+   * que ya existen; esta marca es la que cubre a los que se creen DESPUÉS
+   * (`createAdminUserAction`).
+   */
+  deniedByDefault?: boolean;
 }
 
 export interface ModuleAction {

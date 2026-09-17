@@ -52,6 +52,17 @@ const ROUTES_BY_KEY = new Map(
   ALL_ROUTES.map((entry) => [entry.route.key, entry]),
 );
 
+/**
+ * Rutas que nacen denegadas (`deniedByDefault`).
+ *
+ * El alta de usuarios las siembra en `app_user_route_deny` para que una página
+ * sensible no se abra sola al crear una cuenta nueva. Ojo: solo cubre el alta.
+ * A los usuarios que ya existían los cubre la migración que introduce la ruta.
+ */
+export const RUTAS_DENEGADAS_POR_DEFECTO: readonly string[] = ALL_ROUTES.filter(
+  (entry) => entry.route.deniedByDefault,
+).map((entry) => entry.route.key);
+
 export function routesForZone(zoneKey: ZoneKey): ModuleRoute[] {
   return ALL_ROUTES.filter((entry) => entry.zoneKey === zoneKey).map(
     (entry) => entry.route,
