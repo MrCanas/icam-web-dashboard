@@ -1,7 +1,11 @@
 import bcrypt from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 
-import { signSessionToken } from "@/lib/auth/jwt";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_COOKIE_OPTIONS,
+  signSessionToken,
+} from "@/lib/auth/jwt";
 import { comprobarRateLimit, limpiarRateLimit } from "@/lib/auth/rate-limit";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { createServiceRoleClient } from "@/lib/db/admin";
@@ -10,14 +14,6 @@ const GENERIC_AUTH_ERROR = "Email o contraseña incorrectos";
 
 /** 8 intentos por (IP + email) cada 5 minutos. Suficiente para <15 usuarios. */
 const RATE_LIMIT = { max: 8, ventanaMs: 5 * 60 * 1000 };
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  maxAge: 60 * 60 * 24 * 7,
-  path: "/",
-};
 
 export async function POST(request: NextRequest) {
   let body: { email?: string; password?: string; username?: string };
@@ -103,6 +99,6 @@ export async function POST(request: NextRequest) {
   limpiarRateLimit(clave);
 
   const response = NextResponse.json({ success: true });
-  response.cookies.set("icam-auth", token, COOKIE_OPTIONS);
+  response.cookies.set(SESSION_COOKIE_NAME, token, SESSION_COOKIE_OPTIONS);
   return response;
 }
