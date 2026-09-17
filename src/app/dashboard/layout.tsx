@@ -19,9 +19,13 @@ export default async function DashboardLayout({
 }>) {
   // Proyectos activos para la fila secundaria de la zona pm. Cualquier fallo
   // degrada a nav sin proyectos, nunca rompe el layout.
+  // La identidad se resuelve aquí una vez y se siembra en el provider del
+  // cliente: sin ella, DashboardZoneGuard ocultaba toda la página hasta que
+  // /api/me repetía las mismas consultas tras hidratar.
+  let user: Awaited<ReturnType<typeof getCurrentUser>> = null;
   let pmProjects: PmProjectNavItem[] = [];
   try {
-    const user = await getCurrentUser();
+    user = await getCurrentUser();
     if (user && hasZoneAccess(user, "pm")) {
       pmProjects = await fetchPmProjectNavItems(user);
     }
@@ -30,7 +34,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <CurrentUserProvider>
+    <CurrentUserProvider initialUser={user}>
       <DashboardZoneGuard>
         <div className="min-h-screen flex flex-col bg-page">
           <Header pmProjects={pmProjects} />

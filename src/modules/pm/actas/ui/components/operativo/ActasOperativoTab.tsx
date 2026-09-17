@@ -1,6 +1,6 @@
 import type { UserContext } from "@/lib/auth/currentUser";
 import { canAccessRouteKey, getUserRole } from "@/lib/auth/permissions";
-import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
+import { timed } from "@/lib/perf";
 import { fetchActasProjectOperativo } from "@/modules/pm/actas/data/actasRepository";
 import {
   fetchProjectCreatedAt,
@@ -44,15 +44,19 @@ async function avanceObraGroup(
   hasWriteAccess: boolean,
 ) {
   if (!pmActivoId || !canAccessRouteKey(ctx, "pm.avance_obra")) return null;
-  const resultado = asOfIso
-    ? await fetchAvanceObraAFecha(ctx, pmActivoId, asOfIso)
-    : await fetchAvanceObraProyecto(ctx, pmActivoId);
+  const resultado = await timed(
+    "actas.avance",
+    asOfIso
+      ? fetchAvanceObraAFecha(ctx, pmActivoId, asOfIso)
+      : fetchAvanceObraProyecto(ctx, pmActivoId, { conHistorico: false }),
+  );
   return (
     <AvanceObraOperativoGroup
       idActivo={pmActivoId}
       resultado={resultado}
       hasWriteAccess={hasWriteAccess}
       readOnly={asOfIso != null}
+      historicoDiferido={asOfIso == null}
     />
   );
 }
@@ -69,6 +73,9 @@ export async function ActasOperativoTab({
   // El avance mantiene su regla de siempre: editan editor y admin.
   const rolPm = getUserRole(ctx, "pm");
   const canEditAvance = rolPm === "admin" || rolPm === "editor";
+  // ctx.id ya es auth.users.id (loadUserContext lo carga con getUserById):
+  // resolverlo otra vez por email era un viaje más a la base de datos.
+  const currentAuthUserId = ctx.id;
   const asOfIso = parseAsOfDateParam(asOfParam);
   const isHistorical =
     asOfIso != null && !isAsOfFuture(asOfIso);
@@ -89,9 +96,8 @@ export async function ActasOperativoTab({
       return <ActasOperativoBeforeProject projectCode={projectCode} asOfDate={asOfIso} />;
     }
 
-    const [snapshotResult, currentAuthUserId, avanceGroup] = await Promise.all([
+    const [snapshotResult, avanceGroup] = await Promise.all([
       fetchProjectSnapshotAtDate(ctx, projectId, asOfIso),
-      resolveAuthUserIdByEmail(ctx.email),
       avanceObraGroup(ctx, pmActivoId, asOfIso, false),
     ]);
 
@@ -124,9 +130,8 @@ export async function ActasOperativoTab({
     );
   }
 
-  const [operativoResult, currentAuthUserId, avanceGroup] = await Promise.all([
-    fetchActasProjectOperativo(ctx, projectId),
-    resolveAuthUserIdByEmail(ctx.email),
+  const [operativoResult, avanceGroup] = await Promise.all([
+    timed("actas.operativo", fetchActasProjectOperativo(ctx, projectId)),
     avanceObraGroup(ctx, pmActivoId, null, canEditAvance),
   ]);
   const { categories, error } = operativoResult;

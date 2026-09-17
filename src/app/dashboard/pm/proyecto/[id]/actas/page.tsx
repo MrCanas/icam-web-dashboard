@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requireRouteAccess } from "@/lib/auth/require-route-access";
+import { timed } from "@/lib/perf";
 import {
   fetchActasLinkForPmActivo,
   resolveActasProjectRoute,
@@ -33,7 +34,7 @@ export async function generateMetadata({
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; asOf?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -44,16 +45,21 @@ interface PageProps {
  * activo PM detrás) y redirige aquí cuando el vínculo existe.
  */
 export default async function Page({ params, searchParams }: PageProps) {
-  const ctx = await requireRouteAccess("pm.actas");
+  const ctx = await timed("actas.auth", requireRouteAccess("pm.actas"));
   const { id } = await params;
-  const { tab, asOf } = await searchParams;
+  const query = await searchParams;
+  const tab = typeof query.tab === "string" ? query.tab : undefined;
+  const asOf = typeof query.asOf === "string" ? query.asOf : undefined;
   const idActivo = decodeURIComponent(id);
 
   const activeTab: ActasProjectTab = ACTAS_PROJECT_TABS.some((t) => t.key === tab)
     ? (tab as ActasProjectTab)
     : "operativo";
 
-  const link = await fetchActasLinkForPmActivo(ctx, idActivo);
+  const link = await timed(
+    "actas.link",
+    fetchActasLinkForPmActivo(ctx, idActivo),
+  );
 
   if (!link) {
     return (
@@ -75,7 +81,10 @@ export default async function Page({ params, searchParams }: PageProps) {
     );
   }
 
-  const { resolution, error } = await resolveActasProjectRoute(ctx, link.code);
+  const { resolution, error } = await timed(
+    "actas.cabecera",
+    resolveActasProjectRoute(ctx, link.code),
+  );
   // Las subpestañas del proyecto ya las pinta proyecto/[id]/layout.tsx: aquí
   // solo va el contenido, en cualquiera de los estados.
 
@@ -121,6 +130,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       asOfParam={asOf}
       basePath={actasProjectBasePathForPmActivo(idActivo)}
       pmActivoId={idActivo}
+      searchParams={query}
     />
   );
 }

@@ -1,3 +1,7 @@
+import { Suspense } from "react";
+
+import type { UserContext } from "@/lib/auth/currentUser";
+import { fetchActasProjectHeaderStats } from "@/modules/pm/actas/data/actasRepository";
 import { daysSince, formatLastActivity } from "@/modules/pm/actas/logic/actas-time";
 import { projectPhaseLabel } from "@/modules/pm/actas/logic/project-phase";
 import type { ActasProjectDetail } from "@/modules/pm/actas/types";
@@ -5,18 +9,17 @@ import type { ActasProjectDetail } from "@/modules/pm/actas/types";
 import { ActasProjectOwnerPicker } from "./ActasProjectOwnerPicker";
 
 interface ActasProjectHeaderProps {
+  ctx: UserContext;
   project: ActasProjectDetail;
   /** true si el usuario puede modificar el responsable (editor de la zona pm). */
   canEditOwner: boolean;
 }
 
 export function ActasProjectHeader({
+  ctx,
   project,
   canEditOwner,
 }: ActasProjectHeaderProps) {
-  const days = daysSince(project.lastLogEntryAt);
-  const activityLabel = formatLastActivity(days);
-
   return (
     <header className="bg-card rounded-lg border border-subtle/50 p-4">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
@@ -41,32 +44,65 @@ export function ActasProjectHeader({
           </div>
         </div>
 
-        <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm shrink-0">
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-              Última actividad
-            </dt>
-            <dd
-              className={
-                days === null
-                  ? "text-text-muted"
-                  : days > 30
-                    ? "text-amber-600"
-                    : "text-emerald-600"
-              }
-            >
-              {activityLabel}
-            </dd>
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-              Elementos
-            </dt>
-            <dd className="text-text-body">{project.elementCount}</dd>
-          </div>
-        </dl>
+        <Suspense fallback={<ActasProjectHeaderStatsView loading />}>
+          <ActasProjectHeaderStats ctx={ctx} projectId={project.id} />
+        </Suspense>
       </div>
     </header>
+  );
+}
+
+async function ActasProjectHeaderStats({
+  ctx,
+  projectId,
+}: {
+  ctx: UserContext;
+  projectId: string;
+}) {
+  const stats = await fetchActasProjectHeaderStats(ctx, projectId);
+  return (
+    <ActasProjectHeaderStatsView
+      lastLogEntryAt={stats.lastLogEntryAt}
+      elementCount={stats.elementCount}
+    />
+  );
+}
+
+function ActasProjectHeaderStatsView(
+  props:
+    | { loading: true }
+    | { loading?: false; lastLogEntryAt: string | null; elementCount: number },
+) {
+  const days = props.loading ? null : daysSince(props.lastLogEntryAt);
+  const activityLabel = props.loading ? "…" : formatLastActivity(days);
+
+  return (
+    <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm shrink-0">
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+          Última actividad
+        </dt>
+        <dd
+          className={
+            days === null
+              ? "text-text-muted"
+              : days > 30
+                ? "text-amber-600"
+                : "text-emerald-600"
+          }
+        >
+          {activityLabel}
+        </dd>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+          Elementos
+        </dt>
+        <dd className={props.loading ? "text-text-muted" : "text-text-body"}>
+          {props.loading ? "…" : props.elementCount}
+        </dd>
+      </div>
+    </dl>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { softDeleteLogEntry } from "@/modules/pm/actas/actions/soft-delete-log-entry";
@@ -36,7 +35,6 @@ export function ActasHistoryEntryItem({
   onUpdated,
   onDeleted,
 }: ActasHistoryEntryItemProps) {
-  const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -106,8 +104,8 @@ export function ActasHistoryEntryItem({
 
       setEntry(result.entry);
       setEditing(false);
+      // Actualización local; sin router.refresh() de todo el tablero.
       onUpdated(result.entry);
-      router.refresh();
     });
   };
 
@@ -122,7 +120,6 @@ export function ActasHistoryEntryItem({
       setEntry(result.entry);
       setConfirmingDelete(false);
       onDeleted(result.entry);
-      router.refresh();
     });
   };
 

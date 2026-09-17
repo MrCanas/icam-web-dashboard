@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 import type {
@@ -7,6 +9,7 @@ import type {
   PmSnapshotFecha,
 } from "@/modules/pm/types";
 import { getPmReadSupabase, getPmWriteSupabase } from "@/modules/pm/data/readClient";
+import { PM_NAV_CACHE_TAG } from "@/modules/pm/data/pmNavCache";
 import { deviationVsLevantamientoDays } from "@/modules/pm/logic/pm-viz";
 
 export interface PmHitoEnriched extends PmHito {
@@ -234,6 +237,26 @@ export async function fetchPmProjectNavItems(
   ctx: UserContext,
 ): Promise<PmProjectNavItem[]> {
   const supabase = await getPmReadSupabase(ctx);
+  return fetchPmProjectNavItemsCached(supabase);
+}
+
+/**
+ * La lista no depende del usuario (el acceso a la zona se comprueba antes de
+ * pedirla) y cambia poco: se cachea 60 s entre peticiones y se invalida con
+ * PM_NAV_CACHE_TAG al crear, archivar o restaurar proyectos y activos. Los
+ * cambios que entran por importación o SQL tardan como mucho ese minuto.
+ */
+const fetchPmProjectNavItemsCached = async (
+  supabase: Awaited<ReturnType<typeof getPmReadSupabase>>,
+) =>
+  unstable_cache(() => readPmProjectNavItems(supabase), ["pm-nav-projects"], {
+    revalidate: 60,
+    tags: [PM_NAV_CACHE_TAG],
+  })();
+
+async function readPmProjectNavItems(
+  supabase: Awaited<ReturnType<typeof getPmReadSupabase>>,
+): Promise<PmProjectNavItem[]> {
   const { data, error } = await supabase
     .from("pm_activos")
     .select("id_activo, nombre_display, project(code, archived_at)")

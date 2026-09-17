@@ -1,5 +1,8 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
+import { PM_NAV_CACHE_TAG } from "@/modules/pm/data/pmNavCache";
 import { requirePmWriteSupabase } from "@/modules/pm/planificacion/data/writeClient";
 import {
   validateIdActivo,
@@ -75,6 +78,7 @@ export async function createActivo(input: CreateActivoInput): Promise<CreateActi
 
   const catalogoIds = (input.catalogoIds ?? []).filter((c) => validateUuid(c).ok);
   if (catalogoIds.length === 0) {
+    updateTag(PM_NAV_CACHE_TAG);
     return { ok: true, id: creado.id as string, hitos: 0 };
   }
 
@@ -98,6 +102,7 @@ export async function createActivo(input: CreateActivoInput): Promise<CreateActi
     if (eHitos) return { ok: false, error: eHitos.message };
   }
 
+  updateTag(PM_NAV_CACHE_TAG);
   return { ok: true, id: creado.id as string, hitos: filas.length };
 }
 
@@ -145,6 +150,7 @@ export async function updateActivo(
     return { ok: false, error: error.message };
   }
   if (count === 0) return { ok: false, error: "Proyecto no encontrado" };
+  updateTag(PM_NAV_CACHE_TAG);
   return { ok: true };
 }
 
@@ -172,6 +178,7 @@ export async function archiveActivo(
 
   if (error) return { ok: false, error: error.message };
   if (count === 0) return { ok: false, error: "Proyecto no encontrado" };
+  updateTag(PM_NAV_CACHE_TAG);
   return { ok: true };
 }
 
@@ -197,5 +204,6 @@ export async function reorderActivos(
       .eq("id", id);
     if (error) return { ok: false, error: error.message };
   }
+  updateTag(PM_NAV_CACHE_TAG);
   return { ok: true };
 }

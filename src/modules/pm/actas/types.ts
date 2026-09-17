@@ -58,6 +58,13 @@ export interface ActasProjectOwner {
 export interface ActasProjectDetail extends ActasProjectListItem {
   /** Responsable del proyecto, null si no hay (Sin responsable). */
   owner: ActasProjectOwner | null;
+}
+
+/**
+ * «Última actividad» y «Elementos» de la cabecera. Van aparte del detalle para
+ * cargarse en su propio Suspense y no retrasar el resto de la página.
+ */
+export interface ActasProjectHeaderStats {
   /** ISO date string of the latest log_entry.entry_date, null if no entries. */
   lastLogEntryAt: string | null;
   /** Count of active (non-archived) elements. */

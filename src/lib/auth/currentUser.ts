@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 
@@ -80,23 +81,63 @@ export async function getCurrentUserFromRequest(
   }
 }
 
+/** Etiqueta de caché de la identidad de Auth de un usuario (ver readAuthIdentity). */
+export function authIdentityCacheTag(userId: string): string {
+  return `auth-identity:${userId}`;
+}
+
+interface AuthIdentity {
+  email: string;
+  metadata: Record<string, unknown> | undefined;
+}
+
+/**
+ * Email y metadata del usuario en Supabase Auth.
+ *
+ * Es una llamada a la API de Auth (no una consulta a tablas) que se repetía en
+ * cada render, en /api/me y en cada Server Action. Se cachea 5 minutos: solo da
+ * el nombre y el email. Lo que decide el acceso (roles, cuenta activa, páginas
+ * denegadas) se sigue leyendo en cada petición en loadUserContext. Borrar un
+ * usuario invalida su entrada con authIdentityCacheTag.
+ *
+ * Los fallos lanzan en vez de devolver null para no quedar cacheados.
+ */
+function readAuthIdentity(userId: string): Promise<AuthIdentity | null> {
+  return unstable_cache(
+    async (): Promise<AuthIdentity | null> => {
+      const admin = createServiceRoleClient();
+      const { data, error } = await admin.auth.admin.getUserById(userId);
+      if (error || !data.user) {
+        throw new Error(`getUserById: ${error?.message ?? "usuario no encontrado"}`);
+      }
+      const email = data.user.email?.trim() ?? "";
+      if (!email) return null;
+      return {
+        email,
+        metadata: data.user.user_metadata as Record<string, unknown> | undefined,
+      };
+    },
+    ["auth-identity", userId],
+    { revalidate: 300, tags: [authIdentityCacheTag(userId)] },
+  )();
+}
+
 export async function loadUserContext(
   userId: string,
 ): Promise<UserContext | null> {
   const admin = createServiceRoleClient();
 
-  const { data: authData, error: authError } =
-    await admin.auth.admin.getUserById(userId);
-
-  if (authError || !authData.user) {
+  let identity: AuthIdentity | null;
+  try {
+    identity = await readAuthIdentity(userId);
+  } catch {
+    // Mismo resultado que antes ante un error de Auth: sin sesión.
     return null;
   }
-
-  const authUser = authData.user;
-  const email = authUser.email?.trim() ?? "";
-  if (!email) {
+  if (!identity) {
     return null;
   }
+  const { email } = identity;
 
   const [zoneResult, accountResult, denyResult] = await Promise.all([
     admin
@@ -134,10 +175,7 @@ export async function loadUserContext(
   return {
     id: userId,
     email,
-    name: displayNameFromAuthUser(
-      email,
-      authUser.user_metadata as Record<string, unknown> | undefined,
-    ),
+    name: displayNameFromAuthUser(email, identity.metadata),
     zones: (zoneResult.data ?? []).map((row) => ({
       zone_key: row.zone_key as string,
       role: row.role as string,

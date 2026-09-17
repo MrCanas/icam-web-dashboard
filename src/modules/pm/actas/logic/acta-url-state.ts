@@ -1,4 +1,7 @@
-import type { ActasActaRangePreset } from "@/modules/pm/actas/types";
+import type {
+  ActasActaQueryInput,
+  ActasActaRangePreset,
+} from "@/modules/pm/actas/types";
 
 import { actasProjectPath } from "./actas-paths";
 
@@ -88,6 +91,44 @@ export function parseActaUrlState(
 export function authorKeysToIds(keys: string[]): (string | null)[] | undefined {
   if (keys.length === 0) return undefined;
   return keys.map((k) => (k === ACTA_AUTHOR_NONE ? null : k));
+}
+
+/**
+ * Consulta de la vista de acta para un estado de URL. La usan el servidor (carga
+ * inicial) y el cliente (cambios de filtro): si las dos dan la misma consulta,
+ * el cliente reutiliza lo que ya trajo el servidor.
+ */
+export function actaQueryForState(
+  projectId: string,
+  state: ActasActaUrlState,
+  now = new Date(),
+): ActasActaQueryInput {
+  const bounds = resolveActaRangeBounds(
+    state.range,
+    state.dateFrom,
+    state.dateTo,
+    now,
+  );
+  return {
+    projectId,
+    dateFrom: bounds.dateFrom,
+    dateTo: bounds.dateTo,
+    categoryIds: state.categoryIds.length > 0 ? state.categoryIds : undefined,
+    authorIds: authorKeysToIds(state.authorKeys),
+    onlyWithStatusChange: state.onlyWithStatusChange,
+  };
+}
+
+/** Clave estable de una consulta de acta, para comparar la del servidor con la del cliente. */
+export function actaQueryKey(query: ActasActaQueryInput): string {
+  return JSON.stringify([
+    query.projectId,
+    query.dateFrom,
+    query.dateTo,
+    query.categoryIds ?? null,
+    query.authorIds ?? null,
+    query.onlyWithStatusChange ?? false,
+  ]);
 }
 
 export function authorIdsToKeys(ids: (string | null)[]): string[] {

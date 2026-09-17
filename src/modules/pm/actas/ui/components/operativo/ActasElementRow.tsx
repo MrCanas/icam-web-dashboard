@@ -429,6 +429,11 @@ export function ActasElementRow({
             setLastEntryAuthorId(entry.authorId);
             setLastEntrySource(entry.source);
             setDisplayStatus(elementStatus);
+            // Sin recarga del tablero, el reparto activos/completados se entera
+            // del cambio de estado por aquí, igual que desde el selector.
+            if (elementStatus !== displayStatus) {
+              onElementStatusLiveChange?.(element.id, elementStatus);
+            }
             setHistoryReloadNonce((n) => n + 1);
             setHistoryOpen(true);
           }}

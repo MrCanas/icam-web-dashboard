@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { obtenerHistoricoAvance } from "@/modules/pm/avance/actions/obtener-historico-avance";
 import type { AvanceProyectoResult } from "@/modules/pm/avance/data/avanceRepository";
+import type { PmAvanceProyecto } from "@/modules/pm/avance/types";
 
 import { AvanceHistoricoTable } from "./AvanceHistoricoTable";
 import { AvanceObraEstadoVacio } from "./AvanceObraEstadoVacio";
@@ -14,6 +16,18 @@ interface AvanceObraOperativoGroupProps {
   hasWriteAccess: boolean;
   /** Snapshot histórico (`?asOf=`): valores reconstruidos, sin edición. */
   readOnly: boolean;
+  /**
+   * `resultado` llega sin histórico: se pide al desplegar el panel. En el
+   * snapshot no aplica, porque el histórico ya viene recortado a la fecha.
+   */
+  historicoDiferido?: boolean;
+}
+
+interface HistoricoCargado {
+  /** Datos del tablero con los que se pidió: si cambian (Guardar), se vuelve a pedir. */
+  para: PmAvanceProyecto;
+  filas: PmAvanceProyecto["historico"];
+  error: string | null;
 }
 
 /**
@@ -28,10 +42,24 @@ export function AvanceObraOperativoGroup({
   resultado,
   hasWriteAccess,
   readOnly,
+  historicoDiferido = false,
 }: AvanceObraOperativoGroupProps) {
   const [expanded, setExpanded] = useState(true);
   const [verHistorico, setVerHistorico] = useState(false);
+  const [historico, setHistorico] = useState<HistoricoCargado | null>(null);
   const { data } = resultado;
+
+  const historicoAlDia = historico != null && historico.para === data;
+  useEffect(() => {
+    if (!historicoDiferido || !verHistorico || !data || historicoAlDia) return;
+    let cancelado = false;
+    void obtenerHistoricoAvance(data.promocion.id).then((r) => {
+      if (!cancelado) setHistorico({ para: data, filas: r.filas, error: r.error });
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [historicoDiferido, verHistorico, data, historicoAlDia]);
   const nFases = data ? data.fases.length : 0;
 
   return (
@@ -85,7 +113,17 @@ export function AvanceObraOperativoGroup({
                 </button>
                 {verHistorico ? (
                   <div className="mt-2">
-                    <AvanceHistoricoTable filas={data.historico} />
+                    {!historicoDiferido ? (
+                      <AvanceHistoricoTable filas={data.historico} />
+                    ) : historicoAlDia && historico.error ? (
+                      <p className="text-sm text-red-700">
+                        No se pudo cargar el histórico: {historico.error}
+                      </p>
+                    ) : historicoAlDia ? (
+                      <AvanceHistoricoTable filas={historico.filas} />
+                    ) : (
+                      <p className="text-sm text-text-muted">Cargando histórico…</p>
+                    )}
                   </div>
                 ) : null}
               </div>

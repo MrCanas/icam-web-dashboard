@@ -20,13 +20,29 @@ interface CurrentUserContextValue {
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
+interface CurrentUserProviderProps {
+  children: ReactNode;
+  /**
+   * Identidad ya resuelta por el layout en el servidor. Si llega, no se pide
+   * /api/me al montar: el guard puede pintar la página en el primer render en
+   * vez de esconderla tras un «Cargando…» hasta que responda la API.
+   * `undefined` = no sembrado (se pide a la API); `null` = sin sesión válida.
+   */
+  initialUser?: UserContext | null;
+}
+
 /**
- * CLIENT: fetches identity from GET /api/me (backed by getCurrentUser on the server).
+ * CLIENT: identity from GET /api/me (backed by getCurrentUser on the server),
+ * or seeded from the server via `initialUser`.
  * Wrap the app (or dashboard layout) with CurrentUserProvider.
  */
-export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserContext | null>(null);
-  const [loading, setLoading] = useState(true);
+export function CurrentUserProvider({
+  children,
+  initialUser,
+}: CurrentUserProviderProps) {
+  const seeded = initialUser !== undefined;
+  const [user, setUser] = useState<UserContext | null>(initialUser ?? null);
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -52,8 +68,18 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (seeded) return;
     void refresh();
-  }, [refresh]);
+  }, [seeded, refresh]);
+
+  // router.refresh() vuelve a renderizar el layout con la identidad al día
+  // (p. ej. tras cambiar roles): se sincroniza sin otra llamada a /api/me.
+  // Ajuste durante el render, no en un efecto, para no pintar dos veces.
+  const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
+  if (initialUser !== prevInitialUser) {
+    setPrevInitialUser(initialUser);
+    if (initialUser !== undefined) setUser(initialUser);
+  }
 
   const value = useMemo(
     () => ({ user, loading, error, refresh }),

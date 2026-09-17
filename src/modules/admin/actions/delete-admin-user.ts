@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
+import { authIdentityCacheTag } from "@/lib/auth/currentUser";
 import { requireAdminContext } from "@/modules/admin/data/adminGuard";
 import {
   countActivePlatformAdmins,
@@ -56,6 +57,7 @@ export async function deleteAdminUserAction(input: {
     }
 
     await deleteAdminUser(input.userId);
+    updateTag(authIdentityCacheTag(input.userId));
     revalidatePath("/dashboard/admin/usuarios");
     return { ok: true, data: undefined };
   } catch (err) {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { listElementLogEntries } from "@/modules/pm/actas/actions/list-element-log-entries";
@@ -35,7 +34,6 @@ export function ActasElementInlineHistory({
   asOfDate,
   onLastEntryChange,
 }: ActasElementInlineHistoryProps) {
-  const router = useRouter();
   const { showUndo } = useActasLogEntryUndo();
   const [entries, setEntries] = useState<ActasLogEntryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,7 +142,6 @@ export function ActasElementInlineHistory({
                       logEntryId: deleted.id,
                       onRestored: (restored) => {
                         applyEntryListChange((prev) => [...prev, restored]);
-                        router.refresh();
                       },
                     });
                   }}
