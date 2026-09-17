@@ -12,6 +12,8 @@ import {
 import { getActaView } from "@/modules/pm/actas/actions/get-acta-view";
 import {
   ACTA_AUTHOR_NONE,
+  actaQueryForState,
+  actaQueryKey,
   authorKeysToIds,
   buildActaShareUrl,
   parseActaUrlState,
@@ -31,6 +33,16 @@ import { ActasActaCategoryBlock } from "./ActasActaCategoryBlock";
 interface ActasActaTabProps {
   projectId: string;
   projectCode: string;
+  /**
+   * Vista ya cargada en el servidor (ActasActaTabServer) y la clave de su
+   * consulta. Sin ella, o si la consulta del cliente es otra, se pide por
+   * Server Action como siempre.
+   */
+  initial?: {
+    key: string;
+    data: ActasActaViewData | null;
+    error: string | null;
+  };
 }
 
 const RANGE_OPTIONS: { value: ActasActaRangePreset; label: string }[] = [
@@ -40,14 +52,22 @@ const RANGE_OPTIONS: { value: ActasActaRangePreset; label: string }[] = [
   { value: "custom", label: "Personalizado" },
 ];
 
-export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
+export function ActasActaTab({
+  projectId,
+  projectCode,
+  initial,
+}: ActasActaTabProps) {
   const basePath = useActasBasePath();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewData, setViewData] = useState<ActasActaViewData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewData, setViewData] = useState<ActasActaViewData | null>(
+    initial?.data ?? null,
+  );
+  const [loadError, setLoadError] = useState<string | null>(
+    initial?.error ?? null,
+  );
   const [shareToast, setShareToast] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -69,22 +89,17 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
 
   const loadView = useCallback(
     (state: ActasActaUrlState) => {
-      const bounds = resolveActaRangeBounds(
-        state.range,
-        state.dateFrom,
-        state.dateTo,
-      );
+      const query = actaQueryForState(projectId, state);
+      // Cambiar un filtro reemplaza la URL y el servidor vuelve a renderizar la
+      // pestaña con la vista nueva: si ya la trae, no se pide otra vez.
+      if (initial && initial.key === actaQueryKey(query)) {
+        setLoadError(initial.error);
+        setViewData(initial.data);
+        return;
+      }
       startTransition(async () => {
         setLoadError(null);
-        const res = await getActaView({
-          projectId,
-          dateFrom: bounds.dateFrom,
-          dateTo: bounds.dateTo,
-          categoryIds:
-            state.categoryIds.length > 0 ? state.categoryIds : undefined,
-          authorIds: authorKeysToIds(state.authorKeys),
-          onlyWithStatusChange: state.onlyWithStatusChange,
-        });
+        const res = await getActaView(query);
         if (!res.ok) {
           setLoadError(res.error);
           setViewData(null);
@@ -93,7 +108,7 @@ export function ActasActaTab({ projectId, projectCode }: ActasActaTabProps) {
         setViewData(res.data);
       });
     },
-    [projectId],
+    [projectId, initial],
   );
 
   useEffect(() => {

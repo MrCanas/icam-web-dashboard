@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { PM_NAV_CACHE_TAG } from "@/modules/pm/data/pmNavCache";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { getActasAuthenticatedSupabase } from "@/modules/pm/actas/data/authenticatedClient";
 
@@ -53,5 +54,6 @@ export async function archiveProject(
   }
 
   revalidatePath("/dashboard/pm/actas", "layout");
+  updateTag(PM_NAV_CACHE_TAG);
   return { ok: true, projectCode };
 }

@@ -121,6 +121,7 @@ export default async function ActasProjectRoutePage({
         project={resolution.project}
         activeTab={activeTab}
         asOfParam={asOf}
+        searchParams={query}
       />
     </div>
   );

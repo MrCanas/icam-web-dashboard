@@ -1,9 +1,10 @@
 "use server";
 
 import type { PoolClient } from "pg";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/currentUser";
+import { PM_NAV_CACHE_TAG } from "@/modules/pm/data/pmNavCache";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 import { getPgPool } from "@/modules/pm/actas/data/pg";
@@ -342,6 +343,7 @@ export async function createProjectFromTemplate(
     );
     await client.query("COMMIT");
     revalidatePath("/dashboard/pm/actas", "layout");
+    updateTag(PM_NAV_CACHE_TAG);
     return { ok: true, ...result };
   } catch (err) {
     try {

@@ -225,10 +225,10 @@ export function ActasOwnerPicker({
       return;
     }
 
+    // Añadir o quitar a uno ya está pintado (onOwnersChange optimista): solo la
+    // asignación masiva necesita recargar, porque toca otras filas.
     if (bulkIds.length > 1) {
       selection?.clearAll();
-      router.refresh();
-    } else if (!isOwner) {
       router.refresh();
     }
   };

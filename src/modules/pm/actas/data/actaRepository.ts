@@ -35,12 +35,27 @@ export async function fetchActasActaView(
   const supabase = await getActasReadSupabase(ctx);
   const { from, to } = toIsoRangeBounds(input.dateFrom, input.dateTo);
 
-  const { data: catRows, error: catErr } = await supabase
-    .from("category")
-    .select("id, name, order_index, master_group_id, sublot_label")
-    .eq("project_id", input.projectId)
-    .is("archived_at", null)
-    .order("order_index", { ascending: true });
+  // Categorías y elementos a la vez: los elementos se filtran por proyecto con
+  // un join a category en vez de esperar a tener los ids de categoría. Los de
+  // categorías archivadas se descartan abajo, igual que antes.
+  const [
+    { data: catRows, error: catErr },
+    { data: elRows, error: elErr },
+  ] = await Promise.all([
+    supabase
+      .from("category")
+      .select("id, name, order_index, master_group_id, sublot_label")
+      .eq("project_id", input.projectId)
+      .is("archived_at", null)
+      .order("order_index", { ascending: true }),
+    supabase
+      .from("element")
+      .select(
+        "id, category_id, name, order_index, parent_element_id, category!inner(project_id)",
+      )
+      .eq("category.project_id", input.projectId)
+      .is("archived_at", null),
+  ]);
 
   if (catErr) {
     return { data: null, error: catErr.message };
@@ -59,19 +74,15 @@ export async function fetchActasActaView(
     };
   }
 
-  const categoryIds = categories.map((c) => c.id);
-
-  const { data: elRows, error: elErr } = await supabase
-    .from("element")
-    .select("id, category_id, name, order_index, parent_element_id")
-    .in("category_id", categoryIds)
-    .is("archived_at", null);
+  const categoryIds = new Set(categories.map((c) => c.id));
 
   if (elErr) {
     return { data: null, error: elErr.message };
   }
 
-  const elements = (elRows ?? []).map((row) => ({
+  const elements = (elRows ?? [])
+    .filter((row) => categoryIds.has(row.category_id as string))
+    .map((row) => ({
     id: row.id as string,
     categoryId: row.category_id as string,
     name: row.name as string,
@@ -104,7 +115,10 @@ export async function fetchActasActaView(
     .is("deleted_at", null)
     .gte("entry_date", from)
     .lte("entry_date", to)
-    .order("entry_date", { ascending: true });
+    .order("entry_date", { ascending: true })
+    // Desempate estable: las entradas importadas de Monday comparten fecha.
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
 
   if (logErr) {
     return { data: null, error: logErr.message };

@@ -2,7 +2,6 @@ import { Suspense } from "react";
 
 import type { UserContext } from "@/lib/auth/currentUser";
 import { getUserRole } from "@/lib/auth/permissions";
-import { resolveAuthUserIdByEmail } from "@/lib/auth/resolve-auth-user";
 
 import { ActasHistoricoTab } from "./ActasHistoricoTab";
 
@@ -17,7 +16,9 @@ export async function ActasHistoricoTabServer({
   projectId,
   projectCode,
 }: ActasHistoricoTabServerProps) {
-  const currentAuthUserId = await resolveAuthUserIdByEmail(ctx.email);
+  // ctx.id ya es auth.users.id (loadUserContext lo carga con getUserById):
+  // resolverlo otra vez por email era un viaje más a la base de datos.
+  const currentAuthUserId = ctx.id;
   const isPmAdmin = getUserRole(ctx, "pm") === "admin";
   const hasWriteAccess = getUserRole(ctx, "pm") !== "lector";
 

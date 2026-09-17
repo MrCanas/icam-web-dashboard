@@ -1,4 +1,5 @@
 import type { UserContext } from "@/lib/auth/currentUser";
+import { isMissingFunctionError } from "@/lib/db/pgErrors";
 
 import { getActasReadSupabase } from "./readClient";
 import { formatCategoryDisplayName } from "../logic/actas-category-display";
@@ -17,6 +18,7 @@ import type {
   ActasLogEntryItem,
   ActasOperativoCategory,
   ActasProjectDetail,
+  ActasProjectHeaderStats,
   ActasProjectListItem,
   ActasProjectOwner,
   ProjectPhase,
@@ -105,17 +107,21 @@ export async function fetchActasLinkForPmActivo(
 ): Promise<ActasLinkForPmActivo | null> {
   const supabase = await getActasReadSupabase(ctx);
 
-  const { data: activo } = await supabase
-    .from("pm_activos")
-    .select("id")
-    .eq("id_activo", idActivo)
-    .maybeSingle();
+  // En paralelo: el catálogo de proyectos es pequeño y hay que leerlo entero
+  // igualmente (el emparejamiento por código normalizado no se puede filtrar
+  // en SQL).
+  const [{ data: activo }, { data: projects }] = await Promise.all([
+    supabase
+      .from("pm_activos")
+      .select("id")
+      .eq("id_activo", idActivo)
+      .maybeSingle(),
+    supabase
+      .from("project")
+      .select("code, archived_at, pm_activo_id")
+      .order("sort_order", { ascending: true }),
+  ]);
   if (!activo) return null;
-
-  const { data: projects } = await supabase
-    .from("project")
-    .select("code, archived_at, pm_activo_id")
-    .order("sort_order", { ascending: true });
   if (!projects?.length) return null;
 
   const explicitos = projects.filter((p) => p.pm_activo_id === activo.id);
@@ -250,7 +256,7 @@ export async function resolveActasProjectRoute(
 
   const { data: row, error: rowErr } = await supabase
     .from("project")
-    .select("id, code, name, archived_at")
+    .select("id, code, name, phase, owner_user_id, archived_at")
     .eq("code", code)
     .maybeSingle();
 
@@ -276,14 +282,8 @@ export async function resolveActasProjectRoute(
     };
   }
 
-  const { project, error } = await fetchActasProjectDetail(ctx, code);
-  if (error) {
-    return { resolution: { kind: "not_found" }, error };
-  }
-  if (!project) {
-    return { resolution: { kind: "not_found" }, error: null };
-  }
-
+  // La fila ya está leída: se completa sin volver a pedir el proyecto.
+  const project = await buildActasProjectDetail(row as ProjectDetailRow);
   return { resolution: { kind: "active", project }, error: null };
 }
 
@@ -318,11 +318,82 @@ export async function fetchActasProjectDetail(
     return { project: null, error: null };
   }
 
-  const projectId = projectRow.id as string;
+  return {
+    project: await buildActasProjectDetail(projectRow as ProjectDetailRow),
+    error: null,
+  };
+}
 
-  // Categorías del proyecto → elementos → última fecha de log. PostgREST no
-  // admite subconsultas dentro de .eq() (la versión anterior las pasaba como
-  // builder y no filtraban nada): se resuelven por pasos con .in().
+interface ProjectDetailRow {
+  id: string;
+  code: string;
+  name: string;
+  phase: string;
+  owner_user_id: string | null;
+}
+
+/**
+ * Cabecera del proyecto a partir de su fila: solo falta resolver el responsable.
+ * Las estadísticas (fetchActasProjectHeaderStats) se cargan aparte, en streaming.
+ */
+async function buildActasProjectDetail(
+  projectRow: ProjectDetailRow,
+): Promise<ActasProjectDetail> {
+  const ownerUserId = projectRow.owner_user_id ?? null;
+
+  // Responsable del proyecto (project.owner_user_id) resuelto a avatar + nombre.
+  let owner: ActasProjectOwner | null = null;
+  if (ownerUserId) {
+    const displayMap = await resolveUserDisplayMap([ownerUserId]);
+    const resolved = displayMap.get(ownerUserId);
+    owner = {
+      userId: ownerUserId,
+      email: resolved?.email ?? null,
+      displayName:
+        resolved?.label || resolved?.email?.split("@")[0] || "Usuario",
+      initials: resolved?.initials ?? "?",
+    };
+  }
+
+  return {
+    id: projectRow.id,
+    code: projectRow.code,
+    name: projectRow.name,
+    phase: toProjectPhase(projectRow.phase),
+    owner,
+  };
+}
+
+/**
+ * «Elementos» y «Última actividad» de la cabecera. Una llamada a la RPC de la
+ * migración 042; si no está aplicada, la versión por pasos de antes.
+ */
+export async function fetchActasProjectHeaderStats(
+  ctx: UserContext,
+  projectId: string,
+): Promise<ActasProjectHeaderStats> {
+  const supabase = await getActasReadSupabase(ctx);
+
+  const { data, error } = await supabase.rpc("actas_project_header_stats", {
+    p_project_id: projectId,
+  });
+  if (!error) {
+    const row = (
+      data as { element_count: number | string; last_log_entry_at: string | null }[] | null
+    )?.[0];
+    return {
+      elementCount: Number(row?.element_count ?? 0),
+      lastLogEntryAt: row?.last_log_entry_at ?? null,
+    };
+  }
+  // Antes estos datos nunca rompían la página: ante cualquier fallo de la RPC
+  // se cae a la ruta por pasos.
+  if (!isMissingFunctionError(error)) {
+    console.error("[actas] actas_project_header_stats", error.message);
+  }
+
+  // PostgREST no admite subconsultas dentro de .eq() (una versión anterior las
+  // pasaba como builder y no filtraban nada): se resuelven por pasos con .in().
   const { data: cats } = await supabase
     .from("category")
     .select("id")
@@ -339,55 +410,66 @@ export async function fetchActasProjectDetail(
     : { data: [] as { id: string }[] };
   const elementIds = (els ?? []).map((e: { id: string }) => e.id);
 
-  const [logResult, elementResult] = await Promise.all([
-    elementIds.length
-      ? supabase
-          .from("log_entry")
-          .select("entry_date")
-          .in("element_id", elementIds)
-          .order("entry_date", { ascending: false })
-          .limit(1)
-      : Promise.resolve({ data: [] as { entry_date: string }[] }),
-    categoryIds.length
-      ? supabase
-          .from("element")
-          .select("id", { count: "exact", head: true })
-          .is("archived_at", null)
-          .in("category_id", categoryIds)
-      : Promise.resolve({ count: 0 }),
-  ]);
-
-  // Responsable del proyecto (project.owner_user_id) resuelto a avatar + nombre.
-  const ownerUserId = (projectRow.owner_user_id as string | null) ?? null;
-  let owner: ActasProjectOwner | null = null;
-  if (ownerUserId) {
-    const displayMap = await resolveUserDisplayMap([ownerUserId]);
-    const resolved = displayMap.get(ownerUserId);
-    owner = {
-      userId: ownerUserId,
-      email: resolved?.email ?? null,
-      displayName:
-        resolved?.label || resolved?.email?.split("@")[0] || "Usuario",
-      initials: resolved?.initials ?? "?",
-    };
-  }
-
-  const lastLogEntryAt =
-    (logResult.data as { entry_date: string }[] | null)?.[0]?.entry_date ??
-    null;
+  const { data: logRows } = elementIds.length
+    ? await supabase
+        .from("log_entry")
+        .select("entry_date")
+        .in("element_id", elementIds)
+        .order("entry_date", { ascending: false })
+        .limit(1)
+    : { data: [] as { entry_date: string }[] };
 
   return {
-    project: {
-      id: projectId,
-      code: projectRow.code as string,
-      name: projectRow.name as string,
-      phase: toProjectPhase(projectRow.phase as string),
-      owner,
-      lastLogEntryAt,
-      elementCount: elementResult.count ?? 0,
-    },
-    error: null,
+    elementCount: elementIds.length,
+    lastLogEntryAt:
+      (logRows as { entry_date: string }[] | null)?.[0]?.entry_date ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Última entrada por elemento
+// ---------------------------------------------------------------------------
+
+interface LastLogRow {
+  id: string;
+  element_id: string;
+  content: string;
+  entry_date: string;
+  author_id: string | null;
+  source: string | null;
+}
+
+/**
+ * Última entrada no borrada de cada elemento, ordenada por entry_date DESC.
+ *
+ * Con la RPC de la migración 042 viaja una fila por elemento. Sin ella, la
+ * versión anterior: todo el log de los elementos, que pesa lo que el histórico
+ * del proyecto y que PostgREST corta a 1000 filas.
+ */
+async function fetchLastLogEntries(
+  supabase: Awaited<ReturnType<typeof getActasReadSupabase>>,
+  elementIds: string[],
+): Promise<{ rows: LastLogRow[]; error: string | null }> {
+  const { data, error } = await supabase.rpc("actas_last_log_entries", {
+    p_element_ids: elementIds,
+  });
+  if (!error) {
+    return { rows: (data ?? []) as LastLogRow[], error: null };
+  }
+  if (!isMissingFunctionError(error)) {
+    return { rows: [], error: error.message };
+  }
+
+  const { data: logRows, error: logErr } = await supabase
+    .from("log_entry")
+    .select("id, element_id, content, entry_date, author_id, source")
+    .in("element_id", elementIds)
+    .is("deleted_at", null)
+    .order("entry_date", { ascending: false });
+  if (logErr) {
+    return { rows: [], error: logErr.message };
+  }
+  return { rows: (logRows ?? []) as LastLogRow[], error: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -405,12 +487,42 @@ export async function fetchActasProjectOperativo(
 ): Promise<FetchActasProjectOperativoResult> {
   const supabase = await getActasReadSupabase(ctx);
 
-  const { data: catRows, error: catErr } = await supabase
-    .from("category")
-    .select("id, name, order_index, sublot_label, master_group_id")
-    .eq("project_id", projectId)
-    .is("archived_at", null)
-    .order("order_index", { ascending: true });
+  // Categorías, elementos activos y archivados a la vez: los elementos se
+  // filtran por proyecto con un join a category en vez de esperar a los ids de
+  // categoría, y los de categorías archivadas se descartan aquí mismo.
+  const [
+    { data: catRows, error: catErr },
+    { data: elRows, error: elErr },
+    { data: archivedRows, error: archErr },
+  ] = await Promise.all([
+    supabase
+      .from("category")
+      .select("id, name, order_index, sublot_label, master_group_id")
+      .eq("project_id", projectId)
+      .is("archived_at", null)
+      .order("order_index", { ascending: true }),
+    supabase
+      .from("element")
+      .select(
+        "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end, progress, category!inner(project_id)",
+      )
+      .eq("category.project_id", projectId)
+      .is("archived_at", null)
+      .order("order_index", { ascending: true })
+      // Desempate estable: hay elementos con el mismo order_index y, sin él,
+      // su orden depende del plan de la consulta.
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true }),
+    // Elementos archivados (soft-delete) por categoría → sección "Archivados".
+    supabase
+      .from("element")
+      .select(
+        "id, category_id, name, parent_element_id, archived_at, category!inner(project_id)",
+      )
+      .eq("category.project_id", projectId)
+      .not("archived_at", "is", null)
+      .order("archived_at", { ascending: false }),
+  ]);
 
   if (catErr) {
     return { categories: [], error: catErr.message };
@@ -421,54 +533,23 @@ export async function fetchActasProjectOperativo(
     return { categories: [], error: null };
   }
 
-  const categoryIds = categoriesRaw.map((c) => c.id as string);
-
-  const { data: elRows, error: elErr } = await supabase
-    .from("element")
-    .select(
-      "id, category_id, name, status, order_index, parent_element_id, timeline_start, timeline_end, progress",
-    )
-    .in("category_id", categoryIds)
-    .is("archived_at", null)
-    .order("order_index", { ascending: true });
-
   if (elErr) {
     return { categories: [], error: elErr.message };
   }
-
-  const allElements = elRows ?? [];
-  const elementIds = allElements.map((el) => el.id as string);
-
-  // Recuento de adjuntos por elemento. No fatal: si la tabla aún no existe
-  // (migración 014 sin aplicar) seguimos con 0 para no romper el tablero.
-  const attachmentCountByElement = new Map<string, number>();
-  if (elementIds.length > 0) {
-    const { data: attachmentRows } = await supabase
-      .from("actas_attachment")
-      .select("element_id")
-      .in("element_id", elementIds);
-    for (const row of attachmentRows ?? []) {
-      const eid = row.element_id as string;
-      attachmentCountByElement.set(
-        eid,
-        (attachmentCountByElement.get(eid) ?? 0) + 1,
-      );
-    }
-  }
-
-  // Elementos archivados (soft-delete) por categoría → sección "Archivados".
-  const { data: archivedRows, error: archErr } = await supabase
-    .from("element")
-    .select("id, category_id, name, parent_element_id, archived_at")
-    .in("category_id", categoryIds)
-    .not("archived_at", "is", null)
-    .order("archived_at", { ascending: false });
-
   if (archErr) {
     return { categories: [], error: archErr.message };
   }
 
-  const archivedAll = archivedRows ?? [];
+  const categoryIds = new Set(categoriesRaw.map((c) => c.id as string));
+  const inActiveCategory = (row: { category_id: unknown }) =>
+    categoryIds.has(row.category_id as string);
+
+  const allElements = (elRows ?? [])
+    .filter(inActiveCategory)
+    .map(({ category: _category, ...el }) => el);
+  const elementIds = allElements.map((el) => el.id as string);
+
+  const archivedAll = (archivedRows ?? []).filter(inActiveCategory);
   const archivedIds = new Set(archivedAll.map((r) => r.id as string));
 
   const countArchivedDescendants = (id: string): number => {
@@ -498,28 +579,41 @@ export async function fetchActasProjectOperativo(
     archivedByCategory.set(cid, list);
   }
 
-  const [ownerResult, logResult] = await Promise.all([
-    elementIds.length > 0
+  const hasElements = elementIds.length > 0;
+  const [attachmentResult, ownerResult, lastLogResult] = await Promise.all([
+    // Recuento de adjuntos por elemento. No fatal: si la tabla aún no existe
+    // (migración 014 sin aplicar) seguimos con 0 para no romper el tablero.
+    hasElements
+      ? supabase
+          .from("actas_attachment")
+          .select("element_id")
+          .in("element_id", elementIds)
+      : Promise.resolve({ data: [] as { element_id: string }[] }),
+    hasElements
       ? supabase
           .from("element_owner")
           .select("element_id, user_id")
           .in("element_id", elementIds)
       : Promise.resolve({ data: [], error: null }),
-    elementIds.length > 0
-      ? supabase
-          .from("log_entry")
-          .select("id, element_id, content, entry_date, author_id, source")
-          .in("element_id", elementIds)
-          .is("deleted_at", null)
-          .order("entry_date", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
+    hasElements
+      ? fetchLastLogEntries(supabase, elementIds)
+      : Promise.resolve({ rows: [] as LastLogRow[], error: null }),
   ]);
+
+  const attachmentCountByElement = new Map<string, number>();
+  for (const row of attachmentResult.data ?? []) {
+    const eid = row.element_id as string;
+    attachmentCountByElement.set(
+      eid,
+      (attachmentCountByElement.get(eid) ?? 0) + 1,
+    );
+  }
 
   if (ownerResult.error) {
     return { categories: [], error: ownerResult.error.message };
   }
-  if (logResult.error) {
-    return { categories: [], error: logResult.error.message };
+  if (lastLogResult.error) {
+    return { categories: [], error: lastLogResult.error };
   }
 
   const ownersByElement = new Map<string, string[]>();
@@ -541,15 +635,14 @@ export async function fetchActasProjectOperativo(
       source: string | null;
     }
   >();
-  for (const row of logResult.data ?? []) {
-    const eid = row.element_id as string;
-    if (!lastLogByElement.has(eid)) {
-      lastLogByElement.set(eid, {
-        id: row.id as string,
-        content: row.content as string,
-        entryDate: row.entry_date as string,
-        authorId: (row.author_id as string | null) ?? null,
-        source: (row.source as string | null) ?? null,
+  for (const row of lastLogResult.rows) {
+    if (!lastLogByElement.has(row.element_id)) {
+      lastLogByElement.set(row.element_id, {
+        id: row.id,
+        content: row.content,
+        entryDate: row.entry_date,
+        authorId: row.author_id ?? null,
+        source: row.source ?? null,
       });
     }
   }

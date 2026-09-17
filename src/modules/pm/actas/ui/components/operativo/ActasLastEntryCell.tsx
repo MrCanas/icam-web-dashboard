@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { updateLogEntry } from "@/modules/pm/actas/actions/update-log-entry";
@@ -37,7 +36,6 @@ export function ActasLastEntryCell({
   readOnly = false,
   onUpdated,
 }: ActasLastEntryCellProps) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +97,8 @@ export function ActasLastEntryCell({
         return;
       }
       setEditing(false);
+      // Actualización local; sin router.refresh() de todo el tablero.
       onUpdated(result.entry.content, result.entry.entryDate);
-      router.refresh();
     });
   };
 

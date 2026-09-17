@@ -44,9 +44,18 @@ const VACIO: AvanceProyectoResult = {
   error: null,
 };
 
+export interface FetchAvanceObraOpciones {
+  /**
+   * Traer el histórico de cambios (por defecto, sí). El Operativo de actas lo
+   * pide aparte al desplegar su panel, que empieza plegado.
+   */
+  conHistorico?: boolean;
+}
+
 export async function fetchAvanceObraProyecto(
   ctx: UserContext,
   idActivo: string,
+  { conHistorico = true }: FetchAvanceObraOpciones = {},
 ): Promise<AvanceProyectoResult> {
   const supabase = await getPmReadSupabase(ctx);
 
@@ -84,12 +93,14 @@ export async function fetchAvanceObraProyecto(
       .eq("activo", true)
       .order("orden"),
     supabase.from("pm_avance_obra").select("*").eq("promocion_id", promocionId),
-    supabase
-      .from("pm_avance_obra_historico")
-      .select("*")
-      .eq("promocion_id", promocionId)
-      .order("cambiado_at", { ascending: false })
-      .limit(HISTORICO_LIMITE),
+    conHistorico
+      ? supabase
+          .from("pm_avance_obra_historico")
+          .select("*")
+          .eq("promocion_id", promocionId)
+          .order("cambiado_at", { ascending: false })
+          .limit(HISTORICO_LIMITE)
+      : Promise.resolve({ data: [] as PmAvanceHistorico[], error: null }),
     supabase
       .from("pm_avance_zoho_outbox")
       .select("*")
@@ -154,6 +165,52 @@ export async function fetchAvanceObraProyecto(
 }
 
 // ---------------------------------------------------------------------------
+// Histórico bajo demanda (panel plegado del Operativo de actas)
+// ---------------------------------------------------------------------------
+
+export interface AvanceHistoricoResult {
+  filas: PmAvanceProyecto["historico"];
+  error: string | null;
+}
+
+/** Los últimos HISTORICO_LIMITE cambios de una promoción, con el nombre de su fase. */
+export async function fetchAvanceHistorico(
+  ctx: UserContext,
+  promocionId: string,
+): Promise<AvanceHistoricoResult> {
+  const supabase = await getPmReadSupabase(ctx);
+
+  const [rHist, rFases] = await Promise.all([
+    supabase
+      .from("pm_avance_obra_historico")
+      .select("*")
+      .eq("promocion_id", promocionId)
+      .order("cambiado_at", { ascending: false })
+      .limit(HISTORICO_LIMITE),
+    supabase.from("pm_avance_fase_catalogo").select("id, nombre"),
+  ]);
+
+  const fallo = [rHist, rFases].find((r) => r.error);
+  if (fallo?.error) {
+    if (isMissingTableError(fallo.error)) return { filas: [], error: null };
+    return { filas: [], error: fallo.error.message };
+  }
+
+  const nombreFase = new Map(
+    ((rFases.data ?? []) as { id: string; nombre: string }[]).map((f) => [f.id, f.nombre]),
+  );
+  return {
+    filas: ((rHist.data ?? []) as PmAvanceHistorico[]).map((h) => ({
+      ...h,
+      porcentaje_anterior: numero(h.porcentaje_anterior),
+      porcentaje_nuevo: numero(h.porcentaje_nuevo),
+      fase_nombre: nombreFase.get(h.fase_id) ?? "—",
+    })),
+    error: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Avance a una fecha (snapshot del Operativo de actas)
 // ---------------------------------------------------------------------------
 
@@ -169,7 +226,8 @@ export async function fetchAvanceObraAFecha(
   idActivo: string,
   fechaYmd: string,
 ): Promise<AvanceProyectoResult> {
-  const base = await fetchAvanceObraProyecto(ctx, idActivo);
+  // El histórico capado de la base no sirve aquí: se sustituye por el de abajo.
+  const base = await fetchAvanceObraProyecto(ctx, idActivo, { conHistorico: false });
   if (!base.data) return base;
 
   const corte = finDelDia(fechaYmd);

@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint src --ext .ts,.tsx",
+    "actas:apply-migration-042": "tsx scripts/actas/apply-migration-042.ts",
     "actas:check-supabase": "tsx scripts/actas/check-supabase.ts",
     "actas:verify-master-catalog": "tsx scripts/actas/verify-master-catalog.ts",
     "actas:seed-master-catalog": "tsx scripts/actas/seed-master-catalog.ts",

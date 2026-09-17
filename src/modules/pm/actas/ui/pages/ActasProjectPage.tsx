@@ -5,7 +5,7 @@ import { checkWriteAccess } from "@/lib/auth/permissions";
 import type { ActasProjectDetail, ActasProjectTab } from "@/modules/pm/actas/types";
 import { ACTAS_PROJECT_TABS } from "@/modules/pm/actas/types";
 
-import { ActasActaTab } from "../components/acta/ActasActaTab";
+import { ActasActaTabServer } from "../components/acta/ActasActaTabServer";
 import { ActasHistoricoTabServer } from "../components/historico/ActasHistoricoTabServer";
 import { ActasCompletadosTab } from "../components/completados/ActasCompletadosTab";
 import { ActasOperativoAsOfPicker } from "../components/operativo/ActasOperativoAsOfPicker";
@@ -33,6 +33,8 @@ interface ActasProjectPageProps {
   basePath?: string;
   /** Activo PM detrás del proyecto: abre el Operativo con «Avance de obra» como primera categoría. */
   pmActivoId?: string;
+  /** Query completa de la URL: la pestaña Acta la necesita para cargar en servidor con sus filtros. */
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export function ActasProjectPage({
@@ -42,6 +44,7 @@ export function ActasProjectPage({
   asOfParam,
   basePath,
   pmActivoId,
+  searchParams = {},
 }: ActasProjectPageProps) {
   const validTab = ACTAS_PROJECT_TABS.some((t) => t.key === activeTab)
     ? activeTab
@@ -54,7 +57,11 @@ export function ActasProjectPage({
       <div className="flex flex-col gap-0">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <ActasProjectHeader project={project} canEditOwner={canEditOwner} />
+            <ActasProjectHeader
+              ctx={ctx}
+              project={project}
+              canEditOwner={canEditOwner}
+            />
           </div>
           {validTab === "operativo" ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -90,11 +97,19 @@ export function ActasProjectPage({
               />
             </Suspense>
           ) : validTab === "completados" ? (
-            <ActasCompletadosTab
-              ctx={ctx}
-              projectId={project.id}
-              projectCode={project.code}
-            />
+            <Suspense
+              fallback={
+                <section className="rounded-b-lg border border-t-0 border-subtle/50 bg-card p-6 text-sm text-text-muted">
+                  Cargando completados…
+                </section>
+              }
+            >
+              <ActasCompletadosTab
+                ctx={ctx}
+                projectId={project.id}
+                projectCode={project.code}
+              />
+            </Suspense>
           ) : validTab === "acta" ? (
             <Suspense
               fallback={
@@ -103,7 +118,12 @@ export function ActasProjectPage({
                 </section>
               }
             >
-              <ActasActaTab projectId={project.id} projectCode={project.code} />
+              <ActasActaTabServer
+                ctx={ctx}
+                projectId={project.id}
+                projectCode={project.code}
+                searchParams={searchParams}
+              />
             </Suspense>
           ) : validTab === "historico" ? (
             <ActasHistoricoTabServer

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
 import { createLogEntry } from "@/modules/pm/actas/actions/create-log-entry";
@@ -27,7 +26,6 @@ export function ActasAddLogEntryPanel({
   onCancel,
   onSaved,
 }: ActasAddLogEntryPanelProps) {
-  const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [content, setContent] = useState("");
   const [statusChoice, setStatusChoice] = useState<"" | ElementStatus>("");
@@ -65,11 +63,12 @@ export function ActasAddLogEntryPanel({
         return;
       }
 
+      // La fila se actualiza con lo que devuelve la acción; no se recarga el
+      // tablero entero con router.refresh().
       onSaved({
         entry: result.entry,
         elementStatus: result.elementStatus,
       });
-      router.refresh();
     });
   };
 

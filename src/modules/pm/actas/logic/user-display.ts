@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import { createServiceRoleClient } from "@/lib/db/admin";
 import {
   initialsFromDisplayName,
@@ -53,6 +55,34 @@ export function ownerFromAuthUser(
   };
 }
 
+type AuthUserDisplayRow = {
+  id: string;
+  email: string | null;
+  meta: Record<string, unknown> | null;
+};
+
+/**
+ * Filas de `auth_users_display` para un conjunto de ids (ordenado, para que el
+ * mismo conjunto dé la misma clave). Nombres y emails casi no cambian y se
+ * piden en cada carga de un tablero: se cachean una hora entre peticiones.
+ * `null` = la RPC no existe (migración 033 sin aplicar): se usa la paginación.
+ */
+const readAuthUsersDisplay = unstable_cache(
+  async (sortedIds: string[]): Promise<AuthUserDisplayRow[] | null> => {
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin.rpc("auth_users_display", {
+      p_ids: sortedIds,
+    });
+    if (!error && Array.isArray(data)) return data as AuthUserDisplayRow[];
+    if (error && !/could not find|does not exist|PGRST202|42883/i.test(error.message ?? "")) {
+      throw new Error(`auth_users_display: ${error.message}`);
+    }
+    return null;
+  },
+  ["actas-auth-users-display"],
+  { revalidate: 3600 },
+);
+
 /**
  * Resuelve etiquetas/iniciales para avatares (service role).
  *
@@ -67,16 +97,14 @@ export async function resolveUserDisplayMap(
   const result = new Map<string, ActasElementOwner>();
   if (unique.length === 0) return result;
 
-  const admin = createServiceRoleClient();
-  const { data, error } = await admin.rpc("auth_users_display", { p_ids: unique });
+  const rows = await readAuthUsersDisplay([...unique].sort());
 
-  if (!error && Array.isArray(data)) {
-    for (const row of data as { id: string; email: string | null; meta: Record<string, unknown> | null }[]) {
+  if (rows) {
+    for (const row of rows) {
       result.set(row.id, ownerFromAuthUser(row.id, row.email ?? undefined, row.meta ?? undefined));
     }
-  } else if (error && !/could not find|does not exist|PGRST202|42883/i.test(error.message ?? "")) {
-    throw new Error(`auth_users_display: ${error.message}`);
-  } else if (error) {
+  } else {
+    const admin = createServiceRoleClient();
     // RPC sin aplicar todavía: fallback a la paginación.
     await paginarAuthUsers(admin, new Set(unique), result);
   }
