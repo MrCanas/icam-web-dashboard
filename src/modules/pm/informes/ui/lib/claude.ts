@@ -105,7 +105,9 @@ const MENSAJES: Record<string, string> = {
   session_expired: "Tu sesión ha caducado: vuelve a entrar en el portal.",
   refused: "Claude no ha podido procesar esta petición.",
   max_tokens: "La respuesta de Claude se cortó por longitud. Vuelve a intentarlo.",
-  not_configured: "Claude no está configurado en el portal (falta la clave de la API de Anthropic).",
+  not_configured:
+    "El servidor no tiene ANTHROPIC_API_KEY. En Vercel, la variable tiene que estar en el entorno de este despliegue (Production y/o Preview) y hay que volver a desplegar después de crearla.",
+  invalid_key: "Anthropic rechaza la clave de la API configurada en el servidor: revisa que ANTHROPIC_API_KEY esté completa y sin comillas ni espacios.",
   not_found: "El informe ya no existe.",
   network: "Se ha cortado la conexión. Vuelve a intentarlo.",
 };
