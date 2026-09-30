@@ -23,7 +23,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/replace-proyectos-status") ||
     pathname.startsWith("/api/replace-pm-portfolio-status") ||
     pathname.startsWith("/api/monday") ||
-    pathname.startsWith("/api/actas");
+    pathname.startsWith("/api/actas") ||
+    pathname.startsWith("/api/informes");
   // Las Server Actions son POST a la URL de la página con esta cabecera.
   const isServerAction =
     request.method === "POST" && request.headers.has("next-action");

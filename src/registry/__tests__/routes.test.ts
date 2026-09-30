@@ -19,6 +19,14 @@ test("las subpáginas de proyecto NO caen en pm.detalle (regex negativa)", () =>
   assert.equal(routeKeyForPathname("/dashboard/pm/proyecto/SE84/planificacion"), "pm.planificacion");
   assert.equal(routeKeyForPathname("/dashboard/pm/proyecto/SE84/actas"), "pm.actas");
   assert.equal(routeKeyForPathname("/dashboard/pm/proyecto/SE84/avance-obra"), "pm.avance_obra");
+  assert.equal(routeKeyForPathname("/dashboard/pm/proyecto/SE84/informe"), "pm.informes");
+});
+
+test("los informes trimestrales resuelven a pm.informes", () => {
+  assert.equal(routeKeyForPathname("/dashboard/pm/informes"), "pm.informes");
+  assert.equal(routeKeyForPathname("/dashboard/pm/informes/nuevo"), "pm.informes");
+  assert.equal(routeKeyForPathname("/dashboard/pm/informes/SE84_Q3-2026/imprimir"), "pm.informes");
+  assert.equal(zoneForRouteKey("pm.informes"), "pm");
 });
 
 test("monday.logs ya tiene su propia key (antes devolvía null)", () => {

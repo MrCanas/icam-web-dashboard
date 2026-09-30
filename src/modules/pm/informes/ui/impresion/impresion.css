@@ -1,0 +1,26 @@
+/* Vista de impresión del informe: una slide por página de 960 × 540 pt, como templates/visor.html del skill.
+   En pantalla, las slides escaladas al ancho; al imprimir, a 1280 × 720 px (= 960 × 540 pt) sin márgenes. */
+
+.iq-paginas { display: flex; flex-direction: column; gap: 24px; max-width: 1000px; margin: 0 auto; }
+.iq-pagina-pdf .iq-marco { outline: 1px solid #d6d3cf; }
+
+/* @page (960 × 540 pt, sin márgenes) lo pone VistaImpresion mientras está abierta: aquí afectaría a todo el portal. */
+
+@media print {
+  html, body { background: #fff !important; }
+  .iq-no-imprimir { display: none !important; }
+  .iq-imprimir-contenedor {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .iq-paginas { display: block; max-width: none; gap: 0; margin: 0; }
+  .iq-pagina-pdf { break-after: page; page-break-after: always; }
+  .iq-pagina-pdf:last-child { break-after: auto; page-break-after: auto; }
+  .iq-pagina-pdf .iq-marco { width: 1280px; height: 720px; aspect-ratio: auto; outline: none; border: 0; }
+  .iq-pagina-pdf .iq-escala { transform: scale(1.33333) !important; }
+}

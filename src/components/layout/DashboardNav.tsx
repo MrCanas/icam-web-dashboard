@@ -50,6 +50,7 @@ const PM_CONFIG_ROUTE_KEYS = [
   "pm.actas",
   "pm.planificacion",
   "pm.avance_obra",
+  "pm.informes",
   "pm.proyectos",
 ];
 

@@ -17,13 +17,13 @@ export const pmModule: ModuleDefinition = {
       // pero su key gobierna el permiso de proyecto/[id] y de la fila misma.
       hiddenInNav: true,
       // proyecto/[id] es el Resumen Ejecutivo; sus subpáginas de
-      // planificación/actas/avance de obra resuelven a sus propias keys de
+      // planificación/actas/avance de obra/informe resuelven a sus propias keys de
       // permiso. routeKeyForPathname devuelve el PRIMER match del array y esta
       // ruta va la primera: si no las excluye, se las traga.
       match: (p) =>
         p === "/dashboard/pm/detalle" ||
         (p.startsWith("/dashboard/pm/proyecto/") &&
-          !/\/(planificacion|actas|avance-obra)(\/|$)/.test(p)),
+          !/\/(planificacion|actas|avance-obra|informe)(\/|$)/.test(p)),
     },
     {
       key: "pm.planificacion",
@@ -55,6 +55,18 @@ export const pmModule: ModuleDefinition = {
         p === "/dashboard/pm/actas" ||
         p.startsWith("/dashboard/pm/actas/") ||
         /^\/dashboard\/pm\/proyecto\/[^/]+\/actas$/.test(p),
+    },
+    {
+      key: "pm.informes",
+      path: "/dashboard/pm/informes",
+      label: "Informes trimestrales",
+      // Informes para inversores. Cada proyecto tiene su subpestaña «Informe»;
+      // la lista de todos (y el asistente y el editor) cuelgan de Configuración.
+      hiddenInNav: true,
+      match: (p) =>
+        p === "/dashboard/pm/informes" ||
+        p.startsWith("/dashboard/pm/informes/") ||
+        /^\/dashboard\/pm\/proyecto\/[^/]+\/informe$/.test(p),
     },
     {
       key: "pm.avance_obra",

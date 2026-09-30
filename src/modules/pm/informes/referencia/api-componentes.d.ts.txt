@@ -1,0 +1,49 @@
+// Impar Capital · Informes Trimestrales — componentes de slide (src/modules/pm/informes/slides/components)
+// Todos los componentes pintan sobre un lienzo 960 × 540. Texto con "**negrita**".
+type Rich = string;
+export interface Pie { variante: 'sl' | 'cnmv'; vehiculo?: string; nif?: string; entidad?: string; tipo?: string; fondo?: string; isin?: string; }
+export interface SlideBase { pie?: Pie; pagina?: number; }
+export interface Imagen { src?: string; pie?: string; focalX?: number; focalY?: number; placeholder?: string; }
+export interface Bloque { icono?: 'situacion-actual' | 'compraventa-financiacion' | 'operacion-cronograma' | 'logros' | string; titulo: string; parrafos?: Rich[]; vinetas?: Rich[]; }
+export declare const assets: { logoAzul: string; logoBlanco: string; cierreMosaico: string; iconos: Record<string, string> };
+export declare function textoPie(p: Pie): string;
+export declare function Slide(p: SlideBase & { fondo?: 'paper' | 'navy' | 'warm'; layout?: string; children?: any }): any;
+export declare function SlideHeader(p: { seccion?: number; titulo: string; logo?: boolean }): any;
+export declare function Contenido(p: { className?: string; children?: any }): any;
+export declare function Logo(p: { tono?: 'azul' | 'blanco' }): any;
+export declare function PieConfidencial(p: Pie): any;
+export declare function Subtitulo(p: { nivel?: 1 | 2; children: any }): any;
+export declare function Texto(p: { parrafos: Rich[] }): any;
+export declare function Vinetas(p: { items: Rich[]; compacta?: boolean }): any;
+export declare function ImagenMarco(p: Imagen & { ancho: number; alto: number }): any;
+export declare function Portada(p: { trimestre: string; proyecto: string; imagen?: string; recorte?: 'paisaje' | 'sobresale' }): any;
+export declare function Indice(p: { secciones: string[] }): any;
+export declare function Disclaimer(p: { pagina?: number; parrafos?: Rich[] }): any;
+export declare function Cierre(): any;
+export declare function BloqueIcono(p: Bloque): any;
+export declare function ResumenEjecutivo(p: SlideBase & { trimestre: string; izquierda: Bloque[]; logros: Rich[]; derecha?: Bloque[]; seccion?: number }): any;
+export declare function AntecedentesNovedades(p: { titulo?: string; anterior: { trimestre: string; parrafos: Rich[] }; actual: { trimestre: string; parrafos: Rich[]; vinetas?: Rich[] } }): any;
+export declare function DosColumnas(p: SlideBase & { seccion: number; titulo: string; izquierda: any; derecha: any; nota?: Rich }): any;
+export declare function TextoImagen(p: SlideBase & { seccion: number; titulo: string; subtitulo?: string; parrafos: Rich[]; imagenes?: Imagen[]; variante?: 'una' | 'dos-apiladas'; nota?: Rich }): any;
+export declare function MapaLateral(p: { mapa?: string; pin?: string; rotulo: string; foto?: string }): any;
+export declare function TablaKpis(p: { trimestre: string; siguiente: string; cabeceraObjetivo?: string; filas: { indicador: string; actual: string; objetivo: Rich }[] }): any;
+export declare function TablaRiesgos(p: { filas: { riesgo: Rich; mitigacion: Rich }[] }): any;
+export declare function ListaObjetivos(p: { trimestre: string; items: Rich[] }): any;
+export declare function SlideKpisRiesgosObjetivos(p: SlideBase & { trimestre: string; siguiente: string; kpis: any[]; riesgos: any[]; objetivos: Rich[]; cabeceraObjetivo?: string; seccion?: number }): any;
+export declare function Timeline(p: { hitos: { titulo: string; fecha: string; hecho: boolean }[]; puntoSituacion?: number | false; variante?: 'slate' | 'teal'; ancho?: number; nota?: Rich }): any;
+export declare function HitosResenables(p: { intro?: string; items: { etiqueta: string; fecha: string }[] }): any;
+export declare function TimelineTrimestral(p: { trimestres: { nombre: string; estado: 'pasado' | 'actual' | 'futuro'; eventos: { fecha: string; texto: string }[] }[] }): any;
+export declare function Galeria(p: { imagenes?: Imagen[]; disposicion?: '1' | '2' | '3' | '4' | 'hero-2'; escala?: number }): any;
+export declare function BreeamRating(p: { estrellas: number; calificacion: string; rango?: string; total?: number }): any;
+export declare function BarrasBreeam(p: { titulo?: string; categorias: { nombre: string; objetivo: number; avance?: number }[]; max?: number }): any;
+export declare function BarraConsolidacion(p: { segmentos: { etiqueta: string; valor: number; tono?: 0 | 1 | 2 | 3 }[] }): any;
+export declare function Colaboradores(p: SlideBase & { intro?: Rich; roles: { rol: string; parrafos?: Rich[]; vinetas?: Rich[] }[]; logos?: { src?: string; nombre?: string; pie?: string }[]; seccion?: number }): any;
+export declare function VehiculoInversion(p: SlideBase & { titulo?: string; detalles: Rich[]; fichas: { icono: string; etiqueta: string; valor: string }[]; nota?: Rich; seccion?: number }): any;
+export declare function ConsejoAdministracion(p: { titulo: string; intro?: string; puntos: Rich[] }): any;
+export declare function SlideBloqueado(p: SlideBase & { seccion?: number; titulo?: string; origen?: string; version?: number | string; estado?: string; vista?: string; children?: any }): any;
+export declare function KpiIconosFinancieros(p: { kpis: { icono: string; etiqueta: string; valor: string }[]; columnas?: number }): any;
+export declare function TablaVarianzas(p: { anterior: string; actual: string; filas: { descripcion: string; previo: string; actual: string; variacion: string; variacionPct: string; observaciones?: Rich }[] }): any;
+export declare function TablaFinanciera(p: { titulo: string; columnas: string[]; filas: { celdas: string[]; total?: boolean }[] }): any;
+export declare function TablaLicitaciones(p: { titulo: string; columnas?: string[]; filas: Rich[][] }): any;
+export declare function TablaMensual(p: { meses: string[]; filas: { activo: string; valores: string[]; total: string; vendido?: boolean }[]; total?: { valores: string[]; total: string }; etiquetaTotal?: string }): any;
+export declare function DonutOcupacion(p: { titulo?: string; segmentos: { etiqueta: string; valor: number }[]; tam?: number }): any;
