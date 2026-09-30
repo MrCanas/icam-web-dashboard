@@ -172,6 +172,7 @@ export type CodigoErrorClaude =
   | "refused"
   | "max_tokens"
   | "not_configured"
+  | "invalid_key"
   | "not_found"
   | "api_error";
 
