@@ -84,6 +84,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "bcrypt": "^6.0.0",
+    "html2canvas-pro": "^2.5.0",
     "jose": "^6.2.3",
     "jszip": "^3.10.2",
     "next": "16.2.4",
