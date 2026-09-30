@@ -46,6 +46,20 @@ Todas tienen RLS sin políticas: se sirven solo con service role desde los route
 - Cada petición se registra en `informe_uso`, incluidas las que terminan en `refusal` o `max_tokens`, porque también se facturan.
 - `ANTHROPIC_API_KEY` es una key de Anthropic Console. Una suscripción Pro/Max no sirve: es de uso personal.
 
+## Puesta en marcha (una vez)
+
+1. Aplicar la migración: `npm run pm:apply-migration-043`, primero en simulación y luego con `-- --apply`. Necesita `DATABASE_POOLER_URL` (la conexión directa de Supabase es solo IPv6).
+2. Poner `ANTHROPIC_API_KEY` en `.env.local` y en Vercel, con límite de gasto mensual en Anthropic Console.
+3. Importar los informes anteriores (artifact y skill) para que el primer trimestre en el portal tenga «informe anterior» estructurado:
+   ```
+   # en el repo del motor de informes
+   python app-equipo/exportar_para_portal.py      # → migracion-portal/paquete
+   # en este repo
+   npm run pm:importar-informes -- --origen "<…>/migracion-portal/paquete"            # simulación
+   npm run pm:importar-informes -- --origen "<…>/migracion-portal/paquete" --apply
+   ```
+   El importador vincula cada proyecto con su activo PM por código. Si el código es ambiguo (PC25) o no coincide (SA31-33 ↔ SA-33-31), el proyecto queda sin vincular: la PM lo elige en la app y el vínculo se guarda en `informe_proyecto`. El paquete es confidencial y no se commitea.
+
 ## Auditoría
 
 Todas las escrituras pasan por `withAudit`: `pm.informe.<coleccion>.set|delete`, `pm.informe.asset.create|delete` y `pm.informe.claude.call`.

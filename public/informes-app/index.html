@@ -605,6 +605,14 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     // En el portal, un activo de Proyectos sin informes previos llega sin arquetipo ni pie:
     // se piden aquí, con el nombre y el código ya puestos.
     var sel = S.proyectos[f.proyecto], configurar = nuevo || !!(sel && sel.sinConfigurar);
+    // Proyecto con informes (p. ej. importado del artifact) pero sin activo de Proyectos:
+    // se vincula aquí para que entren sus actas y su planificación.
+    var vincular = '';
+    if (PORTAL && !configurar && sel && !sel.idActivo) {
+      var libres = Object.keys(S.proyectos).filter(function (k) { return S.proyectos[k].sinConfigurar; }).sort();
+      vincular = '<div class="rejilla">' + campo('Activo de Proyectos (para cargar actas y planificación)', '<select id="f-idActivo" data-campo="form.idActivo"><option value="">Sin vincular</option>' +
+        libres.map(function (k) { var p = S.proyectos[k]; return '<option value="' + esc(p.idActivo) + '"' + (f.idActivo === p.idActivo ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' + esc(p.idActivo) + '</option>'; }).join('') + '</select>') + '</div>';
+    }
     var campos = configurar ? '<div class="rejilla">' +
       (nuevo ? campo('Nombre del proyecto', '<input type="text" id="f-nombre" data-campo="form.nombre" value="' + esc(f.nombre || '') + '" placeholder="Santa Engracia 84">') +
       campo('Código corto', '<input type="text" id="f-codigo" data-campo="form.codigo" value="' + esc(f.codigo || '') + '" placeholder="SE84">') : '') +
@@ -616,7 +624,7 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
       '</div><p class="sutil">Los datos del vehículo salen en el pie legal de cada página. Si hay informe anterior, se toman de él.</p>' : '';
     return '<div class="tarjeta"><h3>¿Qué informe vamos a preparar?</h3><div class="rejilla">' +
       campo('Proyecto', '<select id="f-proyecto" data-campo="form.proyecto">' + opts + '<option value="__nuevo"' + (nuevo ? ' selected' : '') + '>Otro proyecto…</option></select>') +
-      campo('Trimestre anterior', selQ('qAnt')) + campo('Trimestre nuevo', selQ('qNew')) + '</div>' + campos +
+      campo('Trimestre anterior', selQ('qAnt')) + campo('Trimestre nuevo', selQ('qNew')) + '</div>' + campos + vincular +
       '<div class="fila"><button class="btn btn-prim" data-accion="paso0"' + (C.db ? '' : ' disabled') + '>Continuar</button></div></div>';
   }
   function campo(etq, control) { return '<label class="campo">' + esc(etq) + control + '</label>'; }
@@ -853,6 +861,10 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
       codigo = f.proyecto; proyecto = S.proyectos[codigo];
       if (proyecto && proyecto.sinConfigurar) {
         proyecto = { nombre: proyecto.nombre, codigo: codigo, idActivo: proyecto.idActivo, arquetipo: f.arquetipo, pie: pieDeForm(f), actualizado: ahora() };
+        S.proyectos[codigo] = proyecto;
+        C.db.doc('proyectos/' + codigo).set(proyecto).catch(function () {});
+      } else if (PORTAL && proyecto && !proyecto.idActivo && f.idActivo) {
+        proyecto = Object.assign({}, proyecto, { idActivo: f.idActivo, actualizado: ahora() });
         S.proyectos[codigo] = proyecto;
         C.db.doc('proyectos/' + codigo).set(proyecto).catch(function () {});
       }
