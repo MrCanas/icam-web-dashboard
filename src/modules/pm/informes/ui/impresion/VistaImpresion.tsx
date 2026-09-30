@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { rutaInforme } from "../../logic/paths";
-import { qCierre } from "../../logic/trimestre";
+import { nombrePdf, rutaInforme } from "../../logic/paths";
 import type { InformeJson } from "../../slides/tipos";
 import type { EstadoInforme } from "../../types";
 import { Aviso, Boton } from "../componentes";
@@ -20,14 +19,6 @@ interface Props {
   contenido: InformeJson;
 }
 
-/** Nombre del PDF: YYYYMMDD_<CODIGO>_<Qn AAAA>_Informe Trimestral Inversores[ (borrador vN)]. */
-export function nombrePdf(p: { codigo: string; trimestre: string; estado: EstadoInforme; version: number }): string {
-  return (
-    `${qCierre(p.trimestre).replace(/-/g, "")}_${p.codigo}_${p.trimestre}_Informe Trimestral Inversores` +
-    (p.estado === "aprobado" ? "" : ` (borrador v${p.version})`)
-  );
-}
-
 /**
  * Vista de impresión: una slide por página de 960 × 540 pt y «Descargar PDF»
  * con el diálogo de impresión del navegador (Guardar como PDF). Sale vectorial,
@@ -40,15 +31,6 @@ export function VistaImpresion({ id, codigo, trimestre, estado, version, conteni
   const [pintadas, setPintadas] = useState(0);
   const listo = pintadas >= visibles.length;
   const nombre = nombrePdf({ codigo, trimestre, estado, version });
-
-  // El navegador propone como nombre del PDF el título de la página.
-  useEffect(() => {
-    const antes = document.title;
-    document.title = nombre;
-    return () => {
-      document.title = antes;
-    };
-  }, [nombre]);
 
   // Tamaño de página del PDF, solo mientras esta vista está abierta.
   useEffect(() => {
