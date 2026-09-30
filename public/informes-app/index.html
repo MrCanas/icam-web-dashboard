@@ -1416,7 +1416,7 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     var d = S.doc, sl = d.informe.slides, visibles = sl.filter(function (s) { return !s.oculto; }), ocultas = sl.filter(function (s) { return s.oculto; });
     var opcionesBib = BIB.filter(function (b) { return ['portada', 'indice', 'disclaimer', 'cierre'].indexOf(b.id) < 0; }).map(function (b) { return '<option value="' + b.n + '">' + b.n + ' · ' + esc(b.nombre) + '</option>'; }).join('');
     main.innerHTML = avisosPlataforma() +
-      '<div class="fila fila-sep"><div><h2>' + esc(d.proyecto) + ' · ' + esc(d.trimestre) + '</h2><p class="sutil">Versión ' + esc(d.version || 1) + ' · ' + chipEstado(d.estado) + ' · actualizado ' + esc(fecha(d.actualizado)) + '</p></div>' +
+      '<div class="fila fila-sep"><div><h2>' + esc(d.proyecto) + ' · ' + esc(d.trimestre) + '</h2><p class="sutil">Versión ' + esc(d.version || 1) + ' · ' + chipEstado(d.estado) + ' · actualizado ' + esc(fecha(d.actualizado)) + (PORTAL ? '<span id="ed-coste"></span>' : '') + '</p></div>' +
       '<div class="fila">' + (S.confirmar === d.id ? confirmarBorrado(d) : '<button class="btn-texto" data-accion="inicio">Volver a la lista</button>' +
       (C.db ? '<button class="btn btn-min btn-peligro" data-accion="pedir-borrar" data-id="' + esc(d.id) + '">Eliminar informe</button>' : '') +
       (C.downloads ? '<button class="btn btn-prim" data-accion="ed-pdf">Exportar PDF</button>' : '')) + '</div></div>' +
@@ -1434,6 +1434,15 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     var fl = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     fl.then(function () { visibles.forEach(function (s, i) { pintarEnEditor(s, i + 1); }); ajustarEscalas(); pintarQa(); });
     prepararSoltarEditor(); visibles.forEach(function (s) { pintarAdjuntos(s.id); });
+    pintarCoste(d.id);
+  }
+  /* Portal: coste acumulado de Claude para este informe (tabla informe_uso). */
+  function pintarCoste(id) {
+    if (!PORTAL) return;
+    PORTAL.uso(id).then(function (u) {
+      var el = $('#ed-coste'); if (!el || !u || !u.peticiones) return;
+      el.textContent = ' · Claude: ' + u.peticiones + ' peticiones, ' + u.costeUsd.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
+    }, function () {});
   }
   function tarjetaSlide(s, pagina, total) {
     var marcando = S.marcando === s.id;
