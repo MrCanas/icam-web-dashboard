@@ -596,15 +596,18 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
   }
 
   function paso0() {
-    var f = S.form || (S.form = { proyecto: Object.keys(S.proyectos)[0] || '__nuevo', qNew: qUltimoCerrado(), arquetipo: 'A', variante: 'cnmv', tipo: 'fondo' });
+    var f = S.form || (S.form = { proyecto: proyectoInicial(), qNew: qUltimoCerrado(), arquetipo: 'A', variante: 'cnmv', tipo: 'fondo' });
     if (!f.qAnt) f.qAnt = qAnt(f.qNew);
     var opts = Object.keys(S.proyectos).sort().map(function (k) { var p = S.proyectos[k]; return '<option value="' + esc(k) + '"' + (f.proyecto === k ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' + esc(p.codigo) + '</option>'; }).join('');
     var qs = qLista().map(function (q) { return q; });
     function selQ(campo) { return '<select id="f-' + campo + '" data-campo="form.' + campo + '">' + qs.map(function (q) { return '<option' + (f[campo] === q ? ' selected' : '') + '>' + q + '</option>'; }).join('') + '</select>'; }
     var nuevo = f.proyecto === '__nuevo';
-    var campos = nuevo ? '<div class="rejilla">' +
-      campo('Nombre del proyecto', '<input type="text" id="f-nombre" data-campo="form.nombre" value="' + esc(f.nombre || '') + '" placeholder="Santa Engracia 84">') +
-      campo('Código corto', '<input type="text" id="f-codigo" data-campo="form.codigo" value="' + esc(f.codigo || '') + '" placeholder="SE84">') +
+    // En el portal, un activo de Proyectos sin informes previos llega sin arquetipo ni pie:
+    // se piden aquí, con el nombre y el código ya puestos.
+    var sel = S.proyectos[f.proyecto], configurar = nuevo || !!(sel && sel.sinConfigurar);
+    var campos = configurar ? '<div class="rejilla">' +
+      (nuevo ? campo('Nombre del proyecto', '<input type="text" id="f-nombre" data-campo="form.nombre" value="' + esc(f.nombre || '') + '" placeholder="Santa Engracia 84">') +
+      campo('Código corto', '<input type="text" id="f-codigo" data-campo="form.codigo" value="' + esc(f.codigo || '') + '" placeholder="SE84">') : '') +
       campo('Tipo de proyecto', '<select id="f-arquetipo" data-campo="form.arquetipo">' + [['A', 'A · Hospitality / apartamentos'], ['B', 'B · Branded residences'], ['C', 'C · Mixto residencial + hotelero'], ['D', 'D · Value-add residencial'], ['E', 'E · Cartera / multi-activo']].map(function (o) { return '<option value="' + o[0] + '"' + (f.arquetipo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>') +
       campo('Vehículo', '<select id="f-variante" data-campo="form.variante"><option value="cnmv"' + (f.variante === 'cnmv' ? ' selected' : '') + '>Fondo CNMV (ISIN)</option><option value="sl"' + (f.variante === 'sl' ? ' selected' : '') + '>Sociedad (NIF)</option></select>') +
       (f.variante === 'cnmv'
@@ -617,6 +620,13 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
       '<div class="fila"><button class="btn btn-prim" data-accion="paso0"' + (C.db ? '' : ' disabled') + '>Continuar</button></div></div>';
   }
   function campo(etq, control) { return '<label class="campo">' + esc(etq) + control + '</label>'; }
+  function proyectoInicial() {
+    // Portal: /proyecto/<id>/informe abre la app con ?activo=<id_activo> y el proyecto ya elegido.
+    var act = PORTAL && PORTAL.parametro('activo');
+    var k = act ? Object.keys(S.proyectos).filter(function (x) { return S.proyectos[x].idActivo === act; })[0] : null;
+    return k || Object.keys(S.proyectos).sort()[0] || '__nuevo';
+  }
+  function pieDeForm(f) { return f.variante === 'cnmv' ? { variante: 'cnmv', tipo: 'fondo', fondo: f.fondo || '', isin: f.isin || '' } : { variante: 'sl', vehiculo: f.vehiculo || '', nif: f.nif || '' }; }
 
   function paso1() {
     var p = S.prev, base;
@@ -636,7 +646,15 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
   var PARA_FINANZAS = [['resumen-financiero', 'Resumen financiero'], ['varianzas', 'Análisis de varianzas'], ['seguimiento-economico-obra', 'Seguimiento económico de obra']];
   function paso2() {
     var fu = S.fuentes || {};
-    var docs = (fu.documentos || []).map(function (d, i) { return '<li>' + esc(d.nombre) + ' <span class="sutil">· ' + d.texto.length.toLocaleString('es-ES') + ' caracteres</span> <button class="btn-texto" data-accion="quitar-doc" data-i="' + i + '">Quitar</button></li>'; }).join('');
+    var docs = (fu.documentos || []).map(function (d, i) { return '<li>' + esc(d.nombre) + (d.auto ? ' <span class="chip ok">del portal</span>' : '') + ' <span class="sutil">· ' + d.texto.length.toLocaleString('es-ES') + ' caracteres</span> <button class="btn-texto" data-accion="quitar-doc" data-i="' + i + '">Quitar</button></li>'; }).join('');
+    var auto = '';
+    if (PORTAL) {
+      var avisos = (S.avisosAuto || []).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
+      auto = '<div class="aviso' + (avisos ? '' : ' ok') + '">' +
+        (fu.autoCargadas === S.doc.trimestre ? 'Actas y planificación del ' + esc(S.doc.trimestre) + ' cargadas del portal' + (fu.autoFecha ? ' (' + esc(fecha(fu.autoFecha)) + ')' : '') + '. Están en la lista de documentos: puedes quitarlas o añadir más.' : 'Las actas y la planificación del trimestre se cargan del portal.') +
+        (avisos ? '<ul class="lista">' + avisos + '</ul>' : '') +
+        ' <button class="btn-texto" data-accion="recargar-auto"' + (S.ocupado ? ' disabled' : '') + '>Volver a cargar</button></div>';
+    }
     var fotos = (S.doc.fotos || []).map(function (f, i) {
       return '<div class="foto"><img src="/api/informes/assets/' + esc(f.id) + '" alt="' + esc(f.pie || 'Foto ' + (i + 1)) + '">' +
         '<select id="foto-cat-' + i + '" data-campo="foto.' + i + '.categoria" aria-label="Categoría">' + CATEGORIAS.map(function (c) { return '<option' + (f.categoria === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
@@ -644,7 +662,7 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
         '<input type="text" id="foto-pie-' + i + '" data-campo="foto.' + i + '.pie" value="' + esc(f.pie || '') + '" placeholder="Qué muestra (opcional)">' +
         '<button class="btn-texto" data-accion="quitar-foto" data-i="' + i + '">Quitar foto</button></div>';
     }).join('');
-    return '<div class="tarjeta"><h3>Información del ' + esc(S.doc.trimestre) + '</h3>' +
+    return '<div class="tarjeta"><h3>Información del ' + esc(S.doc.trimestre) + '</h3>' + auto +
       '<p class="sutil">Pega todo lo que tengas: notas, correos, actas, informes del PM, del asesor BREEAM o de Finanzas. No hace falta ordenarlo.</p>' +
       '<textarea id="f-notas" data-campo="fuentes.notas" placeholder="Notas del trimestre…">' + esc(fu.notas || '') + '</textarea>' +
       '<label class="soltar" id="soltar-docs">Documentos (PDF, Word, PowerPoint, Excel, texto): arrastra aquí o pulsa para elegir<input type="file" id="f-docs" multiple accept=".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.csv" class="oculto" data-cambio="docs"></label>' +
@@ -743,7 +761,8 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     abrir: function (b) { abrir(b.getAttribute('data-id')); },
     ir: function (b) { S.paso = +b.getAttribute('data-paso'); mensaje(null); render(); },
     paso0: paso0Continuar,
-    paso1: function () { S.doc.base = S.prev && S.prev.tipo === 'estructurado' ? { tipo: 'estructurado', id: S.prev.id } : S.fuentes.previoTexto ? { tipo: 'texto', nombre: S.fuentes.previoNombre } : { tipo: 'ninguno' }; if (S.doc.estado === 'datos') S.doc.estado = 'fuentes'; guardarDoc(0); S.paso = 2; render(); },
+    paso1: function () { S.doc.base = S.prev && S.prev.tipo === 'estructurado' ? { tipo: 'estructurado', id: S.prev.id } : S.fuentes.previoTexto ? { tipo: 'texto', nombre: S.fuentes.previoNombre } : { tipo: 'ninguno' }; if (S.doc.estado === 'datos') S.doc.estado = 'fuentes'; guardarDoc(0); S.paso = 2; render(); cargarFuentesAuto(false); },
+    'recargar-auto': function () { cargarFuentesAuto(true); },
     'quitar-doc': function (b) { S.fuentes.documentos.splice(+b.getAttribute('data-i'), 1); guardarFuentes(0); render(); },
     'quitar-foto': function (b) {
       var i = +b.getAttribute('data-i'), f = S.doc.fotos[i];
@@ -802,6 +821,7 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
       if (e === 'borrador' || e === 'aprobado') { S.vista = 'editor'; }
       else { S.vista = 'nuevo'; S.paso = e === 'datos' ? 1 : e === 'fuentes' ? 2 : 3; if (e === 'generando') mensaje('La generación anterior no terminó. Revisa la selección y pulsa GO para repetirla.'); }
       render();
+      if (S.vista === 'nuevo' && S.paso === 2) cargarFuentesAuto(false);
     });
   }
   function eliminarInforme(id) {
@@ -826,22 +846,55 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     if (f.proyecto === '__nuevo') {
       codigo = limpiarCodigo(f.codigo);
       if (!f.nombre || !codigo) { mensaje('Indica el nombre y el código corto del proyecto.', 'error'); return render(); }
-      proyecto = { nombre: f.nombre.trim(), codigo: codigo, arquetipo: f.arquetipo,
-        pie: f.variante === 'cnmv' ? { variante: 'cnmv', tipo: 'fondo', fondo: f.fondo || '', isin: f.isin || '' } : { variante: 'sl', vehiculo: f.vehiculo || '', nif: f.nif || '' },
-        actualizado: ahora() };
+      proyecto = { nombre: f.nombre.trim(), codigo: codigo, arquetipo: f.arquetipo, pie: pieDeForm(f), actualizado: ahora() };
       S.proyectos[codigo] = proyecto;
       C.db.doc('proyectos/' + codigo).set(proyecto).catch(function () {});
-    } else { codigo = f.proyecto; proyecto = S.proyectos[codigo]; }
+    } else {
+      codigo = f.proyecto; proyecto = S.proyectos[codigo];
+      if (proyecto && proyecto.sinConfigurar) {
+        proyecto = { nombre: proyecto.nombre, codigo: codigo, idActivo: proyecto.idActivo, arquetipo: f.arquetipo, pie: pieDeForm(f), actualizado: ahora() };
+        S.proyectos[codigo] = proyecto;
+        C.db.doc('proyectos/' + codigo).set(proyecto).catch(function () {});
+      }
+    }
     var id = idInforme(codigo, f.qNew);
     estadoCab('Preparando…');
     cargarDoc(id).then(function () {
       if (S.doc) { mensaje('Ya existía el informe ' + esc(proyecto.nombre) + ' ' + esc(f.qNew) + ': se ha abierto donde se quedó.', 'ok'); return abrir(id); }
       S.doc = { id: id, codigo: codigo, proyecto: proyecto.nombre, arquetipo: proyecto.arquetipo || 'A', trimestre: f.qNew, trimestreAnterior: f.qAnt, siguiente: qSig(f.qNew),
-        estado: 'datos', version: 1, creado: ahora(), actualizado: ahora(), fotos: [], cambios: [], pie: proyecto.pie || null };
+        estado: 'datos', version: 1, creado: ahora(), actualizado: ahora(), fotos: [], cambios: [], pie: proyecto.pie || null, idActivo: proyecto.idActivo || null };
       S.fuentes = { notas: '', documentos: [], previoTexto: '', previoNombre: '' };
       guardarDoc(0); guardarFuentes(0);
       return cargarPrevio().then(function () { mensaje(null); S.paso = 1; render(); });
     });
+  }
+
+  /* ================= Fuentes automáticas del portal (actas y planificación) ================= */
+  function idActivoDoc() {
+    if (!S.doc) return null;
+    if (S.doc.idActivo) return S.doc.idActivo;
+    var p = S.proyectos[S.doc.codigo];
+    return (p && p.idActivo) || null;
+  }
+  function cargarFuentesAuto(forzar) {
+    if (!PORTAL || !S.doc || !S.fuentes) return Promise.resolve();
+    var act = idActivoDoc();
+    if (!act) { S.avisosAuto = ['Este proyecto no está vinculado a un activo de Proyectos: añade las actas y la planificación a mano.']; render(); return Promise.resolve(); }
+    if (!forzar && S.fuentes.autoCargadas === S.doc.trimestre) return Promise.resolve();
+    var id = S.doc.id;
+    S.ocupado = 'Cargando las actas y la planificación del portal…'; render();
+    return PORTAL.fuentesAutomaticas(act, S.doc.trimestre).then(function (r) {
+      if (!S.doc || S.doc.id !== id) return;
+      // Las fuentes del portal van primero: si hay que recortar, se recorta lo aportado a mano.
+      var manuales = (S.fuentes.documentos || []).filter(function (d) { return !d.auto; });
+      S.fuentes.documentos = (r.documentos || []).map(function (d) { return { nombre: d.nombre, texto: d.texto, auto: true, clave: d.clave }; }).concat(manuales);
+      S.fuentes.autoCargadas = S.doc.trimestre; S.fuentes.autoFecha = ahora();
+      S.avisosAuto = r.avisos || [];
+      if (!S.doc.idActivo) { S.doc.idActivo = act; guardarDoc(0); }
+      guardarFuentes(0);
+    }, function (e) {
+      S.avisosAuto = ['No se han podido cargar las actas y la planificación (' + (e && (e.message || e.code) || 'error') + '). Puedes añadirlas a mano.'];
+    }).then(function () { S.ocupado = null; render(); });
   }
 
   /* ================= Lectura de ficheros en el navegador ================= */
