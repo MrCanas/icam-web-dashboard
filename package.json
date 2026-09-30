@@ -50,6 +50,7 @@
     "pm:apply-migration-035": "tsx scripts/pm/apply-migration-035.ts",
     "pm:apply-migration-036": "tsx scripts/pm/apply-migration-036.ts",
     "pm:apply-migration-037": "tsx scripts/pm/apply-migration-037.ts",
+    "pm:apply-migration-043": "tsx scripts/pm/apply-migration-043.ts",
     "pm:seed-avance-obra": "tsx scripts/pm/seed-avance-obra.ts",
     "pm:zoho-auth": "tsx scripts/pm/zoho-auth.ts",
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",
@@ -74,6 +75,7 @@
     "auth:test-login": "tsx scripts/auth/test-login.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
