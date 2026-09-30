@@ -23,7 +23,7 @@ export const pmModule: ModuleDefinition = {
       match: (p) =>
         p === "/dashboard/pm/detalle" ||
         (p.startsWith("/dashboard/pm/proyecto/") &&
-          !/\/(planificacion|actas|avance-obra)(\/|$)/.test(p)),
+          !/\/(planificacion|actas|avance-obra|informe)(\/|$)/.test(p)),
     },
     {
       key: "pm.planificacion",
@@ -55,6 +55,18 @@ export const pmModule: ModuleDefinition = {
         p === "/dashboard/pm/actas" ||
         p.startsWith("/dashboard/pm/actas/") ||
         /^\/dashboard\/pm\/proyecto\/[^/]+\/actas$/.test(p),
+    },
+    {
+      key: "pm.informes",
+      path: "/dashboard/pm/informes",
+      label: "Informes trimestrales",
+      // Como las demás: dentro del proyecto es una subpestaña («Informe
+      // trimestral», que abre la app con el activo ya elegido) y el hub con la
+      // lista de todos los informes vive en Configuración.
+      hiddenInNav: true,
+      match: (p) =>
+        p === "/dashboard/pm/informes" ||
+        /^\/dashboard\/pm\/proyecto\/[^/]+\/informe$/.test(p),
     },
     {
       key: "pm.avance_obra",

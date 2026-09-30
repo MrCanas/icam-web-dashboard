@@ -9,10 +9,13 @@ interface PmProjectTabsProps {
   showPlanificacion?: boolean;
   /** false cuando el usuario tiene denegada pm.actas. */
   showActas?: boolean;
+  /** false cuando el usuario tiene denegada pm.informes. */
+  showInforme?: boolean;
 }
 
 /**
- * Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Actas.
+ * Subpestañas de un proyecto: Resumen Ejecutivo / Planificación / Actas /
+ * Informe trimestral.
  * Avance de obra ya no tiene pestaña propia: es la primera sección de la vista
  * Acta. Su ruta /avance-obra sigue viva como rescate, fuera del menú.
  */
@@ -20,6 +23,7 @@ export function PmProjectTabs({
   idActivo,
   showPlanificacion = true,
   showActas = true,
+  showInforme = true,
 }: PmProjectTabsProps) {
   const pathname = usePathname();
   const base = `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}`;
@@ -48,6 +52,16 @@ export function PmProjectTabs({
             label: "Actas",
             href: `${base}/actas`,
             active: pathname === `${base}/actas`,
+          },
+        ]
+      : []),
+    ...(showInforme
+      ? [
+          {
+            key: "informe",
+            label: "Informe trimestral",
+            href: `${base}/informe`,
+            active: pathname === `${base}/informe`,
           },
         ]
       : []),

@@ -48,6 +48,7 @@ interface SecondaryItem {
  */
 const PM_CONFIG_ROUTE_KEYS = [
   "pm.actas",
+  "pm.informes",
   "pm.planificacion",
   "pm.avance_obra",
   "pm.proyectos",

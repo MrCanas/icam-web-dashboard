@@ -1,0 +1,1727 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="claude-shim.js"></script>
+<title>Informes Trimestrales Impar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baskervville:ital@0;1&family=Lato:ital,wght@0,300;0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="ds/bundle.css">
+<style>
+/* Tokens del design system (slides). Documento de impresión: las slides son siempre blancas. */
+:root {
+  --navy: #1c2e69;
+  --navy-600: #263b78;
+  --navy-500: #2e3d70;
+  --ink: #0a0a0a;
+  --ink-800: #1a1a1a;
+  --ink-700: #303030;
+  --pearl: #e2deda;
+  --pearl-300: #cccccc;
+  --gold: #9b7f57;
+  --gold-400: #a69478;
+  --gold-100: #e8e0c9;
+  --paper: #ffffff;
+  --teal-600: #487e7f;
+  --teal-900: #003a54;
+  --teal-200: #a5cecd;
+  --teal-ink: #234047;
+  --slate-600: #51647e;
+  --slate-700: #44546a;
+  --orange-marker: #ee8640;
+  --orange-text: #e97132;
+  --warm-mauve: #eae6e7;
+  --row-a: #e7eaed;
+  --row-b: #ccd2d8;
+  --table-head: #cfcfcf;
+  --rule-grey: #d9d9d9;
+  --fin-head: #1f3864;
+  --footer-grey: #a6a6a6;
+  --pending-grey: #a6a6a6;
+  --periwinkle: #8e96c8;
+  --indigo-400: #5561a8;
+  --positive: #00b050;
+  --font-serif: Baskervville, "Baskerville Old Face", "Baskerville MT Std", Baskerville, Georgia, serif;
+  --font-sans: Lato, "Helvetica Neue", Arial, sans-serif;
+}
+/* Tokens de la herramienta (claro por defecto, oscuro por sistema o por elección). */
+:root {
+  --a-fondo: #f3f1ed; --a-sup: #ffffff; --a-sup2: #f8f6f3; --a-tinta: #1b1e2b; --a-sutil: #666572;
+  --a-linea: #dcd7cf; --a-marca: #1c2e69; --a-marca-t: #ffffff; --a-oro: #9b7f57; --a-suave: #e9ecf5;
+  --a-ok: #2f7a55; --a-aviso: #a3620a; --a-error: #b3261e; --a-foco: #3b5bcc; --a-sombra: 0 1px 2px rgba(20, 24, 40, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --a-fondo: #13151c; --a-sup: #1b1e27; --a-sup2: #20242e; --a-tinta: #ebe8e3; --a-sutil: #a4a2a9;
+    --a-linea: #2f3440; --a-marca: #a9b8ee; --a-marca-t: #10152a; --a-oro: #c9ab7e; --a-suave: #242a3d;
+    --a-ok: #6cc39a; --a-aviso: #e3a64d; --a-error: #f08a80; --a-foco: #8ea6ff; --a-sombra: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --a-fondo: #13151c; --a-sup: #1b1e27; --a-sup2: #20242e; --a-tinta: #ebe8e3; --a-sutil: #a4a2a9;
+  --a-linea: #2f3440; --a-marca: #a9b8ee; --a-marca-t: #10152a; --a-oro: #c9ab7e; --a-suave: #242a3d;
+  --a-ok: #6cc39a; --a-aviso: #e3a64d; --a-error: #f08a80; --a-foco: #8ea6ff; --a-sombra: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--a-fondo); color: var(--a-tinta); font: 15px/1.55 Lato, "Helvetica Neue", Arial, sans-serif; }
+.cab { background: #1c2e69; border-bottom: 1px solid #16255a; position: relative; z-index: 2; }
+.cab-in { max-width: 1120px; margin: 0 auto; padding-block: 12px; padding-inline: 16px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between; }
+.marca { display: flex; align-items: center; gap: 16px; margin: 0; font-family: var(--font-serif); font-size: 19px; letter-spacing: .06em; text-transform: uppercase; color: #ffffff; }
+.marca img { height: 34px; width: auto; display: block; }
+.marca span { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.35); line-height: 1.1; }
+.cab-estado { font-size: 13px; color: rgba(255,255,255,.72); }
+/* Pantalla principal: foto de fondo con velo oscuro; las tarjetas siguen opacas. */
+body.con-fondo { background: #1b1e27 url(assets/fondo-inicio.jpg) center / cover no-repeat fixed; }
+body.con-fondo::before { content: ""; position: fixed; inset: 0; background: linear-gradient(180deg, rgba(10, 14, 30, .55), rgba(10, 14, 30, .78)); pointer-events: none; }
+body.con-fondo main { position: relative; z-index: 1; }
+body.con-fondo main > h2, body.con-fondo main > .fila > h2, body.con-fondo main > .sutil { color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+body.con-fondo main > .fila > .btn-prim { border-color: #fff; }
+main { max-width: 1120px; margin: 0 auto; padding-block: 24px 64px; padding-inline: 16px; display: flex; flex-direction: column; gap: 20px; }
+h2 { font-family: var(--font-serif); font-weight: 400; font-size: 26px; letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h3 { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--a-marca); margin: 0 0 10px; }
+p { margin: 0; }
+.sutil { color: var(--a-sutil); font-size: 14px; }
+.tarjeta { background: var(--a-sup); border: 1px solid var(--a-linea); border-radius: 6px; padding: 20px; box-shadow: var(--a-sombra); display: flex; flex-direction: column; gap: 14px; }
+.fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.fila-sep { justify-content: space-between; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.campo { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--a-sutil); }
+.campo input, .campo select, .campo textarea, textarea, select, input[type=text] {
+  font: inherit; font-size: 15px; color: var(--a-tinta); background: var(--a-sup2); border: 1px solid var(--a-linea);
+  border-radius: 4px; padding: 8px 10px; width: 100%; max-width: 100%; }
+textarea { min-height: 180px; resize: vertical; line-height: 1.5; }
+:focus-visible { outline: 2px solid var(--a-foco); outline-offset: 2px; }
+.btn { font: inherit; font-size: 14px; font-weight: 700; border-radius: 4px; padding: 9px 16px; cursor: pointer;
+  background: var(--a-sup); color: var(--a-marca); border: 1px solid var(--a-marca); }
+.btn:hover { background: var(--a-suave); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn-prim { background: var(--a-marca); color: var(--a-marca-t); }
+.btn-prim:hover { background: var(--a-marca); filter: brightness(1.12); }
+.btn-go { font-size: 16px; padding: 12px 26px; letter-spacing: .04em; }
+.btn-min { font-size: 13px; padding: 5px 10px; font-weight: 400; }
+.btn-peligro { color: var(--a-error); border-color: currentColor; background: transparent; }
+.btn-peligro:hover { background: rgba(179, 38, 30, .08); }
+.confirmar { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.adjuntos { display: flex; flex-wrap: wrap; gap: 6px; }
+.adjunto { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--a-linea); background: var(--a-sup2); }
+.adjunto img { width: 28px; height: 22px; object-fit: cover; border-radius: 2px; }
+.soltar.mini { padding: 10px; font-size: 13px; }
+.btn-texto { background: none; border: none; padding: 4px 6px; color: var(--a-marca); text-decoration: underline; cursor: pointer; font: inherit; font-size: 13px; }
+.pasos { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; counter-reset: paso; }
+.pasos li { counter-increment: paso; font-size: 13px; padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid var(--a-linea); color: var(--a-sutil); background: var(--a-sup); }
+.pasos li::before { content: counter(paso); display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; margin-right: 6px; background: var(--a-sup2); font-weight: 700; font-size: 12px; }
+.pasos li.hecho { color: var(--a-tinta); }
+.pasos li.hecho::before { content: "✓"; background: var(--a-ok); color: #fff; }
+.pasos li.actual { border-color: var(--a-marca); color: var(--a-marca); font-weight: 700; }
+.pasos li.actual::before { background: var(--a-marca); color: var(--a-marca-t); }
+.aviso { border-left: 3px solid var(--a-aviso); background: var(--a-sup); padding: 12px 14px; font-size: 14px; border-radius: 0 4px 4px 0; }
+.aviso.error { border-color: var(--a-error); }
+.aviso.ok { border-color: var(--a-ok); }
+.tabla-env { overflow-x: auto; }
+table.t { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.t th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--a-sutil); font-weight: 700; padding: 8px; border-bottom: 1px solid var(--a-linea); }
+table.t td { padding: 8px; border-bottom: 1px solid var(--a-linea); vertical-align: top; }
+table.t td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--a-sup2); color: var(--a-sutil); border: 1px solid var(--a-linea); white-space: nowrap; }
+.chip.ok { color: var(--a-ok); border-color: currentColor; background: transparent; }
+.chip.aviso { color: var(--a-aviso); border-color: currentColor; background: transparent; }
+.chip.error { color: var(--a-error); border-color: currentColor; background: transparent; }
+.chip.marca { color: var(--a-marca); border-color: currentColor; background: transparent; }
+.estrella { color: var(--a-oro); font-weight: 700; }
+.lista { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.soltar { border: 1.5px dashed var(--a-linea); border-radius: 6px; padding: 18px; text-align: center; color: var(--a-sutil); background: var(--a-sup2); cursor: pointer; }
+.soltar.encima { border-color: var(--a-marca); color: var(--a-marca); }
+.fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.foto { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.foto img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: var(--a-sup2); }
+.progreso { display: flex; flex-direction: column; gap: 2px; }
+.progreso-fila { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: baseline; padding: 7px 4px; border-bottom: 1px solid var(--a-linea); font-size: 14px; }
+.progreso-fila .ico { text-align: center; font-weight: 700; }
+.en-curso .ico { color: var(--a-marca); animation: latido 1.2s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .en-curso .ico { animation: none; } }
+.barra { height: 6px; background: var(--a-sup2); border-radius: 3px; overflow: hidden; }
+.barra i { display: block; height: 100%; background: var(--a-marca); transition: width .3s; }
+/* Editor */
+.ed-lista { display: flex; flex-direction: column; gap: 26px; }
+.ed-slide { display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 16px; }
+.ed-barra { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
+.ed-barra b { font-size: 14px; }
+.ed-barra .tit { color: var(--a-sutil); }
+.ed-barra .acc { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.v-marco { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; border: 1px solid var(--a-linea); background: #fff; border-radius: 2px; }
+.v-marco > .v-escala { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; }
+.v-marcas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; touch-action: auto; }
+.marcando .v-marcas { pointer-events: auto; cursor: crosshair; touch-action: none; }
+.marcando .v-marco { outline: 2px solid var(--a-error); outline-offset: 2px; }
+.ed-barra .btn.activo { background: var(--a-error); border-color: var(--a-error); color: #fff; }
+.marcar-barra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; background: var(--a-sup); border: 1px solid var(--a-linea); border-radius: 6px; padding: 8px 10px; }
+.marcar-barra .btn[aria-pressed="true"] { background: var(--a-suave); border-color: var(--a-marca); color: var(--a-marca); font-weight: 700; }
+.marcar-barra .sutil { font-size: 13px; }
+.marcar-barra .der { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.marcas-lista { font-size: 13px; color: var(--a-sutil); margin: 0; }
+.ed-corregir { display: flex; flex-direction: column; gap: 8px; background: var(--a-sup); border: 1px solid var(--a-linea); border-radius: 6px; padding: 12px; }
+.ed-corregir textarea { min-height: 70px; }
+.ed-fuentes { font-size: 12px; color: var(--a-sutil); }
+mark.v-pend { background: #ffe58a; color: inherit; outline: 1px dashed #b35c00; }
+.iq-bloqueado-sello { top: auto !important; bottom: 40px; }
+#lienzo-oculto { position: absolute; left: -20000px; top: 0; width: 960px; pointer-events: none; }
+#lienzo-oculto .v-lienzo { width: 960px; height: 540px; position: relative; overflow: hidden; background: #fff; }
+#lienzo-oculto.exportando .iq-bloqueado-sello, #lienzo-oculto.exportando mark.v-pend { display: none !important; }
+.oculto { display: none !important; }
+@media (max-width: 640px) { h2 { font-size: 22px; } .btn-go { width: 100%; } .ed-barra .acc { margin-left: 0; } }
+</style>
+
+<header class="cab"><div class="cab-in">
+  <p class="marca"><img src="ds/assets/logo-impar-capital-white.png" alt="Impar Capital"><span>Informes Trimestrales</span></p>
+  <span class="cab-estado" id="cab-estado" aria-live="polite"></span>
+</div></header>
+<main id="principal"><p class="sutil">Cargando…</p></main>
+<div id="lienzo-oculto" aria-hidden="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="ds/bundle.js"></script>
+<script src="ds/motor.js"></script>
+<script id="ref-api" type="text/plain">// Impar Capital · Informes Trimestrales — window.ImparInformes
+// Todos los componentes pintan sobre un lienzo 960 × 540. Texto con "**negrita**".
+type Rich = string;
+export interface Pie { variante: 'sl' | 'cnmv'; vehiculo?: string; nif?: string; entidad?: string; tipo?: string; fondo?: string; isin?: string; }
+export interface SlideBase { pie?: Pie; pagina?: number; }
+export interface Imagen { src?: string; pie?: string; focalX?: number; focalY?: number; placeholder?: string; }
+export interface Bloque { icono?: 'situacion-actual' | 'compraventa-financiacion' | 'operacion-cronograma' | 'logros' | string; titulo: string; parrafos?: Rich[]; vinetas?: Rich[]; }
+export declare const assets: { logoAzul: string; logoBlanco: string; cierreMosaico: string; iconos: Record<string, string> };
+export declare function textoPie(p: Pie): string;
+export declare function Slide(p: SlideBase & { fondo?: 'paper' | 'navy' | 'warm'; layout?: string; children?: any }): any;
+export declare function SlideHeader(p: { seccion?: number; titulo: string; logo?: boolean }): any;
+export declare function Contenido(p: { className?: string; children?: any }): any;
+export declare function Logo(p: { tono?: 'azul' | 'blanco' }): any;
+export declare function PieConfidencial(p: Pie): any;
+export declare function Subtitulo(p: { nivel?: 1 | 2; children: any }): any;
+export declare function Texto(p: { parrafos: Rich[] }): any;
+export declare function Vinetas(p: { items: Rich[]; compacta?: boolean }): any;
+export declare function ImagenMarco(p: Imagen & { ancho: number; alto: number }): any;
+export declare function Portada(p: { trimestre: string; proyecto: string; imagen?: string; recorte?: 'paisaje' | 'sobresale' }): any;
+export declare function Indice(p: { secciones: string[] }): any;
+export declare function Disclaimer(p: { pagina?: number; parrafos?: Rich[] }): any;
+export declare function Cierre(): any;
+export declare function BloqueIcono(p: Bloque): any;
+export declare function ResumenEjecutivo(p: SlideBase & { trimestre: string; izquierda: Bloque[]; logros: Rich[]; derecha?: Bloque[]; seccion?: number }): any;
+export declare function AntecedentesNovedades(p: { titulo?: string; anterior: { trimestre: string; parrafos: Rich[] }; actual: { trimestre: string; parrafos: Rich[]; vinetas?: Rich[] } }): any;
+export declare function DosColumnas(p: SlideBase & { seccion: number; titulo: string; izquierda: any; derecha: any; nota?: Rich }): any;
+export declare function TextoImagen(p: SlideBase & { seccion: number; titulo: string; subtitulo?: string; parrafos: Rich[]; imagenes?: Imagen[]; variante?: 'una' | 'dos-apiladas'; nota?: Rich }): any;
+export declare function MapaLateral(p: { mapa?: string; pin?: string; rotulo: string; foto?: string }): any;
+export declare function TablaKpis(p: { trimestre: string; siguiente: string; cabeceraObjetivo?: string; filas: { indicador: string; actual: string; objetivo: Rich }[] }): any;
+export declare function TablaRiesgos(p: { filas: { riesgo: Rich; mitigacion: Rich }[] }): any;
+export declare function ListaObjetivos(p: { trimestre: string; items: Rich[] }): any;
+export declare function SlideKpisRiesgosObjetivos(p: SlideBase & { trimestre: string; siguiente: string; kpis: any[]; riesgos: any[]; objetivos: Rich[]; cabeceraObjetivo?: string; seccion?: number }): any;
+export declare function Timeline(p: { hitos: { titulo: string; fecha: string; hecho: boolean }[]; puntoSituacion?: number | false; variante?: 'slate' | 'teal'; ancho?: number; nota?: Rich }): any;
+export declare function HitosResenables(p: { intro?: string; items: { etiqueta: string; fecha: string }[] }): any;
+export declare function TimelineTrimestral(p: { trimestres: { nombre: string; estado: 'pasado' | 'actual' | 'futuro'; eventos: { fecha: string; texto: string }[] }[] }): any;
+export declare function Galeria(p: { imagenes?: Imagen[]; disposicion?: '1' | '2' | '3' | '4' | 'hero-2'; escala?: number }): any;
+export declare function BreeamRating(p: { estrellas: number; calificacion: string; rango?: string; total?: number }): any;
+export declare function BarrasBreeam(p: { titulo?: string; categorias: { nombre: string; objetivo: number; avance?: number }[]; max?: number }): any;
+export declare function BarraConsolidacion(p: { segmentos: { etiqueta: string; valor: number; tono?: 0 | 1 | 2 | 3 }[] }): any;
+export declare function Colaboradores(p: SlideBase & { intro?: Rich; roles: { rol: string; parrafos?: Rich[]; vinetas?: Rich[] }[]; logos?: { src?: string; nombre?: string; pie?: string }[]; seccion?: number }): any;
+export declare function VehiculoInversion(p: SlideBase & { titulo?: string; detalles: Rich[]; fichas: { icono: string; etiqueta: string; valor: string }[]; nota?: Rich; seccion?: number }): any;
+export declare function ConsejoAdministracion(p: { titulo: string; intro?: string; puntos: Rich[] }): any;
+export declare function SlideBloqueado(p: SlideBase & { seccion?: number; titulo?: string; origen?: string; version?: number | string; estado?: string; vista?: string; children?: any }): any;
+export declare function KpiIconosFinancieros(p: { kpis: { icono: string; etiqueta: string; valor: string }[]; columnas?: number }): any;
+export declare function TablaVarianzas(p: { anterior: string; actual: string; filas: { descripcion: string; previo: string; actual: string; variacion: string; variacionPct: string; observaciones?: Rich }[] }): any;
+export declare function TablaFinanciera(p: { titulo: string; columnas: string[]; filas: { celdas: string[]; total?: boolean }[] }): any;
+export declare function TablaLicitaciones(p: { titulo: string; columnas?: string[]; filas: Rich[][] }): any;
+export declare function TablaMensual(p: { meses: string[]; filas: { activo: string; valores: string[]; total: string; vendido?: boolean }[]; total?: { valores: string[]; total: string }; etiquetaTotal?: string }): any;
+export declare function DonutOcupacion(p: { titulo?: string; segmentos: { etiqueta: string; valor: number }[]; tam?: number }): any;</script>
+<script id="ref-recetas" type="text/plain"># informe.json y catálogo de layouts
+
+El informe es un único `informe.json`. El visor lo pinta con los componentes del design system
+(`design-system/project/components/bundle.js`, API en `index.d.ts`). Nunca se escribe HTML a mano.
+
+## Estructura del fichero
+
+```json
+{
+  "meta": {
+    "proyecto": "Santa Engracia 84", "codigo": "SE84",
+    "trimestre": "Q3 2026", "trimestreAnterior": "Q2 2026", "siguiente": "Q4 2026",
+    "fechaCierre": "2026-09-30", "arquetipo": "A",
+    "pie": { "variante": "cnmv", "tipo": "fondo", "fondo": "Impar Prime Alternative Investment Fund", "isin": "ES0147869004" },
+    "version": "v1", "estado": "Borrador", "actualizado": "2026-09-24",
+    "artifact": "https://claude.ai/artifact/…"
+  },
+  "slides": [ …en orden… ]
+}
+```
+
+- `pie`: `{"variante":"sl","vehiculo":"…, S.L.","nif":"B…"}` para sociedades; `{"variante":"cnmv","tipo":"fondo","fondo":"…","isin":"…"}` para FICC/FCR. Se copia del informe anterior; lo aporta Legal/Finanzas, nunca se inventa.
+- El visor añade solo `pie` y `pagina` (posición entre los slides visibles). No los escribas en cada slide.
+
+## Un slide
+
+Tres formas:
+
+1. **Slide completo** (componente que ya es un slide):
+   `{"id":"resumen-ejecutivo","c":"ResumenEjecutivo","props":{…},"origen":"actualizada","fuentes":"notas PM 15/09; KPI obra"}`
+2. **Slide compuesto** (cabecera + bloques):
+   `{"id":"calendario","compuesto":{"seccion":3,"titulo":"Resumen de Proyecto. Calendario","clase":"iq-cols","contenido":[nodos…],"nota":"**Nota:** …"},"origen":"…","fuentes":"…"}`
+   - `clase`: `iq-cols` (dos columnas 48/48, cada hijo es una columna) o `iq-apilado` (vertical). Sin clase: flujo normal.
+   - `estilo`: objeto CSS opcional (p. ej. `{"gridTemplateColumns":"1fr 270px"}` para texto + columna de mapa).
+3. **Oculto**: añade `"oculto": true` para quitarlo del informe sin perderlo.
+
+Campos de control (no se pintan en el PDF; el visor los muestra debajo del slide):
+- `id`: estable, en minúsculas con guiones. Nunca se renombra (las correcciones lo referencian).
+- `origen`: `heredada` (igual que el trimestre anterior), `actualizada`, `nueva`, `bloqueada` (Finanzas/Legal).
+- `fuentes`: de dónde sale cada dato (p. ej. «acta obra 12/09; correo operador 03/09; informe Q2»). Obligatorio en slides con datos nuevos.
+
+## Nodos
+
+Un nodo es un texto o `{"c": "Componente", "props": {…}, "hijos": [nodos]}`. `c` puede ser cualquier componente
+de `ImparInformes` o `div`/`span`/`p`. Dentro de `props`, cualquier objeto con `c` también se convierte en nodo
+(así se pasan `izquierda`/`derecha` de `DosColumnas`). Texto enriquecido: solo `**negrita**` para el dato clave.
+
+Bloques más usados:
+- `{"c":"Subtitulo","hijos":["ESTRATEGIA DE PROYECTO"]}` — mayúsculas navy. `{"c":"Subtitulo","props":{"nivel":2},"hijos":["Novedades. Q3 2026"]}`.
+- `{"c":"Texto","props":{"parrafos":["…","…"]}}`
+- `{"c":"Vinetas","props":{"items":["**Inicio de obra**: enero de 2026"],"compacta":true}}`
+- `{"c":"ImagenMarco","props":{"src":"fotos/fachada.jpg","ancho":348,"alto":290,"pie":"Fachada a septiembre de 2026"}}`
+- `{"c":"div","props":{"style":{"marginTop":24}},"hijos":[…]}` — solo para separar; no inventes estilos de color o fuente.
+
+## Catálogo (sección → layout → receta)
+
+Los límites de caracteres del design system son **orientativos**: manda la medición real de `construir.py` (desborde y
+relleno ≥ 85 %). Nunca se reduce la letra. Capacidad aproximada al tamaño actual (cuerpo 10,5 pt), para planificar:
+
+| Zona | Capacidad aproximada |
+|---|---|
+| Columna de `DosColumnas` / columna de texto de un compuesto `iq-cols` | 1.300–1.500 caracteres (≈ 22 líneas) |
+| Texto a ancho completo | ≈ 2.800–3.000 caracteres |
+| Columna de texto de `TextoImagen` | 1.000–1.300 caracteres |
+| Texto a ancho completo sobre una galería `2` | ≈ 450 caracteres (3 líneas) |
+| Rol de `Colaboradores` (2 columnas, con logos) | 3–4 roles por columna de ~350 caracteres |
+
+Cada subtítulo resta ≈ 1 línea; cada viñeta compacta ≈ 0,8 líneas.
+
+| id sugerido | Sección | Forma | Contenido y límites |
+|---|---|---|---|
+| `portada` | — | `Portada` | `{"trimestre":"Q3 2026","proyecto":"Santa Engracia 84","imagen":"fotos/portada.jpg"}`. Foto 390×296. |
+| `indice` | — | `Indice` | `{"secciones":[…]}` 5–7, nombres de sección, en el orden de los dígitos usados. |
+| `resumen-ejecutivo` | 1 | `ResumenEjecutivo` | `trimestre`, `izquierda` = bloques `{icono,titulo,parrafos|vinetas}` con iconos `situacion-actual`, `compraventa-financiacion`, `operacion-cronograma`; `logros` 6/9 viñetas fechadas. Situación actual 650/900. **Se redacta el último.** |
+| `resumen-financiero` | 1 | `SlideBloqueado` | `{"seccion":1,"titulo":"Resumen Ejecutivo. Financiero Q3 2026","origen":"Finanzas","version":"…","estado":"…","vista":"fotos/finanzas-p4.png"}`. Si Finanzas no la ha enviado: sin `vista`, `estado":"Pendiente de Finanzas"`. |
+| `varianzas` | 2 | `SlideBloqueado` (+ `TablaVarianzas` en `hijos` si Finanzas pasa las cifras) | Nunca se calculan ni redactan cifras financieras. |
+| `estrategia` | 3 | compuesto `iq-cols` con `estilo {"gridTemplateColumns":"1fr 270px"}`: col. 1 Subtitulo+Texto; col. 2 `MapaLateral {pin, rotulo, foto}` | Estrategia heredada salvo cambio. Texto ≤ 900. |
+| `compraventa-financiacion` | 3 | `DosColumnas` | izquierda: Compraventa/Financiación; derecha: Seguros / Project Monitoring. 700/900 por columna. |
+| `calendario` | 3 | compuesto `iq-cols`: col. 1 `AntecedentesNovedades` (anterior ≤ 400) + `HitosResenables`; col. 2 o fila inferior `Timeline` | Timeline 5–11 hitos, título ≤ 32, fecha `MM/AA`, `hecho` true/false. Un solo esquema (`slate` por defecto). Si no cabe en columna: timeline en slide aparte `calendario-timeline` (compuesto, `ancho` 820). |
+| `kpis-riesgos-objetivos` | 3 | `SlideKpisRiesgosObjetivos` | `trimestre`, `siguiente`, `kpis [{indicador,actual,objetivo}]` ≤ 8, `riesgos [{riesgo,mitigacion}]` 2–5, `objetivos` 3–6. Celdas 140/220. |
+| `situacion-<tema>` | 4 | `DosColumnas` (dos temas) o `TextoImagen` (un tema + foto/render) | Licencia, Arquitectura, Interiorismo, Ingeniería, Operador/Arrendaticia, Suministros, CM/PM, Desinversión, Comercialización… Un slide por 1–2 módulos. `TextoImagen`: ≤ 500 con 1 imagen; `variante":"dos-apiladas"` con 2 renders. |
+| `sostenibilidad` | 4 | compuesto `iq-cols`: Texto + `BreeamRating {estrellas,calificacion,rango}` + `BarrasBreeam {categorias [{nombre,objetivo,avance}]}` o `BarraConsolidacion` | Solo con cifras BREEAM aportadas (informe del asesor). |
+| `licitaciones` | 4 | compuesto con `TablaLicitaciones {titulo,columnas,filas}` | Estado de contratación por lote. |
+| `calendario-timeline` | 3 | compuesto con `Subtitulo` + `Timeline` `ancho` 840 (+ texto breve) | Timelines largos o por subproyecto. |
+| `obra-<n>` | 5 | compuesto `iq-cols`: Texto a la izquierda + `Galeria` a la derecha, o `Galeria` sola | `disposicion` `1`/`2`/`3`/`4`/`hero-2`; máx. 4 fotos por slide; pie «* Imágenes del estado actual de la ejecución de las obras». |
+| `seguimiento-economico-obra` | 5 | `SlideBloqueado` o compuesto con `TablaFinanciera` | Cifras de certificación solo si las aporta el PM/PMo. |
+| `colaboradores` / `colaboradores-2` | 6 | `Colaboradores` | **`seccion` siempre explícita** (el componente usa 5 por defecto). `intro`, `roles` 4–8 (párrafo ≤ 300, firma en negrita), `logos` 4–7 (`src` si hay logo). Si hay más roles: segundo slide. |
+| `vehiculo` | 7 | `VehiculoInversion` | **`seccion` siempre explícita** (usa 6 por defecto). `detalles` (viñetas), 4 `fichas {icono,etiqueta,valor}` con iconos `vehiculo-aeat`, `vehiculo-obligacion-mercantil`, `vehiculo-inscripcion-rm`, `vehiculo-siguiente-informe`. Datos de Legal/Finanzas; actualizar «siguiente informe». |
+| `consejo` | 7 | compuesto con `ConsejoAdministracion {titulo,intro,puntos}` | Solo sociedades con consejo. |
+| `disclaimer` | — | `Disclaimer` | Sin `parrafos` (usa el texto vigente). Obligatorio, penúltimo. |
+| `cierre` | — | `Cierre` | Obligatorio, último. |
+
+El sello «BLOQUEADO · origen · versión» de `SlideBloqueado` solo se ve en el visor; no sale en el PDF.
+
+Cartera / multi-activo (arquetipo E): `cartera-ocupacion` (`DonutOcupacion`), `cartera-rentas` (`TablaMensual`), `cartera-calendario` (`TimelineTrimestral`), `KpiIconosFinancieros`.
+
+Los ids `situacion-<tema>` de la biblioteca (licencia, arquitectura, interiorismo, ingeniería, suministros, marca, marketing, comercialización, inquilinos, reformas) usan `DosColumnas` o `TextoImagen` según haya imágenes.
+
+## Heurística de elección
+
+- ≤ 500 caracteres + 1 imagen → `TextoImagen`. > 900 → `DosColumnas` o partir.
+- 1–2 fotos → imagen grande (`Galeria` `1`/`2`); 3–4 → `Galeria` `3`/`4`/`hero-2`; > 4 → otro slide.
+- Dos módulos cortos del mismo ámbito → un `DosColumnas`. Un módulo largo → su propio slide.
+- Títulos: «Sección. Subtema» en tipo frase; `SlideHeader` pone las mayúsculas y parte en el primer «. ». La parte antes del «. » ≤ 38 caracteres.</script>
+<script id="ref-reglas" type="text/plain"># Redacción: tono, herencia entre trimestres y reglas de hechos
+
+## Regla de oro: nada se inventa
+
+Todo dato material (fecha, %, importe, empresa, licencia, hito, nº de inversores, puntuación) debe salir de:
+el informe anterior, lo que aporta el usuario este trimestre (notas, correos, actas, documentos, Excel) o
+los datos del vehículo. Cada dato nuevo se anota en `hechos.json` con su fuente.
+
+- Falta un dato que el slide necesita → `[pendiente: qué falta]` en el texto y se lista en el resumen al usuario.
+- Dos fuentes se contradicen → no elijas: pregunta y muestra ambas versiones.
+- Puedes **interpretar y redactar** libremente: sintetizar, priorizar, explicar por qué importa un hito, proponer riesgos
+  y objetivos. Todo lo que propongas sin respaldo directo (riesgos u objetivos sugeridos) se marca en la propuesta
+  como «sugerido» y el usuario lo confirma.
+- Las cifras financieras (TIR, ROE, varianzas, NOI…) nunca se calculan ni se redactan: son slides bloqueados de Finanzas.
+- Fotos: solo las que aporta el usuario (o las del informe anterior si él lo confirma). Un pie de foto describe solo lo confirmado.
+
+## Tiempo
+
+Distingue siempre: hecho histórico · hecho del trimestre anterior · hecho de este trimestre · previsión.
+- Nunca presentes una previsión como cumplida ni un hecho de Q-1 como logro de Q.
+- Frases heredadas con «próximo trimestre», «previsto para…», «se iniciará…»: revisa si ya ocurrió; reescribe en pasado o actualiza la fecha.
+- Usa el trimestre explícito («Q4 2026»), no «el próximo trimestre».
+
+## Herencia desde el informe anterior (spec §69)
+
+| Tipo | Ejemplos | Qué hacer |
+|---|---|---|
+| Persistente | estrategia, descripción del activo, compraventa, financiación, colaboradores, datos del vehículo | Se copia tal cual salvo cambio aportado. `origen: heredada`. |
+| Del trimestre | «Durante el trimestre…», Novedades, logros | Solo como contexto: Novedades Q-1 → se resume en **Antecedentes Q** (≤ 400). Nunca se reutiliza como texto actual. |
+| Estructurado | KPIs, hitos, riesgos, objetivos | Se arrastran los objetos y se actualizan: KPI con valor nuevo; hitos marcados como hechos o con fecha movida; riesgos activos/resueltos; objetivos Q-1 → estado. |
+| Legal | disclaimer, pie | Texto vigente del design system; datos del vehículo del informe anterior. |
+| Bloqueado | financiero, varianzas | Placeholder `SlideBloqueado` «Pendiente de Finanzas» hasta que llegue la página. |
+
+Módulo sin cambios: conserva lo persistente; si el slide necesita una frase del periodo, «No se han producido cambios materiales en este ámbito durante el trimestre.» (no la pongas en todos lados; a menudo es mejor ocultar el slide).
+
+## Bucle de objetivos
+
+Los «Objetivos Qn» del informe anterior son el guion de este trimestre. Para cada uno infiere de las notas:
+Cumplido · Parcial · No cumplido · Ya no aplica, con la evidencia. Los cumplidos alimentan Logros; los no cumplidos,
+riesgos o retrasos (con su explicación) y, si siguen vigentes, los nuevos objetivos Q+1.
+
+## Tono (spec §66)
+
+Español institucional, factual y sobrio. Sin adjetivos promocionales, sin exclamaciones, sin emojis.
+Fórmulas habituales, sin repetirlas mecánicamente: «Durante el trimestre…», «Se ha avanzado…», «Se mantiene…»,
+«En paralelo…», «Asimismo…», «El foco continúa en…», «Se prevé…», «Se ha iniciado…», «Se ha formalizado…».
+Evita relleno corporativo («se sigue trabajando para…») y afirmaciones positivas sin dato.
+
+## Resumen ejecutivo (spec §67) — se escribe al final
+
+Jerarquía: 1) fase actual; 2) logro(s) más material(es); 3) retrasos o incidencias relevantes y su mitigación;
+4) avance hacia el siguiente gran hito; 5) operador / comercialización / desinversión; 6) próximas fechas críticas.
+No concatenes módulos. Coherente al dígito con KPIs y calendario.
+
+## Logros (spec §68)
+
+Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuario puede fijar uno.
+- Bien: «Obtención de la licencia de obras el 8 de junio de 2026.»
+- Mal: «Se continuó trabajando en el proyecto durante el trimestre.»
+
+## Espacio: cada slide llena, sin tocar la letra
+
+- Objetivo: **relleno ≥ 85 %** del área de contenido de cada slide (lo mide `construir.py`). Nunca se reduce el cuerpo de letra
+  ni se cambian estilos: el tamaño es el del design system.
+- Primero se llena con **información real**: el texto completo del informe anterior cuando sigue vigente (no lo resumas de
+  más), las notas y documentos del trimestre, las condiciones y datos concretos (importes, fechas, nombres, pólizas,
+  expedientes). Prefiere el detalle útil al resumen genérico.
+- Si no hay más información real: 1) agranda fotos o usa una disposición mayor; 2) fusiona dos slides cortas del mismo
+  ámbito; 3) cambia a un layout más compacto; 4) mueve un bloque de una slide llena a una vacía del mismo tema.
+- Nunca rellenes con frases vacías («se sigue trabajando…») ni repitas datos de otra slide solo para ocupar.
+- El visor reparte automáticamente el hueco restante entre las partes de la slide (entre bloques, párrafos y filas de
+  tabla). Un subtítulo, o una frase que termina en «:», va siempre pegada a lo que introduce.
+- Desborde (el texto no cabe): resume lo menos relevante o parte el slide; es bloqueante.
+
+## Formatos
+
+- Trimestres «Q3 2026». Cifras españolas: `12.000.000 €`, `76 %`, `1.907 m²`. Fechas del timeline `MM/AA`.
+- Negrita solo para el dato clave de la frase. Viñetas con rótulo: «**Inicio de obra**: enero de 2026».
+- Nombres oficiales tal cual (operadores, marcas, organismos, constructoras). Mismo nombre en todo el informe.
+- Notas: «**Nota:** …».
+- Archivo: `YYYYMMDD_{PROYECTO}_Qn AAAA_Informe Trimestral Inversores.pdf` (fecha = cierre del trimestre).</script>
+<script id="ref-biblioteca" type="application/json">[{"n": 1, "nombre": "Portada", "para": "Trimestre, proyecto y foto del edificio", "sugerir": "Siempre", "id": "portada", "grupo": "Estructura (siempre presentes)"}, {"n": 2, "nombre": "Índice", "para": "Secciones del informe", "sugerir": "Siempre", "id": "indice", "grupo": "Estructura (siempre presentes)"}, {"n": 3, "nombre": "Resumen ejecutivo del proyecto", "para": "Situación actual, logros, compraventa/financiación, operación y cronograma", "sugerir": "Siempre", "id": "resumen-ejecutivo", "grupo": "Estructura (siempre presentes)"}, {"n": 4, "nombre": "Disclaimer", "para": "Texto legal vigente (obligatorio)", "sugerir": "Siempre", "id": "disclaimer", "grupo": "Estructura (siempre presentes)"}, {"n": 5, "nombre": "Cierre", "para": "Contraportada (obligatoria)", "sugerir": "Siempre", "id": "cierre", "grupo": "Estructura (siempre presentes)"}, {"n": 6, "nombre": "Resumen financiero", "para": "Datos del fondo e indicadores (TIR, ROE, LTV, NOI…)", "sugerir": "Siempre en vehículos CNMV", "id": "resumen-financiero", "grupo": "Finanzas (bloqueadas; las aporta Finanzas)"}, {"n": 7, "nombre": "Análisis de varianzas", "para": "Comparativa Q-1 vs Q de las proyecciones", "sugerir": "Siempre que Finanzas la envíe", "id": "varianzas", "grupo": "Finanzas (bloqueadas; las aporta Finanzas)"}, {"n": 8, "nombre": "Estrategia y descripción", "para": "Estrategia, programa del edificio, mapa y foto", "sugerir": "Primer informe o cambio de estrategia", "id": "estrategia", "grupo": "Resumen de proyecto"}, {"n": 9, "nombre": "Compraventa y financiación", "para": "Préstamo, disposiciones, seguros, monitoring/VIO", "sugerir": "Novedades de financiación o seguros", "id": "compraventa-financiacion", "grupo": "Resumen de proyecto"}, {"n": 10, "nombre": "Calendario", "para": "Antecedentes/Novedades, hitos reseñables y timeline", "sugerir": "Siempre", "id": "calendario", "grupo": "Resumen de proyecto"}, {"n": 11, "nombre": "Timeline a página completa", "para": "Cronograma largo o por fases/subproyectos", "sugerir": "> 8 hitos o varios subproyectos", "id": "calendario-timeline", "grupo": "Resumen de proyecto"}, {"n": 12, "nombre": "KPIs, riesgos y objetivos", "para": "Indicadores, riesgos-mitigaciones y objetivos Q+1", "sugerir": "Siempre", "id": "kpis-riesgos-objetivos", "grupo": "Resumen de proyecto"}, {"n": 13, "nombre": "Licencia y tramitación", "para": "Estado de licencias, requerimientos, CFO/LPO/DR", "sugerir": "Hay novedad administrativa", "id": "situacion-licencia", "grupo": "Situación de proyecto (módulos)"}, {"n": 14, "nombre": "Arquitectura", "para": "Fase de diseño, decisiones, renders", "sugerir": "Diseño aún en curso", "id": "situacion-arquitectura", "grupo": "Situación de proyecto (módulos)"}, {"n": 15, "nombre": "Interiorismo", "para": "Concepto, materiales, aprobaciones, renders", "sugerir": "Proyectos branded / hospitality en diseño", "id": "situacion-interiorismo", "grupo": "Situación de proyecto (módulos)"}, {"n": 16, "nombre": "Ingeniería e instalaciones", "para": "Estructura, MEP, estudios técnicos", "sugerir": "Incidencia o hito técnico", "id": "situacion-ingenieria", "grupo": "Situación de proyecto (módulos)"}, {"n": 17, "nombre": "Arrendaticia / operador", "para": "Contrato con operador, condiciones, coordinación", "sugerir": "Hay operador", "id": "situacion-arrendaticia", "grupo": "Situación de proyecto (módulos)"}, {"n": 18, "nombre": "Suministros y mantenimiento", "para": "Acometidas, contratos, ascensor, legalizaciones", "sugerir": "Fase final de obra o explotación", "id": "situacion-suministros", "grupo": "Situación de proyecto (módulos)"}, {"n": 19, "nombre": "Construction & Project Management", "para": "Gestión de obra y coordinación de Impar", "sugerir": "Obra en curso", "id": "situacion-cm-pm", "grupo": "Situación de proyecto (módulos)"}, {"n": 20, "nombre": "Licitaciones y contratación", "para": "Estado por lote/paquete", "sugerir": "Adjudicaciones en el trimestre", "id": "licitaciones", "grupo": "Situación de proyecto (módulos)"}, {"n": 21, "nombre": "Sostenibilidad BREEAM", "para": "Calificación objetivo, puntuación consolidada, plan de gestión", "sugerir": "Hay informe del asesor", "id": "sostenibilidad", "grupo": "Situación de proyecto (módulos)"}, {"n": 22, "nombre": "Cronograma BREEAM", "para": "Seguimiento y timeline de la certificación", "sugerir": "Fases de evaluación en curso", "id": "sostenibilidad-seguimiento", "grupo": "Situación de proyecto (módulos)"}, {"n": 23, "nombre": "Marca y aprobaciones", "para": "Aprobaciones del brand (p. ej. Marriott)", "sugerir": "Branded residences", "id": "situacion-marca", "grupo": "Situación de proyecto (módulos)"}, {"n": 24, "nombre": "Marketing", "para": "Posicionamiento, materiales, lanzamiento", "sugerir": "Pre-lanzamiento comercial", "id": "situacion-marketing", "grupo": "Situación de proyecto (módulos)"}, {"n": 25, "nombre": "Comercialización / preventas", "para": "Reservas, ventas, precios, canales", "sugerir": "Hay ventas o reservas", "id": "situacion-comercializacion", "grupo": "Situación de proyecto (módulos)"}, {"n": 26, "nombre": "Gestión de inquilinos", "para": "Unidades liberadas, indemnizaciones, ocupación", "sugerir": "Value-add residencial", "id": "situacion-inquilinos", "grupo": "Situación de proyecto (módulos)"}, {"n": 27, "nombre": "Reformas por unidad", "para": "Unidades terminadas/en curso, CAPEX", "sugerir": "Value-add residencial", "id": "situacion-reformas", "grupo": "Situación de proyecto (módulos)"}, {"n": 28, "nombre": "Desinversión", "para": "Proceso de venta, inversores, NBO/DD, cierre", "sugerir": "Proceso de venta iniciado", "id": "situacion-desinversion", "grupo": "Situación de proyecto (módulos)"}, {"n": 29, "nombre": "Slide libre", "para": "Cualquier tema excepcional (texto + imagen/tabla)", "sugerir": "Tema nuevo relevante sin slide propia", "id": "situacion-<tema>", "grupo": "Situación de proyecto (módulos)"}, {"n": 30, "nombre": "Situación de obra (texto + fotos)", "para": "Avance por plantas/lotes con 1–2 fotos", "sugerir": "Obra en curso", "id": "obra-1", "grupo": "Obra"}, {"n": 31, "nombre": "Galería de obra", "para": "2–4 fotos grandes con breve texto", "sugerir": "≥ 3 fotos nuevas", "id": "obra-n", "grupo": "Obra"}, {"n": 32, "nombre": "Seguimiento económico de obra", "para": "Contratación y producción ligada a certificación", "sugerir": "Lo aporta el PM/PMo", "id": "seguimiento-economico-obra", "grupo": "Obra"}, {"n": 33, "nombre": "Colaboradores", "para": "Roles y firmas con logos", "sugerir": "Siempre", "id": "colaboradores", "grupo": "Colaboradores y vehículo"}, {"n": 34, "nombre": "Colaboradores (continuación)", "para": "Resto de roles", "sugerir": "> 4 roles", "id": "colaboradores-2", "grupo": "Colaboradores y vehículo"}, {"n": 35, "nombre": "Vehículo de inversión", "para": "Datos registrales y fichas de estado", "sugerir": "Siempre", "id": "vehiculo", "grupo": "Colaboradores y vehículo"}, {"n": 36, "nombre": "Consejo de administración", "para": "Puntos tratados en consejo/junta", "sugerir": "Sociedades con consejo en el trimestre", "id": "consejo", "grupo": "Colaboradores y vehículo"}, {"n": 37, "nombre": "Ocupación de la cartera", "para": "Donut de ocupación por activo", "sugerir": "Arquetipo E", "id": "cartera-ocupacion", "grupo": "Cartera / multi-activo"}, {"n": 38, "nombre": "Rentas mensuales", "para": "Tabla de ingresos por activo y mes", "sugerir": "Arquetipo E", "id": "cartera-rentas", "grupo": "Cartera / multi-activo"}, {"n": 39, "nombre": "Calendario trimestral de hitos", "para": "Eventos agrupados por trimestre", "sugerir": "Arquetipo E", "id": "cartera-calendario", "grupo": "Cartera / multi-activo"}]</script>
+<script>
+(function () {
+  'use strict';
+  var M = window.InformeMotor;
+  M.configurarAssets('ds/assets/');
+  function txt(id) { return document.getElementById(id).textContent.replace(/<\\\//g, '</'); }
+  var API = txt('ref-api'), RECETAS = txt('ref-recetas'), REGLAS = txt('ref-reglas'), BIB = JSON.parse(txt('ref-biblioteca'));
+  var PERMITIDOS = M.componentes();
+  var CDN = 'https://cdnjs.cloudflare.com/ajax/libs/';
+  // Dentro del portal ICAM (build --destino dashboard) claude-shim.js define window.ICAM:
+  // Claude va con la API key del portal y hay fuentes automáticas (actas, planificación).
+  var PORTAL = window.ICAM || null;
+
+  /* ================= Utilidades ================= */
+  function $(sel, el) { return (el || document).querySelector(sel); }
+  function $$(sel, el) { return Array.prototype.slice.call((el || document).querySelectorAll(sel)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function clon(o) { return JSON.parse(JSON.stringify(o)); }
+  function ahora() { return new Date().toISOString(); }
+  function fecha(iso) { if (!iso) return ''; return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function bytes(s) { return new TextEncoder().encode(s || '').length; }
+  function recortar(s, max) {
+    s = s || ''; if (bytes(s) <= max) return s;
+    var lo = 0, hi = s.length;
+    while (lo < hi) { var m = (lo + hi + 1) >> 1; if (bytes(s.slice(0, m)) <= max) lo = m; else hi = m - 1; }
+    return s.slice(0, lo) + '\n[… recortado]';
+  }
+  function recorrer(v, fn, ruta) {
+    ruta = ruta || []; fn(v, ruta);
+    if (Array.isArray(v)) v.forEach(function (x, i) { recorrer(x, fn, ruta.concat(i)); });
+    else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { recorrer(v[k], fn, ruta.concat(k)); });
+  }
+  var NO_TEXTO = { src: 1, imagen: 1, vista: 1, foto: 1, mapa: 1, c: 1, icono: 1, variante: 1, disposicion: 1, layout: 1, clase: 1, id: 1, origen: 1, fuentes: 1, className: 1 };
+  function textos(slide) {
+    var out = [];
+    recorrer(slide, function (v, r) { if (typeof v === 'string' && !NO_TEXTO[r[r.length - 1]] && r.indexOf('estilo') < 0 && r.indexOf('style') < 0) out.push(v.replace(/\*\*/g, '')); });
+    return out.join(' · ');
+  }
+  function tituloDe(s) {
+    if (s.compuesto) return s.compuesto.titulo || s.id;
+    var p = s.props || {};
+    return p.titulo || ({ Portada: 'Portada', Indice: 'Índice', ResumenEjecutivo: 'Resumen ejecutivo', SlideKpisRiesgosObjetivos: 'KPIs, riesgos y objetivos', Colaboradores: 'Colaboradores', Disclaimer: 'Disclaimer', Cierre: 'Cierre' })[s.c] || s.id;
+  }
+  function cargarScript(url) {
+    return new Promise(function (ok, ko) {
+      if ($('script[src="' + url + '"]')) return ok();
+      var s = document.createElement('script'); s.src = url; s.onload = function () { ok(); }; s.onerror = function () { ko(new Error('No se pudo cargar ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  /* Trimestres */
+  function qParse(q) { var m = /^Q([1-4]) (\d{4})$/.exec(q || ''); return m ? { n: +m[1], a: +m[2] } : null; }
+  function qStr(o) { return 'Q' + o.n + ' ' + o.a; }
+  function qSig(q) { var o = qParse(q); return o.n === 4 ? qStr({ n: 1, a: o.a + 1 }) : qStr({ n: o.n + 1, a: o.a }); }
+  function qAnt(q) { var o = qParse(q); return o.n === 1 ? qStr({ n: 4, a: o.a - 1 }) : qStr({ n: o.n - 1, a: o.a }); }
+  function qCierre(q) { var o = qParse(q); return new Date(Date.UTC(o.a, o.n * 3, 0)).toISOString().slice(0, 10); }
+  function qUltimoCerrado() { var d = new Date(); return qAnt(qStr({ n: Math.floor(d.getMonth() / 3) + 1, a: d.getFullYear() })); }
+  function qLista() { var q = qSig(qSig(qUltimoCerrado())), out = []; for (var i = 0; i < 12; i++) { out.push(q); q = qAnt(q); } return out; }
+  function limpiarCodigo(c) { return String(c || '').trim().replace(/\s+/g, '-').replace(/[^A-Za-z0-9_\-.]/g, '').slice(0, 40); }
+  function idInforme(cod, q) { return limpiarCodigo(cod) + '_' + q.replace(' ', '-'); }
+
+  /* ================= Capacidades de la plataforma ================= */
+  var C = { db: null, sample: null, assets: null, downloads: null };
+  var capacidades = (window.claude && window.claude.use)
+    ? Promise.all(['db', 'sample', 'assets', 'downloads'].map(function (n) { return window.claude.use(n).catch(function () { return null; }); }))
+        .then(function (r) { C.db = r[0]; C.sample = r[1]; C.assets = r[2]; C.downloads = r[3]; })
+    : Promise.resolve();
+
+  /* ================= Estado ================= */
+  var S = {
+    vista: 'inicio', paso: 0, cargado: false,
+    proyectos: {}, informes: {},
+    doc: null, fuentes: null, prev: null,
+    form: null, mensaje: null, ocupado: null, gen: null, abortar: null, qa: null,
+    confirmar: null, adjuntos: {}, limites: null,
+    marcas: {}, marcando: null, herramienta: 'resaltar'
+  };
+  function estadoCab(t, error) { var el = $('#cab-estado'); el.textContent = t || ''; el.style.color = error ? 'var(--a-error)' : ''; }
+
+  /* ================= Guardado (una escritura cada vez por documento) ================= */
+  var colas = {}, temporizadores = {};
+  function escribir(ruta, cuerpo, espera) {
+    if (!C.db) return Promise.resolve();
+    clearTimeout(temporizadores[ruta]);
+    return new Promise(function (res) {
+      temporizadores[ruta] = setTimeout(function () {
+        var datos = clon(cuerpo);
+        if (bytes(JSON.stringify(datos)) > 250000) { estadoCab('El documento supera el tamaño máximo; reduce fuentes o fotos.', true); return res(); }
+        colas[ruta] = (colas[ruta] || Promise.resolve()).then(function () { return C.db.doc(ruta).set(datos); })
+          .then(function () { estadoCab('Guardado · ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })); },
+                function (e) { estadoCab('No se ha podido guardar (' + (e && e.code || 'error') + ').', true); });
+        colas[ruta].then(res, res);
+      }, espera == null ? 700 : espera);
+    });
+  }
+  function guardarDoc(espera) { if (!S.doc) return Promise.resolve(); S.doc.actualizado = ahora(); S.informes[S.doc.id] = S.doc; return escribir('informes/' + S.doc.id, S.doc, espera); }
+  function guardarFuentes(espera) { if (!S.doc || !S.fuentes) return Promise.resolve(); return escribir('fuentes/' + S.doc.id, S.fuentes, espera); }
+  function anotar(texto) { S.doc.cambios = (S.doc.cambios || []).concat({ fecha: ahora(), texto: texto }).slice(-100); }
+
+  /* ================= Arranque ================= */
+  capacidades.then(function () {
+    if (C.sample && C.sample.limits) C.sample.limits().then(function (l) { S.limites = l || null; }, function () {});
+    if (C.db) {
+      C.db.collection('proyectos').onSnapshot(function (snap) {
+        S.proyectos = {}; snap.docs.forEach(function (d) { S.proyectos[d.id] = d.data(); });
+        if (S.vista === 'inicio' || (S.vista === 'nuevo' && S.paso === 0)) render();
+      }, function () {});
+      C.db.collection('informes').onSnapshot(function (snap) {
+        var nuevos = {};
+        snap.docs.forEach(function (d) { nuevos[d.id] = (S.doc && d.id === S.doc.id) ? S.doc : d.data(); });
+        if (S.doc) nuevos[S.doc.id] = S.doc;
+        S.informes = nuevos;
+        S.cargado = true;
+        if (S.vista === 'inicio') render();
+      }, function () { S.cargado = true; render(); });
+    } else { S.cargado = true; }
+    render();
+  });
+
+  /* ================= Render ================= */
+  function render() {
+    var main = $('#principal');
+    document.body.classList.toggle('con-fondo', S.vista === 'inicio');
+    if (S.vista === 'editor') return renderEditor(main);
+    var html = avisosPlataforma();
+    if (S.vista === 'inicio') html += vistaInicio();
+    else if (S.vista === 'nuevo') html += vistaPasos();
+    else if (S.vista === 'generando') html += vistaGenerando();
+    main.innerHTML = html;
+    if (S.vista === 'nuevo' && S.paso === 2) prepararSoltar();
+  }
+  function avisosPlataforma() {
+    var h = '';
+    if (!window.claude) h += '<div class="aviso error">Abre esta herramienta desde claude.ai: fuera de Claude no puede guardar ni redactar.</div>';
+    else {
+      if (!C.db) h += '<div class="aviso error">No hay acceso a los datos compartidos en esta vista. Pide al propietario que te comparta la herramienta con permiso de edición.</div>';
+      if (!C.sample) h += '<div class="aviso">' + (PORTAL ? 'Tu acceso a Proyectos es de lectura: puedes consultar informes, pero no generarlos ni corregirlos.' : 'Claude no está disponible en esta vista: puedes consultar informes, pero no generar ni corregir.') + '</div>';
+    }
+    if (S.mensaje) h += '<div class="aviso ' + (S.mensaje.tipo || '') + '">' + S.mensaje.texto + '</div>';
+    return h;
+  }
+  function mensaje(texto, tipo) { S.mensaje = texto ? { texto: texto, tipo: tipo } : null; }
+
+  /* ---------- Inicio ---------- */
+  function vistaInicio() {
+    var lista = Object.keys(S.informes).map(function (k) { return S.informes[k]; })
+      .sort(function (a, b) { return (b.actualizado || '').localeCompare(a.actualizado || ''); });
+    var filas = lista.map(function (d) {
+      return '<tr><td><b>' + esc(d.proyecto) + '</b><br><span class="sutil">' + esc(d.codigo) + '</span></td>' +
+        '<td class="num">' + esc(d.trimestre) + '</td><td>' + chipEstado(d.estado) + '</td>' +
+        '<td class="num">v' + esc(d.version || 1) + '</td><td class="num">' + esc(fecha(d.actualizado)) + '</td>' +
+        '<td>' + (S.confirmar === d.id ? confirmarBorrado(d) : '<span class="fila" style="gap:6px"><button class="btn btn-min" data-accion="abrir" data-id="' + esc(d.id) + '">Abrir</button>' + (C.db ? '<button class="btn btn-min btn-peligro" data-accion="pedir-borrar" data-id="' + esc(d.id) + '">Eliminar</button>' : '') + '</span>') + '</td></tr>';
+    }).join('');
+    return '<div class="tarjeta"><div class="fila" style="justify-content:flex-end"><button class="btn btn-prim" data-accion="nuevo"' + (C.db ? '' : ' disabled') + '>Nuevo informe</button></div>' + (lista.length
+        ? '<div class="tabla-env"><table class="t"><thead><tr><th>Proyecto</th><th>Trimestre</th><th>Estado</th><th>Versión</th><th>Actualizado</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+        : '<p class="sutil">' + (S.cargado ? 'Todavía no hay informes. Empieza con «Nuevo informe».' : 'Cargando informes…') + '</p>') + '</div>' +
+      '<p class="sutil">Flujo: datos del informe → informe anterior → información del trimestre → biblioteca y GO → revisión y correcciones → PDF. ' + (PORTAL ? 'Las actas y la planificación del trimestre se cargan solas.' : 'Cada petición a Claude usa tu propia cuenta.') + '</p>';
+  }
+  function confirmarBorrado(d) {
+    return '<span class="confirmar"><span>¿Eliminar <b>' + esc(d.proyecto) + ' ' + esc(d.trimestre) + '</b> con sus fuentes, fotos y versiones? No se puede deshacer.</span>' +
+      '<button class="btn btn-min btn-peligro" data-accion="borrar" data-id="' + esc(d.id) + '">Sí, eliminar</button><button class="btn btn-min" data-accion="cancelar-borrar">Cancelar</button></span>';
+  }
+  var ESTADOS = { datos: ['Datos', ''], fuentes: ['Fuentes', ''], analizado: ['Pendiente de GO', 'marca'], generando: ['Generando', 'aviso'], borrador: ['Borrador', 'aviso'], aprobado: ['Aprobado', 'ok'] };
+  function chipEstado(e) { var x = ESTADOS[e] || [e || '—', '']; return '<span class="chip ' + x[1] + '">' + esc(x[0]) + '</span>'; }
+
+  /* ---------- Pasos 0–3 ---------- */
+  var NOMBRES_PASOS = ['Datos del informe', 'Informe anterior', 'Información del trimestre', 'Biblioteca y GO'];
+  function vistaPasos() {
+    var pasos = '<ol class="pasos">' + NOMBRES_PASOS.map(function (n, i) { return '<li class="' + (i < S.paso ? 'hecho' : i === S.paso ? 'actual' : '') + '">' + n + '</li>'; }).join('') + '</ol>';
+    var cab = '<div class="fila fila-sep"><h2>' + (S.doc ? esc(S.doc.proyecto) + ' · ' + esc(S.doc.trimestre) : 'Nuevo informe') + '</h2><button class="btn-texto" data-accion="inicio">Volver a la lista</button></div>';
+    return cab + pasos + [paso0, paso1, paso2, paso3][S.paso]();
+  }
+
+  function paso0() {
+    var f = S.form || (S.form = { proyecto: Object.keys(S.proyectos)[0] || '__nuevo', qNew: qUltimoCerrado(), arquetipo: 'A', variante: 'cnmv', tipo: 'fondo' });
+    if (!f.qAnt) f.qAnt = qAnt(f.qNew);
+    var opts = Object.keys(S.proyectos).sort().map(function (k) { var p = S.proyectos[k]; return '<option value="' + esc(k) + '"' + (f.proyecto === k ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' + esc(p.codigo) + '</option>'; }).join('');
+    var qs = qLista().map(function (q) { return q; });
+    function selQ(campo) { return '<select id="f-' + campo + '" data-campo="form.' + campo + '">' + qs.map(function (q) { return '<option' + (f[campo] === q ? ' selected' : '') + '>' + q + '</option>'; }).join('') + '</select>'; }
+    var nuevo = f.proyecto === '__nuevo';
+    var campos = nuevo ? '<div class="rejilla">' +
+      campo('Nombre del proyecto', '<input type="text" id="f-nombre" data-campo="form.nombre" value="' + esc(f.nombre || '') + '" placeholder="Santa Engracia 84">') +
+      campo('Código corto', '<input type="text" id="f-codigo" data-campo="form.codigo" value="' + esc(f.codigo || '') + '" placeholder="SE84">') +
+      campo('Tipo de proyecto', '<select id="f-arquetipo" data-campo="form.arquetipo">' + [['A', 'A · Hospitality / apartamentos'], ['B', 'B · Branded residences'], ['C', 'C · Mixto residencial + hotelero'], ['D', 'D · Value-add residencial'], ['E', 'E · Cartera / multi-activo']].map(function (o) { return '<option value="' + o[0] + '"' + (f.arquetipo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>') +
+      campo('Vehículo', '<select id="f-variante" data-campo="form.variante"><option value="cnmv"' + (f.variante === 'cnmv' ? ' selected' : '') + '>Fondo CNMV (ISIN)</option><option value="sl"' + (f.variante === 'sl' ? ' selected' : '') + '>Sociedad (NIF)</option></select>') +
+      (f.variante === 'cnmv'
+        ? campo('Nombre del fondo', '<input type="text" id="f-fondo" data-campo="form.fondo" value="' + esc(f.fondo || '') + '">') + campo('ISIN', '<input type="text" id="f-isin" data-campo="form.isin" value="' + esc(f.isin || '') + '">')
+        : campo('Sociedad', '<input type="text" id="f-vehiculo" data-campo="form.vehiculo" value="' + esc(f.vehiculo || '') + '">') + campo('NIF', '<input type="text" id="f-nif" data-campo="form.nif" value="' + esc(f.nif || '') + '">')) +
+      '</div><p class="sutil">Los datos del vehículo salen en el pie legal de cada página. Si hay informe anterior, se toman de él.</p>' : '';
+    return '<div class="tarjeta"><h3>¿Qué informe vamos a preparar?</h3><div class="rejilla">' +
+      campo('Proyecto', '<select id="f-proyecto" data-campo="form.proyecto">' + opts + '<option value="__nuevo"' + (nuevo ? ' selected' : '') + '>Otro proyecto…</option></select>') +
+      campo('Trimestre anterior', selQ('qAnt')) + campo('Trimestre nuevo', selQ('qNew')) + '</div>' + campos +
+      '<div class="fila"><button class="btn btn-prim" data-accion="paso0"' + (C.db ? '' : ' disabled') + '>Continuar</button></div></div>';
+  }
+  function campo(etq, control) { return '<label class="campo">' + esc(etq) + control + '</label>'; }
+
+  function paso1() {
+    var p = S.prev, base;
+    if (p && p.tipo === 'estructurado') base = '<div class="aviso ok">Se usará el informe <b>' + esc(S.doc.trimestreAnterior) + '</b> guardado en la herramienta (' + p.slides.filter(function (s) { return !s.oculto; }).length + ' slides, v' + esc(p.version || 1) + '). No hace falta subir nada.</div>';
+    else if (S.fuentes && S.fuentes.previoTexto) base = '<div class="aviso ok">Informe anterior leído: <b>' + esc(S.fuentes.previoNombre) + '</b> · ' + S.fuentes.previoTexto.length.toLocaleString('es-ES') + ' caracteres.</div><details><summary class="sutil">Ver el texto extraído</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:260px;overflow:auto">' + esc(S.fuentes.previoTexto.slice(0, 4000)) + '</pre></details>';
+    else base = '<p>Sube el informe del <b>' + esc(S.doc.trimestreAnterior) + '</b> en PDF o PowerPoint. Se lee en tu navegador; solo se guarda el texto.</p>';
+    var subir = (p && p.tipo === 'estructurado') ? '' :
+      '<label class="soltar" id="soltar-previo">Arrastra aquí el PDF o PPTX, o pulsa para elegirlo<input type="file" id="f-previo" accept=".pdf,.pptx" class="oculto" data-cambio="previo"></label>' +
+      '<label class="fila sutil"><input type="checkbox" id="f-sinprevio" data-campo="doc.sinPrevio"' + (S.doc.sinPrevio ? ' checked' : '') + '> No hay informe anterior (proyecto nuevo)</label>';
+    var listo = (p && p.tipo === 'estructurado') || (S.fuentes && S.fuentes.previoTexto) || S.doc.sinPrevio;
+    return '<div class="tarjeta"><h3>Informe anterior · ' + esc(S.doc.trimestreAnterior) + '</h3>' + base + subir +
+      (S.ocupado ? '<p class="sutil">' + esc(S.ocupado) + '</p>' : '') +
+      '<div class="fila"><button class="btn" data-accion="ir" data-paso="0">Atrás</button><button class="btn btn-prim" data-accion="paso1"' + (listo ? '' : ' disabled') + '>Continuar</button></div></div>';
+  }
+
+  var CATEGORIAS = ['Obra', 'Portada', 'Render o diseño', 'Página de Finanzas', 'Otra'];
+  var PARA_FINANZAS = [['resumen-financiero', 'Resumen financiero'], ['varianzas', 'Análisis de varianzas'], ['seguimiento-economico-obra', 'Seguimiento económico de obra']];
+  function paso2() {
+    var fu = S.fuentes || {};
+    var docs = (fu.documentos || []).map(function (d, i) { return '<li>' + esc(d.nombre) + ' <span class="sutil">· ' + d.texto.length.toLocaleString('es-ES') + ' caracteres</span> <button class="btn-texto" data-accion="quitar-doc" data-i="' + i + '">Quitar</button></li>'; }).join('');
+    var fotos = (S.doc.fotos || []).map(function (f, i) {
+      return '<div class="foto"><img src="/api/informes/assets/' + esc(f.id) + '" alt="' + esc(f.pie || 'Foto ' + (i + 1)) + '">' +
+        '<select id="foto-cat-' + i + '" data-campo="foto.' + i + '.categoria" aria-label="Categoría">' + CATEGORIAS.map(function (c) { return '<option' + (f.categoria === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
+        (f.categoria === 'Página de Finanzas' ? '<select id="foto-para-' + i + '" data-campo="foto.' + i + '.para" aria-label="Para qué slide">' + PARA_FINANZAS.map(function (o) { return '<option value="' + o[0] + '"' + (f.para === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' : '') +
+        '<input type="text" id="foto-pie-' + i + '" data-campo="foto.' + i + '.pie" value="' + esc(f.pie || '') + '" placeholder="Qué muestra (opcional)">' +
+        '<button class="btn-texto" data-accion="quitar-foto" data-i="' + i + '">Quitar foto</button></div>';
+    }).join('');
+    return '<div class="tarjeta"><h3>Información del ' + esc(S.doc.trimestre) + '</h3>' +
+      '<p class="sutil">Pega todo lo que tengas: notas, correos, actas, informes del PM, del asesor BREEAM o de Finanzas. No hace falta ordenarlo.</p>' +
+      '<textarea id="f-notas" data-campo="fuentes.notas" placeholder="Notas del trimestre…">' + esc(fu.notas || '') + '</textarea>' +
+      '<label class="soltar" id="soltar-docs">Documentos (PDF, Word, PowerPoint, Excel, texto): arrastra aquí o pulsa para elegir<input type="file" id="f-docs" multiple accept=".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.csv" class="oculto" data-cambio="docs"></label>' +
+      (docs ? '<ul class="lista">' + docs + '</ul>' : '') + '</div>' +
+      '<div class="tarjeta"><h3>Fotos</h3>' +
+      (C.assets ? '<label class="soltar" id="soltar-fotos">Arrastra las fotos (JPG, PNG) o pulsa para elegirlas. Indica la categoría de cada una.<input type="file" id="f-fotos" multiple accept="image/jpeg,image/png,image/webp" class="oculto" data-cambio="fotos"></label>'
+        : '<p class="sutil">Para subir fotos necesitas permiso de edición de esta herramienta.</p>') +
+      (fotos ? '<div class="fotos">' + fotos + '</div>' : '') + '</div>' +
+      (S.ocupado ? '<p class="sutil" aria-live="polite">' + esc(S.ocupado) + '</p>' : '') +
+      '<div class="fila"><button class="btn" data-accion="ir" data-paso="1">Atrás</button>' +
+      '<button class="btn btn-prim" data-accion="analizar"' + (C.sample && !S.ocupado ? '' : ' disabled') + '>Analizar la información</button>' +
+      '<span class="sutil">Claude lee todo y propone la estructura (1–2 minutos).</span></div>';
+  }
+
+  function paso3() {
+    var a = S.doc.analisis || {}, sel = S.doc.seleccion || { anadir: [], estructura: [] };
+    var sug = a.sugeridas || [];
+    var presentes = {}; sel.estructura.forEach(function (e) { presentes[e.id] = 1; });
+    var resumen = (a.resumen || []).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
+    var objetivos = (a.objetivosPrevios || []).map(function (o) { return '<tr><td>' + esc(o.objetivo) + '</td><td>' + chipObjetivo(o.estado) + '</td><td class="sutil">' + esc(o.evidencia || '') + '</td></tr>'; }).join('');
+    var ACC = [['mantener', 'Mantener (sin cambios)'], ['actualizar', 'Actualizar'], ['ocultar', 'Ocultar'], ['nueva', 'Nueva']];
+    var estructura = sel.estructura.map(function (e, i) {
+      var b = BIB.filter(function (x) { return x.id === e.id; })[0];
+      return '<tr><td class="num">' + (i + 1) + '</td><td><b>' + esc(e.titulo || (b && b.nombre) || e.id) + '</b><br><span class="sutil">' + esc(e.id) + '</span></td>' +
+        '<td><select id="est-' + i + '" data-campo="est.' + i + '.accion" aria-label="Acción">' + ACC.map(function (o) { return '<option value="' + o[0] + '"' + (e.accion === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td>' +
+        '<td class="sutil">' + esc(e.motivo || '') + '</td></tr>';
+    }).join('');
+    var biblioteca = BIB.filter(function (b) { return !presentes[b.id] && ['portada', 'indice', 'disclaimer', 'cierre'].indexOf(b.id) < 0; }).map(function (b) {
+      var estrella = sug.indexOf(b.n) >= 0;
+      return '<tr><td><input type="checkbox" id="bib-' + b.n + '" data-campo="bib.' + b.n + '"' + (sel.anadir.indexOf(b.n) >= 0 ? ' checked' : '') + ' aria-label="Añadir ' + esc(b.nombre) + '"></td>' +
+        '<td class="num">' + b.n + '</td><td><b>' + esc(b.nombre) + '</b>' + (estrella ? ' <span class="estrella" title="Recomendada">★ recomendada</span>' : '') + '<br><span class="sutil">' + esc(b.para) + '</span></td><td class="sutil">' + esc(b.sugerir) + '</td></tr>';
+    }).join('');
+    var nClaude = sel.estructura.filter(function (e) { return e.accion === 'actualizar' || e.accion === 'nueva'; }).length + sel.anadir.length + 2;
+    function lst(arr) { return arr && arr.length ? '<ul class="lista">' + arr.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '<p class="sutil">Nada.</p>'; }
+    return '<div class="tarjeta"><h3>Lo que he entendido del trimestre</h3><ul class="lista">' + resumen + '</ul></div>' +
+      (objetivos ? '<div class="tarjeta"><h3>Objetivos del ' + esc(S.doc.trimestreAnterior) + '</h3><div class="tabla-env"><table class="t"><thead><tr><th>Objetivo</th><th>Estado</th><th>Evidencia</th></tr></thead><tbody>' + objetivos + '</tbody></table></div></div>' : '') +
+      '<div class="tarjeta"><h3>Estructura propuesta</h3><div class="tabla-env"><table class="t"><thead><tr><th>Nº</th><th>Slide</th><th>Acción</th><th>Motivo</th></tr></thead><tbody>' + estructura + '</tbody></table></div></div>' +
+      '<div class="tarjeta"><h3>Biblioteca · ¿añadimos alguna slide más?</h3><div class="tabla-env"><table class="t"><thead><tr><th></th><th>Nº</th><th>Slide</th><th>Se sugiere cuando</th></tr></thead><tbody>' + biblioteca + '</tbody></table></div></div>' +
+      '<div class="rejilla"><div class="tarjeta"><h3>Datos que faltan</h3>' + lst(a.faltan) + '<p class="sutil">Quedarán marcados como [pendiente] en el informe.</p></div>' +
+      '<div class="tarjeta"><h3>Contradicciones entre fuentes</h3>' + lst(a.contradicciones) + '</div></div>' +
+      '<div class="tarjeta"><div class="fila fila-sep"><p class="sutil">Se harán unas ' + nClaude + ' peticiones a Claude' + (PORTAL ? '' : ' con tu cuenta') + '. Tardará unos ' + Math.max(3, Math.round(nClaude * 0.6)) + ' minutos; puedes dejar la pestaña abierta mientras tanto.</p>' +
+      '<div class="fila"><button class="btn" data-accion="ir" data-paso="2">Atrás</button><button class="btn btn-prim btn-go" data-accion="go"' + (C.sample ? '' : ' disabled') + '>GO · Generar informe</button></div></div></div>';
+  }
+  function chipObjetivo(e) { var m = { cumplido: 'ok', parcial: 'aviso', 'no cumplido': 'error' }; return '<span class="chip ' + (m[e] || '') + '">' + esc(e || '—') + '</span>'; }
+
+  /* ---------- Generación ---------- */
+  function vistaGenerando() {
+    var g = S.gen || { filas: [], fase: '' };
+    var hechas = g.filas.filter(function (f) { return f.estado === 'hecho' || f.estado === 'error'; }).length;
+    var pct = g.filas.length ? Math.round(100 * hechas / g.filas.length) : 0;
+    var ICO = { cola: '·', curso: '●', hecho: '✓', error: '!', fijo: '✓' };
+    var filas = g.filas.map(function (f) {
+      return '<div class="progreso-fila ' + (f.estado === 'curso' ? 'en-curso' : '') + '"><span class="ico" style="color:' + (f.estado === 'error' ? 'var(--a-error)' : f.estado === 'hecho' || f.estado === 'fijo' ? 'var(--a-ok)' : '') + '">' + ICO[f.estado] + '</span>' +
+        '<span>' + esc(f.titulo) + (f.detalle ? ' <span class="sutil">· ' + esc(f.detalle) + '</span>' : '') + '</span><span class="sutil">' + esc(f.nota || '') + '</span></div>';
+    }).join('');
+    return '<div class="fila fila-sep"><h2>' + esc(S.doc.proyecto) + ' · ' + esc(S.doc.trimestre) + '</h2><button class="btn" data-accion="parar">Parar</button></div>' +
+      '<div class="tarjeta"><p><b>' + esc(g.fase) + '</b></p><div class="barra" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="progreso" id="progreso">' + filas + '</div></div>';
+  }
+  function refrescarGen() { if (S.vista === 'generando') render(); }
+
+  /* ================= Eventos ================= */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-accion]'); if (!b || b.disabled) return;
+    var f = ACCIONES[b.getAttribute('data-accion')]; if (f) { e.preventDefault(); f(b); }
+  });
+  document.addEventListener('input', function (e) { if (e.target.matches('[data-campo]') && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') cambioCampo(e.target, false); });
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('[data-campo]')) cambioCampo(e.target, true);
+    if (e.target.matches('[data-cambio]')) subirFicheros(e.target.getAttribute('data-cambio'), e.target.files);
+  });
+
+  function cambioCampo(el, final) {
+    var ruta = el.getAttribute('data-campo').split('.'), v = el.type === 'checkbox' ? el.checked : el.value;
+    if (ruta[0] === 'form') {
+      S.form[ruta[1]] = v;
+      if (ruta[1] === 'qNew') S.form.qAnt = qAnt(v);
+      if (final && ['proyecto', 'qNew', 'variante'].indexOf(ruta[1]) >= 0) render();
+    } else if (ruta[0] === 'fuentes') { S.fuentes[ruta[1]] = v; guardarFuentes(1200); }
+    else if (ruta[0] === 'doc') { S.doc[ruta[1]] = v; guardarDoc(); if (final) render(); }
+    else if (ruta[0] === 'foto') {
+      var foto = S.doc.fotos[+ruta[1]]; foto[ruta[2]] = v;
+      if (ruta[2] === 'categoria' && v === 'Página de Finanzas' && !foto.para) foto.para = 'resumen-financiero';
+      guardarDoc(); if (final && ruta[2] === 'categoria') render();
+    } else if (ruta[0] === 'est') { S.doc.seleccion.estructura[+ruta[1]].accion = v; guardarDoc(); render(); }
+    else if (ruta[0] === 'bib') {
+      var n = +ruta[1], a = S.doc.seleccion.anadir;
+      if (v && a.indexOf(n) < 0) a.push(n); if (!v) S.doc.seleccion.anadir = a.filter(function (x) { return x !== n; });
+      guardarDoc(); render();
+    }
+  }
+
+  var ACCIONES = {
+    inicio: function () { S.vista = 'inicio'; S.doc = null; S.fuentes = null; S.prev = null; mensaje(null); render(); },
+    nuevo: function () { S.vista = 'nuevo'; S.paso = 0; S.doc = null; S.fuentes = null; S.prev = null; S.form = null; mensaje(null); render(); },
+    abrir: function (b) { abrir(b.getAttribute('data-id')); },
+    ir: function (b) { S.paso = +b.getAttribute('data-paso'); mensaje(null); render(); },
+    paso0: paso0Continuar,
+    paso1: function () { S.doc.base = S.prev && S.prev.tipo === 'estructurado' ? { tipo: 'estructurado', id: S.prev.id } : S.fuentes.previoTexto ? { tipo: 'texto', nombre: S.fuentes.previoNombre } : { tipo: 'ninguno' }; if (S.doc.estado === 'datos') S.doc.estado = 'fuentes'; guardarDoc(0); S.paso = 2; render(); },
+    'quitar-doc': function (b) { S.fuentes.documentos.splice(+b.getAttribute('data-i'), 1); guardarFuentes(0); render(); },
+    'quitar-foto': function (b) {
+      var i = +b.getAttribute('data-i'), f = S.doc.fotos[i];
+      S.doc.fotos.splice(i, 1); guardarDoc(0); render();
+      if (C.assets && f) C.assets.delete(f.id).catch(function () {});
+    },
+    analizar: analizar,
+    go: generar,
+    'pedir-borrar': function (b) { S.confirmar = b.getAttribute('data-id'); mensaje(null); render(); },
+    'cancelar-borrar': function () { S.confirmar = null; render(); },
+    borrar: function (b) { eliminarInforme(b.getAttribute('data-id')); },
+    'adj-quitar': function (b) { var a = S.adjuntos[b.getAttribute('data-id')]; if (a) { a.splice(+b.getAttribute('data-i'), 1); pintarAdjuntos(b.getAttribute('data-id')); } },
+    parar: function () { if (S.abortar) S.abortar.abort(); },
+    // Editor
+    'ed-corregir': function (b) { var s = $('#ed-' + b.getAttribute('data-id')); var c = $('.ed-corregir', s); c.classList.toggle('oculto'); if (!c.classList.contains('oculto')) $('textarea', c).focus(); },
+    'ed-aplicar': function (b) { corregirSlide(b.getAttribute('data-id')); },
+    'ed-marcar': function (b) { alternarMarcar(b.getAttribute('data-id')); },
+    'marca-herr': function (b) { elegirHerramienta(b.getAttribute('data-h')); },
+    'marca-deshacer': function (b) { var id = b.getAttribute('data-id'); (S.marcas[id] || []).pop(); dibujarMarcas(id); },
+    'marca-borrar': function (b) { borrarMarcas(b.getAttribute('data-id')); },
+    'ed-subir': function (b) { moverSlide(b.getAttribute('data-id'), -1); },
+    'ed-bajar': function (b) { moverSlide(b.getAttribute('data-id'), 1); },
+    'ed-ocultar': function (b) { alternarOculto(b.getAttribute('data-id')); },
+    'ed-anadir': anadirDesdeBiblioteca,
+    'ed-coherencia': revisarCoherencia,
+    'ed-version': guardarVersion,
+    'ed-aprobar': aprobar,
+    'ed-pdf': exportarPdf,
+    'ed-ir': function (b) { var el = $('#ed-' + b.getAttribute('data-id')); if (el) el.scrollIntoView({ behavior: 'smooth' }); }
+  };
+
+  /* ================= Abrir y crear ================= */
+  function cargarDoc(id) {
+    return Promise.all([C.db.doc('informes/' + id).get(), C.db.doc('fuentes/' + id).get()]).then(function (r) {
+      S.doc = r[0].exists ? clon(r[0].data()) : null;
+      S.fuentes = r[1].exists ? clon(r[1].data()) : { notas: '', documentos: [] };
+      if (!S.fuentes.documentos) S.fuentes.documentos = [];
+    });
+  }
+  function cargarPrevio() {
+    S.prev = null;
+    if (!S.doc) return Promise.resolve();
+    return C.db.doc('informes/' + idInforme(S.doc.codigo, S.doc.trimestreAnterior)).get().then(function (d) {
+      if (d.exists) { var x = d.data(); if (x.informe && x.informe.slides && x.informe.slides.length) S.prev = { tipo: 'estructurado', id: d.id, slides: clon(x.informe.slides), meta: clon(x.informe.meta || {}), version: x.version }; }
+    });
+  }
+  function abrir(id) {
+    if (!C.db) return;
+    S.marcas = {}; S.marcando = null;
+    estadoCab('Abriendo…');
+    cargarDoc(id).then(cargarPrevio).then(function () {
+      estadoCab('');
+      if (!S.doc) { mensaje('Ese informe ya no existe.', 'error'); S.vista = 'inicio'; return render(); }
+      mensaje(null);
+      var e = S.doc.estado;
+      if (e === 'borrador' || e === 'aprobado') { S.vista = 'editor'; }
+      else { S.vista = 'nuevo'; S.paso = e === 'datos' ? 1 : e === 'fuentes' ? 2 : 3; if (e === 'generando') mensaje('La generación anterior no terminó. Revisa la selección y pulsa GO para repetirla.'); }
+      render();
+    });
+  }
+  function eliminarInforme(id) {
+    if (!C.db) return;
+    var d = S.informes[id] || (S.doc && S.doc.id === id ? S.doc : null);
+    var fotos = (d && d.fotos) || [];
+    var otros = Object.keys(S.informes).filter(function (k) { return k !== id; }).map(function (k) { return JSON.stringify(S.informes[k]); }).join('\n');
+    S.confirmar = null; estadoCab('Eliminando…');
+    function ign(p) { return p.catch(function () {}); }
+    Promise.all([ign(C.db.doc('informes/' + id).delete()), ign(C.db.doc('fuentes/' + id).delete())])
+      .then(function () { return ign(C.db.collection('versiones').where('informeId', '==', id).get().then(function (snap) { return Promise.all(snap.docs.map(function (x) { return ign(C.db.doc('versiones/' + x.id).delete()); })); })); })
+      .then(function () {
+        if (C.assets) fotos.forEach(function (f) { if (f.id && otros.indexOf(f.id) < 0) C.assets.delete(f.id).catch(function () {}); });
+        delete S.informes[id];
+        if (S.doc && S.doc.id === id) { S.doc = null; S.fuentes = null; S.prev = null; S.vista = 'inicio'; }
+        estadoCab(''); mensaje('Informe eliminado.', 'ok'); render();
+      }, function (e) { estadoCab(''); mensaje('No se ha podido eliminar el informe (' + (e && e.code || 'error') + ').', 'error'); render(); });
+  }
+  function paso0Continuar() {
+    var f = S.form, proyecto, codigo;
+    if (qSig(f.qAnt) !== f.qNew) { mensaje('El trimestre nuevo debe ser el siguiente al anterior (' + qSig(f.qAnt) + ').', 'error'); return render(); }
+    if (f.proyecto === '__nuevo') {
+      codigo = limpiarCodigo(f.codigo);
+      if (!f.nombre || !codigo) { mensaje('Indica el nombre y el código corto del proyecto.', 'error'); return render(); }
+      proyecto = { nombre: f.nombre.trim(), codigo: codigo, arquetipo: f.arquetipo,
+        pie: f.variante === 'cnmv' ? { variante: 'cnmv', tipo: 'fondo', fondo: f.fondo || '', isin: f.isin || '' } : { variante: 'sl', vehiculo: f.vehiculo || '', nif: f.nif || '' },
+        actualizado: ahora() };
+      S.proyectos[codigo] = proyecto;
+      C.db.doc('proyectos/' + codigo).set(proyecto).catch(function () {});
+    } else { codigo = f.proyecto; proyecto = S.proyectos[codigo]; }
+    var id = idInforme(codigo, f.qNew);
+    estadoCab('Preparando…');
+    cargarDoc(id).then(function () {
+      if (S.doc) { mensaje('Ya existía el informe ' + esc(proyecto.nombre) + ' ' + esc(f.qNew) + ': se ha abierto donde se quedó.', 'ok'); return abrir(id); }
+      S.doc = { id: id, codigo: codigo, proyecto: proyecto.nombre, arquetipo: proyecto.arquetipo || 'A', trimestre: f.qNew, trimestreAnterior: f.qAnt, siguiente: qSig(f.qNew),
+        estado: 'datos', version: 1, creado: ahora(), actualizado: ahora(), fotos: [], cambios: [], pie: proyecto.pie || null };
+      S.fuentes = { notas: '', documentos: [], previoTexto: '', previoNombre: '' };
+      guardarDoc(0); guardarFuentes(0);
+      return cargarPrevio().then(function () { mensaje(null); S.paso = 1; render(); });
+    });
+  }
+
+  /* ================= Lectura de ficheros en el navegador ================= */
+  function prepararSoltar() {
+    [['soltar-docs', 'docs'], ['soltar-fotos', 'fotos'], ['soltar-previo', 'previo']].forEach(function (x) {
+      var z = document.getElementById(x[0]); if (!z) return;
+      z.addEventListener('dragover', function (e) { e.preventDefault(); z.classList.add('encima'); });
+      z.addEventListener('dragleave', function () { z.classList.remove('encima'); });
+      z.addEventListener('drop', function (e) { e.preventDefault(); z.classList.remove('encima'); subirFicheros(x[1], e.dataTransfer.files); });
+    });
+  }
+  function extraerTexto(file) {
+    var n = file.name.toLowerCase();
+    if (n.endsWith('.pdf')) return textoPdf(file);
+    if (n.endsWith('.pptx')) return textoOffice(file, /^ppt\/slides\/slide(\d+)\.xml$/, 'a:p', 'a:t', 'Slide');
+    if (n.endsWith('.docx')) return textoOffice(file, /^word\/document\.xml$/, 'w:p', 'w:t', null);
+    if (/\.(txt|md|csv|json)$/.test(n)) return file.text();
+    if (/\.(xlsx|xlsm|xls)$/.test(n)) return textoHoja(file);
+    return Promise.reject(new Error('Formato no admitido: ' + file.name + '. Pega su contenido en las notas.'));
+  }
+  function textoPdf(file) {
+    return cargarScript(CDN + 'pdf.js/3.11.174/pdf.min.js').then(function () {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+      return file.arrayBuffer();
+    }).then(function (buf) { return window.pdfjsLib.getDocument({ data: buf }).promise; }).then(function (pdf) {
+      var paginas = [];
+      for (var i = 1; i <= pdf.numPages; i++) paginas.push(i);
+      return paginas.reduce(function (p, i) {
+        return p.then(function (acc) {
+          return pdf.getPage(i).then(function (pg) { return pg.getTextContent(); }).then(function (tc) {
+            var t = tc.items.map(function (it) { return it.str + (it.hasEOL ? '\n' : ' '); }).join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+            return acc + '\n## Página ' + i + '\n' + t.trim() + '\n';
+          });
+        });
+      }, Promise.resolve(''));
+    });
+  }
+  function textoHoja(file) {
+    return cargarScript(CDN + 'xlsx/0.18.5/xlsx.full.min.js').then(function () { return file.arrayBuffer(); }).then(function (buf) {
+      var wb = window.XLSX.read(buf, { type: 'array' });
+      return wb.SheetNames.map(function (n) {
+        var csv = window.XLSX.utils.sheet_to_csv(wb.Sheets[n], { FS: ' | ', blankrows: false });
+        return '\n## Tabla «' + n + '» (columnas separadas por |)\n' + csv.trim();
+      }).join('\n');
+    });
+  }
+  function textoOffice(file, patron, parrafo, run, etiqueta) {
+    var dec = function (s) { return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'); };
+    return cargarScript(CDN + 'jszip/3.10.1/jszip.min.js').then(function () { return window.JSZip.loadAsync(file); }).then(function (zip) {
+      var nombres = Object.keys(zip.files).filter(function (k) { return patron.test(k); })
+        .sort(function (a, b) { return (+(patron.exec(a)[1] || 0)) - (+(patron.exec(b)[1] || 0)); });
+      return Promise.all(nombres.map(function (k) { return zip.file(k).async('string'); })).then(function (xmls) {
+        return xmls.map(function (xml, i) {
+          var ps = xml.split('</' + parrafo + '>').map(function (p) {
+            var r = new RegExp('<' + run + '(?:\\s[^>]*)?>([^<]*)</' + run + '>', 'g'), m, out = '';
+            while ((m = r.exec(p))) out += dec(m[1]);
+            return out.trim();
+          }).filter(Boolean);
+          return (etiqueta ? '\n## ' + etiqueta + ' ' + (i + 1) + '\n' : '') + ps.join('\n');
+        }).join('\n');
+      });
+    });
+  }
+  function redimensionar(file) {
+    return createImageBitmap(file).then(function (bmp) {
+      var k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height)), w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      return new Promise(function (ok) { cv.toBlob(function (b) { ok({ blob: b, w: w, h: h }); }, 'image/jpeg', 0.85); });
+    });
+  }
+  function subirFicheros(tipo, files) {
+    files = Array.prototype.slice.call(files || []); if (!files.length) return;
+    if (tipo.indexOf('adj:') === 0) return adjuntar(tipo.slice(4), files);
+    var i = 0;
+    function sig() {
+      if (i >= files.length) { S.ocupado = null; render(); return; }
+      var file = files[i++]; S.ocupado = 'Leyendo ' + file.name + '…'; render();
+      var p;
+      if (tipo === 'previo') p = extraerTexto(file).then(function (t) { S.fuentes.previoTexto = t.slice(0, 90000); S.fuentes.previoNombre = file.name; S.doc.sinPrevio = false; guardarFuentes(0); });
+      else if (tipo === 'docs') p = extraerTexto(file).then(function (t) { S.fuentes.documentos.push({ nombre: file.name, texto: t.slice(0, 60000) }); guardarFuentes(0); });
+      else p = redimensionar(file).then(function (r) { return C.assets.upload(r.blob, { type: 'image/jpeg' }).then(function (u) {
+        S.doc.fotos.push({ id: u.id, pie: '', categoria: 'Obra', w: r.w, h: r.h, nombre: file.name }); guardarDoc(0); }); });
+      p.then(sig, function (e) { mensaje('No se ha podido leer ' + esc(file.name) + ': ' + esc(e && (e.message || e.code) || 'error'), 'error'); sig(); });
+    }
+    sig();
+  }
+
+  /* ---------- Adjuntos de una corrección (imágenes, documentos y tablas) ---------- */
+  var ACEPTA_ADJ = 'image/jpeg,image/png,image/webp,.pdf,.docx,.pptx,.xlsx,.xls,.csv,.txt,.md';
+  function esImagen(file) { return /^image\/(jpeg|png|webp)$/.test(file.type); }
+  function adjuntar(id, files) {
+    var lista = S.adjuntos[id] || (S.adjuntos[id] = []);
+    var sec = $('#ed-' + CSS.escape(id)), est = sec && $('.estado-corr', sec);
+    var i = 0;
+    function sig() {
+      if (i >= files.length) { if (est) est.textContent = ''; pintarAdjuntos(id); return; }
+      var file = files[i++];
+      if (est) est.textContent = 'Leyendo ' + file.name + '…';
+      var p;
+      if (esImagen(file)) p = Promise.resolve({ tipo: 'imagen', nombre: file.name, file: file, url: URL.createObjectURL(file) });
+      else p = extraerTexto(file).then(function (t) { return { tipo: /\.(xlsx|xlsm|xls|csv)$/i.test(file.name) ? 'tabla' : 'documento', nombre: file.name, texto: t.slice(0, 40000) }; });
+      p.then(function (a) { lista.push(a); sig(); }, function (e) { if (est) est.textContent = 'No se ha podido leer ' + file.name + ': ' + (e && e.message || e); pintarAdjuntos(id); setTimeout(sig, 0); });
+    }
+    sig();
+  }
+  function pintarAdjuntos(id) {
+    var sec = $('#ed-' + CSS.escape(id)); if (!sec) return;
+    var el = $('.adjuntos', sec), lista = S.adjuntos[id] || [];
+    el.innerHTML = lista.map(function (a, i) {
+      var ico = a.tipo === 'imagen' ? '<img src="' + a.url + '" alt="">' : a.tipo === 'tabla' ? '▦' : '▤';
+      return '<span class="adjunto">' + ico + ' ' + esc(a.nombre) + (a.texto ? ' <span class="sutil">· ' + a.texto.length.toLocaleString('es-ES') + ' car.</span>' : '') +
+        '<button class="btn-texto" data-accion="adj-quitar" data-id="' + esc(id) + '" data-i="' + i + '" aria-label="Quitar ' + esc(a.nombre) + '">×</button></span>';
+    }).join('');
+  }
+  function prepararSoltarEditor() {
+    $$('.soltar-adj').forEach(function (z) {
+      var id = z.getAttribute('data-id');
+      z.addEventListener('dragover', function (e) { e.preventDefault(); z.classList.add('encima'); });
+      z.addEventListener('dragleave', function () { z.classList.remove('encima'); });
+      z.addEventListener('drop', function (e) { e.preventDefault(); z.classList.remove('encima'); adjuntar(id, Array.prototype.slice.call(e.dataTransfer.files || [])); });
+    });
+  }
+  /* Sube las imágenes adjuntas al almacén (si se puede) y devuelve lo que va al prompt y a Claude. */
+  function prepararAdjuntos(id) {
+    var lista = S.adjuntos[id] || [], imgs = lista.filter(function (a) { return a.tipo === 'imagen'; }), docs = lista.filter(function (a) { return a.tipo !== 'imagen'; });
+    var puedeVer = !!(S.limites && S.limites.images);
+    var subida = C.assets ? imgs.reduce(function (p, a) {
+      return p.then(function () {
+        if (a.id) return;
+        return redimensionar(a.file).then(function (r) { return C.assets.upload(r.blob, { type: 'image/jpeg' }).then(function (u) {
+          a.id = u.id; S.doc.fotos = S.doc.fotos || []; S.doc.fotos.push({ id: u.id, pie: a.nombre.replace(/\.[a-z0-9]+$/i, ''), categoria: 'Otra', w: r.w, h: r.h, nombre: a.nombre });
+        }); });
+      });
+    }, Promise.resolve()) : Promise.resolve();
+    return subida.then(function () {
+      var texto = '';
+      if (imgs.length) texto += '== IMÁGENES ADJUNTAS A ESTA CORRECCIÓN ==\n' + imgs.map(function (a) {
+        return '- ' + a.nombre + (a.id ? ' · src "/api/informes/assets/' + a.id + '" (puedes colocarla en el slide con ImagenMarco o Galeria si la instrucción lo pide o mejora el slide)' : ' (solo para consultar; no se puede colocar en el slide)') + (puedeVer ? ' · la ves adjunta: si contiene datos, una tabla o un texto, extráelos y úsalos' : '');
+      }).join('\n') + '\n';
+      if (docs.length) texto += '== MATERIAL ADJUNTO A ESTA CORRECCIÓN (úsalo como fuente; prevalece sobre lo anterior si se contradicen) ==\n' + docs.map(function (a) { return '### ' + (a.tipo === 'tabla' ? 'TABLA' : 'DOCUMENTO') + ': ' + a.nombre + '\n' + a.texto; }).join('\n\n');
+      return { texto: recortar(texto, 24000), imagenes: puedeVer ? imgs.slice(0, (S.limites.images.maxCount || 4)).map(function (a) { return a.file; }) : [], docs: docs, imgs: imgs };
+    });
+  }
+
+  /* ================= Peticiones a Claude ================= */
+  var MAX_BYTES = 62000, MODELO = 'complex';
+  function llamar(prompt, opciones) {
+    opciones = opciones || {};
+    // Siempre el modelo más capaz que ofrece la plataforma (hoy, Claude Opus 5.5).
+    var o = { modelTier: MODELO, cache: false };
+    if (S.abortar) o.signal = S.abortar.signal;
+    if (opciones.onText) o.onText = opciones.onText;
+    if (opciones.imagenes && opciones.imagenes.length) o.images = opciones.imagenes;
+    // En el portal, el coste de cada petición se apunta al informe (informe_uso).
+    if (PORTAL && S.doc) o.informeId = S.doc.id;
+    return C.sample.json(prompt, o);
+  }
+  function errorClaude(e) {
+    var m = { not_granted: 'No has permitido que esta herramienta use Claude.', rate_limited: 'Has alcanzado el límite de uso de Claude por ahora. Inténtalo más tarde.', prompt_too_large: 'Demasiada información para una sola petición: recorta las notas.', invalid_json: 'Claude no devolvió un resultado válido.', cancelled: 'Parado.', session_expired: 'Tu sesión ha caducado: vuelve a entrar en claude.ai.', refused: 'Claude no ha podido procesar esta petición.' };
+    return m[e && e.code] || ('Error de Claude (' + (e && (e.code || e.message) || 'desconocido') + ').');
+  }
+  function contexto() {
+    var d = S.doc;
+    return 'PROYECTO: ' + d.proyecto + ' (' + d.codigo + '), tipo ' + (d.arquetipo || '?') + '.\n' +
+      'INFORME NUEVO: ' + d.trimestre + ' (cierre ' + qCierre(d.trimestre) + '). Trimestre anterior: ' + d.trimestreAnterior + '. Los objetivos que fija el informe son para ' + d.siguiente + '.';
+  }
+  function fuentesTexto() {
+    var fu = S.fuentes || {}, out = '';
+    if (fu.notas) out += '### NOTAS DEL EQUIPO\n' + fu.notas + '\n\n';
+    (fu.documentos || []).forEach(function (d) { out += '### DOCUMENTO: ' + d.nombre + '\n' + d.texto + '\n\n'; });
+    return out || '(sin notas)';
+  }
+  function fotosTexto() {
+    var f = (S.doc.fotos || []).filter(function (x) { return x.categoria !== 'Página de Finanzas'; });
+    if (!f.length) return '(no hay fotos nuevas)';
+    return f.map(function (x) { return '- src "/api/informes/assets/' + x.id + '" · ' + x.categoria + ' · ' + (x.w >= x.h ? 'horizontal' : 'vertical') + (x.pie ? ' · ' + x.pie : ''); }).join('\n');
+  }
+  function hechosTexto() {
+    var a = S.doc.analisis || {};
+    var h = (a.hechos || []).map(function (x) { return '- [' + (x.tipo || '') + (x.modulo ? ' · ' + x.modulo : '') + '] ' + x.texto + (x.fecha ? ' (' + x.fecha + ')' : '') + (x.fuente ? ' — fuente: ' + x.fuente : ''); }).join('\n');
+    var o = (a.objetivosPrevios || []).map(function (x) { return '- ' + x.objetivo + ' → ' + x.estado + (x.evidencia ? ': ' + x.evidencia : ''); }).join('\n');
+    return (h || '(sin hechos)') + (o ? '\nOBJETIVOS DEL ' + S.doc.trimestreAnterior + ':\n' + o : '');
+  }
+  function componer(partes, relleno) {
+    // `relleno` (fuentes) ocupa lo que quede hasta el máximo de la petición.
+    var fijo = partes.join('\n\n');
+    var libre = Math.max(3000, MAX_BYTES - bytes(fijo) - 200);
+    return fijo + (relleno != null ? '\n\n== FUENTES DEL TRIMESTRE ==\n' + recortar(relleno, libre) : '');
+  }
+  function esquemaPrevio() {
+    if (S.prev && S.prev.tipo === 'estructurado') return 'ESTRUCTURA DEL INFORME ANTERIOR (id · título · extracto):\n' + S.prev.slides.map(function (s) { return '- ' + s.id + (s.oculto ? ' (oculta)' : '') + ' · ' + tituloDe(s) + ' · ' + textos(s).slice(0, 260); }).join('\n');
+    if (S.fuentes && S.fuentes.previoTexto) return 'TEXTO DEL INFORME ANTERIOR:\n' + recortar(S.fuentes.previoTexto, 22000);
+    return 'NO HAY INFORME ANTERIOR: es el primer informe del proyecto.';
+  }
+  function bibliotecaTexto() { return BIB.map(function (b) { return b.n + ' · ' + b.nombre + ' · id ' + b.id + ' · ' + b.para + ' · sugerir: ' + b.sugerir; }).join('\n'); }
+
+  function analizar() {
+    S.ocupado = 'Claude está leyendo la información…'; S.abortar = new AbortController(); render();
+    var estructurado = S.prev && S.prev.tipo === 'estructurado';
+    var prompt = componer([
+      'Eres el asistente de reporting de Impar Capital. Analiza la información para preparar el informe trimestral para inversores. Devuelve SOLO un objeto JSON.',
+      contexto(),
+      esquemaPrevio(),
+      'BIBLIOTECA DE SLIDES (nº · nombre · id · para qué · cuándo sugerirla):\n' + bibliotecaTexto(),
+      'FOTOS APORTADAS: ' + (S.doc.fotos || []).length + ' (' + (S.doc.fotos || []).map(function (f) { return f.categoria; }).join(', ') + ')',
+      'FORMA DEL JSON:\n{"resumen":["5 a 8 frases con lo esencial del trimestre"],' +
+        '"objetivosPrevios":[{"objetivo":"…","estado":"cumplido|parcial|no cumplido|ya no aplica","evidencia":"…"}],' +
+        '"hechos":[{"tipo":"logro|hito|kpi|riesgo|riesgo-resuelto|objetivo-siguiente|incidencia|decision|estado|colaborador","texto":"…","fecha":"…","modulo":"obra|licencia|operador|breeam|desinversion|financiacion|…","fuente":"…"}],' +
+        '"estructura":[{"id":"…","titulo":"…","accion":"mantener|actualizar|ocultar|nueva","motivo":"…"}],' +
+        '"sugeridas":[números de la biblioteca, máximo 3, que NO estén ya en la estructura],"faltan":["…"],"contradicciones":["…"]}',
+      'REGLAS:\n- No inventes nada: hechos, fechas y cifras solo de las fuentes o del informe anterior. Máximo 45 hechos, los más relevantes, con fecha si la hay.\n' +
+        (estructurado
+          ? '- "estructura" recorre TODAS las slides del informe anterior en su orden, con su mismo id. "mantener" solo para slides legales o sin información nueva que no citen el trimestre (disclaimer, cierre, colaboradores sin cambios); "actualizar" para las que deben reflejar el nuevo trimestre (portada, índice y financieras se tratan aparte, márcalas "actualizar"); "ocultar" si ya no aplican. Añade al final con "nueva" las slides que el material pida y no existan (id de la biblioteca).\n'
+          : '- "estructura" propone el informe completo usando ids de la biblioteca en el orden canónico (portada, indice, resumen-ejecutivo, … , disclaimer, cierre), todas con "nueva" salvo disclaimer y cierre ("mantener").\n') +
+        '- Evalúa cada objetivo que el informe anterior fijó para ' + S.doc.trimestre + '.\n- "faltan": datos necesarios que no están en las fuentes. "contradicciones": datos que no cuadran entre fuentes.'
+    ], fuentesTexto());
+    var n = 0;
+    llamar(prompt, { onText: function () { n++; if (n % 20 === 0) { S.ocupado = 'Claude está escribiendo el análisis…'; estadoCab(S.ocupado); } } }).then(function (a) {
+      a = a && typeof a === 'object' ? a : {};
+      ['resumen', 'objetivosPrevios', 'hechos', 'estructura', 'sugeridas', 'faltan', 'contradicciones'].forEach(function (k) { if (!Array.isArray(a[k])) a[k] = []; });
+      a.estructura = normalizarEstructura(a.estructura);
+      S.doc.analisis = a;
+      S.doc.seleccion = { anadir: [], estructura: a.estructura };
+      S.doc.estado = 'analizado';
+      guardarDoc(0);
+      S.ocupado = null; S.paso = 3; mensaje(null); estadoCab(''); render(); window.scrollTo(0, 0);
+    }, function (e) { S.ocupado = null; mensaje(errorClaude(e), 'error'); estadoCab(''); render(); });
+  }
+  function normalizarEstructura(est) {
+    var vistos = {}, out = [];
+    est.forEach(function (e) { if (e && e.id && !vistos[e.id]) { vistos[e.id] = 1; out.push({ id: String(e.id), titulo: e.titulo || '', accion: ['mantener', 'actualizar', 'ocultar', 'nueva'].indexOf(e.accion) >= 0 ? e.accion : 'actualizar', motivo: e.motivo || '' }); } });
+    if (S.prev && S.prev.tipo === 'estructurado') S.prev.slides.forEach(function (s) { if (!vistos[s.id]) { vistos[s.id] = 1; out.push({ id: s.id, titulo: tituloDe(s), accion: s.oculto ? 'ocultar' : 'actualizar', motivo: '' }); } });
+    ['portada', 'indice', 'resumen-ejecutivo'].forEach(function (id, i) { if (!vistos[id]) out.splice(i, 0, { id: id, titulo: '', accion: 'nueva', motivo: 'Obligatoria' }); });
+    ['disclaimer', 'cierre'].forEach(function (id) { if (!vistos[id]) out.push({ id: id, titulo: '', accion: 'mantener', motivo: 'Obligatoria' }); });
+    return out;
+  }
+
+  /* ---------- Secciones, orden e índice ---------- */
+  var SECCIONES = ['Resumen Ejecutivo', 'Análisis de Varianzas', 'Resumen de Proyecto', 'Situación de Proyecto', 'Obra', 'Colaboradores', 'Vehículo de Inversión'];
+  function seccionDe(id) {
+    if (/^resumen-(ejecutivo|financiero)/.test(id)) return 0;
+    if (/^varianzas/.test(id)) return 1;
+    if (/^(estrategia|compraventa|calendario|kpis|cartera)/.test(id)) return 2;
+    if (/^(obra|seguimiento-economico)/.test(id)) return 4;
+    if (/^colaboradores/.test(id)) return 5;
+    if (/^(vehiculo|consejo)/.test(id)) return 6;
+    return 3;
+  }
+  function rango(s) { return s.id === 'portada' ? -2 : s.id === 'indice' ? -1 : s.id === 'disclaimer' ? 100 : s.id === 'cierre' ? 101 : seccionDe(s.id); }
+  function ordenar(slides) { return slides.map(function (s, i) { return [s, i]; }).sort(function (a, b) { return rango(a[0]) - rango(b[0]) || a[1] - b[1]; }).map(function (x) { return x[0]; }); }
+  function renumerar(slides) {
+    var presentes = [];
+    slides.forEach(function (s) { if (!s.oculto && rango(s) >= 0 && rango(s) < 100 && presentes.indexOf(seccionDe(s.id)) < 0) presentes.push(seccionDe(s.id)); });
+    presentes.sort(function (a, b) { return a - b; });
+    slides.forEach(function (s) {
+      if (rango(s) < 0 || rango(s) >= 100) return;
+      var n = presentes.indexOf(seccionDe(s.id)) + 1; if (!n) return;
+      if (s.compuesto) s.compuesto.seccion = n; else { s.props = s.props || {}; s.props.seccion = n; }
+    });
+    slides.forEach(function (s) { if (s.id === 'indice') { s.c = 'Indice'; s.props = { secciones: presentes.map(function (i) { return SECCIONES[i]; }) }; } });
+    return slides;
+  }
+  /* Id libre para una slide nueva de la biblioteca: «situacion-<tema>» → situacion-nueva, «obra-n» → obra-2, obra-3… */
+  function idNuevo(b, slides) {
+    var base = b.id.replace(/<.*>/, 'nueva').replace(/-n$/, ''), k = 2, id = /-n$/.test(b.id) ? base + '-' + k : base;
+    while (slides.some(function (s) { return s.id === id; })) id = base + '-' + (k++);
+    return id;
+  }
+  function actualizarPeriodo(s) {
+    var d = S.doc;
+    recorrer(s, function (v, r) {
+      if (!v || typeof v !== 'object' || Array.isArray(v) || r.indexOf('anterior') >= 0) return;
+      if (typeof v.trimestre === 'string' && r[r.length - 1] !== 'anterior') v.trimestre = d.trimestre;
+      if (typeof v.siguiente === 'string') v.siguiente = d.siguiente;
+      if (typeof v.titulo === 'string') v.titulo = v.titulo.split(d.trimestreAnterior).join(d.trimestre);
+    });
+    return s;
+  }
+
+  /* ---------- Medición fuera de pantalla ---------- */
+  function lienzo() { var el = document.createElement('div'); el.className = 'v-lienzo'; $('#lienzo-oculto').appendChild(el); return el; }
+  function medir(slide, pagina) {
+    var el = lienzo(), raiz = M.pintar(el, slide, pagina || 5, S.doc.informe.meta), r;
+    try { r = raiz.error ? { error: raiz.error } : (M.airear(el) || {}); } catch (e) { r = { error: e.message }; }
+    raiz.unmount(); el.remove();
+    return r;
+  }
+
+  /* ---------- Validación de lo que devuelve Claude ---------- */
+  function validarSlide(o, id) {
+    if (o && typeof o === 'object' && o.slide && typeof o.slide === 'object') o = o.slide;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('la respuesta no es un slide');
+    if (!o.c && !o.compuesto) throw new Error('el slide no indica componente');
+    o.id = id;
+    var malos = [];
+    recorrer(o, function (v) { if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.c === 'string' && PERMITIDOS.indexOf(v.c) < 0) malos.push(v.c); });
+    if (malos.length) throw new Error('usa componentes que no existen: ' + malos.join(', '));
+    recorrer(o, function (v, r) { if (typeof v === 'string' && /^fotos\//.test(v)) throw new Error('usa una ruta de foto que no existe (' + v + ')'); });
+    return o;
+  }
+
+  /* ---------- Prompts de slide ---------- */
+  var SALIDA = function () {
+    var d = S.doc;
+    return '== REGLAS DE SALIDA ==\n' +
+      '- Devuelve SOLO un objeto JSON: el slide completo, con el mismo "id", "origen" ("actualizada" o "nueva") y "fuentes" (de dónde sale cada dato, breve).\n' +
+      '- Solo componentes del API (o div/span/p para agrupar), con sus props. Texto enriquecido solo con **negrita** para el dato clave.\n' +
+      '- Periodo: todo campo "trimestre" = "' + d.trimestre + '" salvo dentro de "anterior"; "siguiente" = "' + d.siguiente + '". En AntecedentesNovedades, "anterior" (trimestre ' + d.trimestreAnterior + ') resume en ≤ 400 caracteres lo que el informe anterior contaba como Novedades; "actual" solo hechos del ' + d.trimestre + '.\n' +
+      '- ESPACIO: el slide debe quedar lleno (85–95 % del área) al tamaño de letra actual, con información real: el texto vigente del informe anterior y las fuentes. Usa la capacidad orientativa del catálogo. Nunca relleno vacío.\n' +
+      '- No inventes: si falta un dato imprescindible, escribe "[pendiente: qué falta]". No calcules ni redactes cifras financieras (TIR, ROE, NOI, varianzas).\n' +
+      '- Fotos: solo las de la lista, con su src exacto ("/api/informes/assets/…"). Si no hay fotos adecuadas, usa un layout sin fotos.\n' +
+      '- Pon "seccion" con el número que corresponda (se renumera después). Títulos en tipo frase «Sección. Subtema».';
+  };
+  function baseSlide(tarea) {
+    return [
+      'Eres el redactor y maquetador de los informes trimestrales para inversores de Impar Capital.',
+      contexto(),
+      '== FORMATO DE informe.json Y CATÁLOGO DE LAYOUTS ==\n' + RECETAS,
+      '== API DE COMPONENTES ==\n' + API,
+      '== REGLAS DE REDACCIÓN ==\n' + REGLAS,
+      '== TAREA ==\n' + tarea,
+      SALIDA(),
+      '== HECHOS DEL TRIMESTRE ==\n' + hechosTexto(),
+      '== FOTOS DISPONIBLES ==\n' + fotosTexto()
+    ];
+  }
+  function promptActualizar(prev) {
+    return componer(baseSlide('Actualiza al ' + S.doc.trimestre + ' el slide "' + prev.id + '" del informe ' + S.doc.trimestreAnterior + '. Conserva su layout salvo que el contenido pida otro. Mantén lo persistente que siga vigente (sin resumirlo de más) y sustituye lo propio del trimestre por lo nuevo.\nSLIDE ANTERIOR:\n' + JSON.stringify(prev)), fuentesTexto());
+  }
+  function promptNueva(id) {
+    var b = BIB.filter(function (x) { return x.id === id || (x.id.indexOf('<') > 0 && id.indexOf(x.id.split('<')[0]) === 0); })[0];
+    var t = 'Crea el slide "' + id + '"' + (b ? ' (biblioteca nº ' + b.n + ': ' + b.nombre + ' — ' + b.para + ')' : '') + '. Usa la receta de ese id en el catálogo.';
+    if (S.fuentes && S.fuentes.previoTexto && !(S.prev && S.prev.tipo === 'estructurado')) t += '\nTEXTO DEL INFORME ANTERIOR (usa lo que siga vigente para este slide):\n' + recortar(S.fuentes.previoTexto, 14000);
+    return componer(baseSlide(t), fuentesTexto());
+  }
+  function promptResumen(slides, prev) {
+    var otros = slides.filter(function (s) { return !s.oculto && s.id !== 'resumen-ejecutivo' && ['portada', 'indice', 'disclaimer', 'cierre'].indexOf(s.id) < 0; })
+      .map(function (s) { return '### ' + s.id + ' · ' + tituloDe(s) + '\n' + textos(s).slice(0, 1500); }).join('\n');
+    var t = 'Redacta el slide "resumen-ejecutivo" (componente ResumenEjecutivo, trimestre "' + S.doc.trimestre + '") a partir del informe ya redactado. Jerarquía: fase actual; logros más materiales; retrasos e incidencias con su mitigación; avance hacia el siguiente hito; operador, comercialización o desinversión; próximas fechas. Situación actual 650–900 caracteres. Logros: 6 (máximo 9), hechos concretos y fechados del ' + S.doc.trimestre + '. Coherente al dígito con los demás slides.' +
+      (prev ? '\nRESUMEN EJECUTIVO ANTERIOR (estructura y datos persistentes):\n' + JSON.stringify(prev) : '') +
+      '\nRESTO DEL INFORME YA REDACTADO:\n' + recortar(otros, 22000);
+    return componer(baseSlide(t), fuentesTexto());
+  }
+  function promptAjuste(slide, m) {
+    var t = m.desborde
+      ? 'El slide "' + slide.id + '" DESBORDA: su contenido ocupa el ' + m.ocupacion + ' % del área útil medida en el navegador. Acórtalo hasta ~90 % quitando lo menos relevante, sin cambiar estilos ni tamaños (o cambia a un layout más compacto).'
+      : 'El slide "' + slide.id + '" queda al ' + m.relleno + ' % del área tras repartir huecos (objetivo ≥ 85 %). Amplíalo con información REAL de las fuentes o del texto vigente del informe anterior, o agranda las fotos (disposición mayor). Si no hay más información real, devuélvelo sin cambios.';
+    return componer(baseSlide(t + '\nSLIDE ACTUAL:\n' + JSON.stringify(slide)), fuentesTexto());
+  }
+  function promptCorreccion(slide, instruccion, adj) {
+    var t = 'Aplica esta corrección del equipo al slide "' + slide.id + '": «' + instruccion + '». Cambia solo lo pedido; mantén el resto igual. ' +
+      'Si la instrucción incluye una tabla pegada (columnas separadas por tabuladores o |), úsala como datos. ' +
+      'Devuelve {"slide": <slide completo>, "avisos": ["otros slides que también deberían cambiar por coherencia, con su id", …]}.\nSLIDE ACTUAL:\n' + JSON.stringify(slide);
+    var partes = baseSlide(t);
+    if (adj && adj.texto) partes.push(adj.texto);
+    return componer(partes, fuentesTexto());
+  }
+
+  /* ---------- GO: generación completa ---------- */
+  function generar() {
+    var d = S.doc, sel = d.seleccion;
+    var prevPorId = {}; if (S.prev && S.prev.tipo === 'estructurado') S.prev.slides.forEach(function (s) { prevPorId[s.id] = s; });
+    var meta = {
+      proyecto: d.proyecto, codigo: d.codigo, trimestre: d.trimestre, trimestreAnterior: d.trimestreAnterior, siguiente: d.siguiente,
+      fechaCierre: qCierre(d.trimestre), arquetipo: d.arquetipo,
+      pie: (S.prev && S.prev.meta && S.prev.meta.pie) || d.pie || (S.proyectos[d.codigo] || {}).pie || { variante: 'sl' },
+      version: 'v' + (d.version || 1), estado: 'Borrador', actualizado: ahora().slice(0, 10)
+    };
+    var slides = [], tareas = [];
+    function porId(id) { return slides.filter(function (s) { return s.id === id; })[0]; }
+    sel.estructura.forEach(function (e) {
+      var prev = prevPorId[e.id], s = prev ? clon(prev) : { id: e.id };
+      if (e.accion === 'ocultar') { s.oculto = true; slides.push(s); return; }
+      delete s.oculto; slides.push(s);
+      tareas.push({ id: e.id, accion: prev ? e.accion : (e.accion === 'mantener' && ['disclaimer', 'cierre'].indexOf(e.id) >= 0 ? 'mantener' : 'nueva'), prev: prev || null, titulo: e.titulo || (prev ? tituloDe(prev) : e.id) });
+    });
+    sel.anadir.forEach(function (n) {
+      var b = BIB.filter(function (x) { return x.n === n; })[0]; if (!b) return;
+      var id = idNuevo(b, slides);
+      slides.push({ id: id }); tareas.push({ id: id, accion: 'nueva', prev: null, titulo: b.nombre });
+    });
+    slides = ordenar(slides);
+    d.informe = { meta: meta, slides: slides };
+    d.estado = 'generando'; guardarDoc(0);
+    S.abortar = new AbortController();
+    S.gen = { fase: 'Preparando…', filas: tareas.map(function (t) { return { id: t.id, titulo: t.titulo, estado: 'cola', detalle: '', nota: '' }; }) };
+    S.vista = 'generando'; render(); window.scrollTo(0, 0);
+    function fila(id) { return S.gen.filas.filter(function (f) { return f.id === id; })[0]; }
+    function poner(id, s) { var i = slides.findIndex(function (x) { return x.id === id; }); slides[i] = s; d.informe.slides = slides; }
+    var fuentesListas = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+
+    function deterministica(t) {
+      var s = clon(porId(t.id));
+      if (t.id === 'portada') {
+        var fp = (d.fotos || []).filter(function (f) { return f.categoria === 'Portada'; })[0];
+        s = { id: 'portada', c: 'Portada', origen: 'actualizada', props: { trimestre: d.trimestre, proyecto: d.proyecto, imagen: fp ? '/api/informes/assets/' + fp.id : (s.props && s.props.imagen) || undefined } };
+      } else if (t.id === 'indice') { s = { id: 'indice', c: 'Indice', origen: 'actualizada', props: { secciones: [] } }; }
+      else if (t.id === 'disclaimer') { s = { id: 'disclaimer', c: 'Disclaimer', origen: 'heredada' }; }
+      else if (t.id === 'cierre') { s = { id: 'cierre', c: 'Cierre', origen: 'heredada' }; }
+      else if (s.c === 'SlideBloqueado' || /^(resumen-financiero|varianzas|seguimiento-economico-obra)$/.test(t.id)) {
+        var pag = (d.fotos || []).filter(function (f) { return f.categoria === 'Página de Finanzas' && (f.para || 'resumen-financiero') === t.id; })[0];
+        var titulo = ((s.props && s.props.titulo) || (t.id === 'varianzas' ? 'Análisis de Varianzas. Financiero ' : t.id === 'resumen-financiero' ? 'Resumen Ejecutivo. Financiero ' : 'Obra. Seguimiento Económico') + (t.id === 'seguimiento-economico-obra' ? '' : d.trimestre)).split(d.trimestreAnterior).join(d.trimestre);
+        s = { id: t.id, c: 'SlideBloqueado', origen: 'bloqueada', fuentes: pag ? 'Página aportada por Finanzas' : '', props: { seccion: (s.props && s.props.seccion) || 1, titulo: titulo, origen: t.id === 'seguimiento-economico-obra' ? 'Project Monitoring' : 'Finanzas', version: d.trimestre, estado: pag ? 'Aportado' : 'Pendiente de Finanzas', vista: pag ? '/api/informes/assets/' + pag.id : undefined } };
+      } else if (t.accion === 'mantener') { s = actualizarPeriodo(s); s.origen = 'heredada'; }
+      else return null;
+      return s;
+    }
+
+    function unaTarea(t) {
+      var f = fila(t.id);
+      if (S.abortar.signal.aborted) { f.estado = 'error'; f.nota = 'Parado'; return Promise.resolve(); }
+      var det = deterministica(t);
+      if (det) { poner(t.id, det); f.estado = 'fijo'; f.nota = det.origen === 'bloqueada' ? det.props.estado : 'Sin cambios de contenido'; refrescarGen(); return Promise.resolve(); }
+      if (t.id === 'resumen-ejecutivo') return Promise.resolve();   // al final
+      f.estado = 'curso'; f.detalle = 'Redactando'; refrescarGen();
+      var prompt = t.prev && t.accion === 'actualizar' ? promptActualizar(t.prev) : promptNueva(t.id);
+      return redactar(t.id, prompt, t.prev ? 'actualizada' : 'nueva', f);
+    }
+    function redactar(id, prompt, origen, f) {
+      return llamar(prompt).then(function (o) {
+        var s = actualizarPeriodo(validarSlide(o, id)); s.origen = s.origen || origen;
+        var m = medir(s);
+        if (m.error) throw new Error(m.error);
+        if (m.desborde || (m.relleno != null && m.relleno < 80)) {
+          f.detalle = m.desborde ? 'Ajustando: desborda' : 'Ajustando: relleno ' + m.relleno + ' %'; refrescarGen();
+          return llamar(promptAjuste(s, m)).then(function (o2) {
+            var s2 = actualizarPeriodo(validarSlide(o2, id)); s2.origen = s2.origen || origen;
+            var m2 = medir(s2);
+            if (!m2.error && !(m2.desborde && !m.desborde)) { s = s2; m = m2; }
+            return [s, m];
+          }, function (e) { if (e && e.code === 'cancelled') throw e; return [s, m]; });
+        }
+        return [s, m];
+      }).then(function (r) {
+        poner(id, r[0]); guardarDoc();
+        f.estado = 'hecho'; f.detalle = ''; f.nota = r[1].desborde ? 'Desborda: revísalo' : r[1].relleno != null ? 'Relleno ' + r[1].relleno + ' %' : 'Hecho';
+        refrescarGen();
+      }, function (e) {
+        f.estado = 'error'; f.detalle = ''; f.nota = e && e.code ? errorClaude(e) : ('No válido: ' + (e && e.message || e));
+        var actual = porId(id);
+        if (!actual.c && !actual.compuesto) poner(id, { id: id, origen: 'nueva', compuesto: { seccion: 1, titulo: f.titulo, contenido: [{ c: 'Texto', props: { parrafos: ['[pendiente: no se pudo redactar este slide; usa «Corregir» o «Regenerar»]'] } }] } });
+        refrescarGen();
+      });
+    }
+    function enParalelo(lista, n) {
+      var i = 0;
+      function trabajador() { if (i >= lista.length) return Promise.resolve(); var t = lista[i++]; return unaTarea(t).then(trabajador); }
+      var ws = []; for (var k = 0; k < n; k++) ws.push(trabajador()); return Promise.all(ws);
+    }
+
+    fuentesListas.then(function () {
+      S.gen.fase = 'Redactando las slides (2 a la vez)'; refrescarGen();
+      return enParalelo(tareas.filter(function (t) { return t.id !== 'resumen-ejecutivo'; }), 2);
+    }).then(function () {
+      var tRes = tareas.filter(function (t) { return t.id === 'resumen-ejecutivo'; })[0];
+      if (!tRes || S.abortar.signal.aborted) return;
+      S.gen.fase = 'Redactando el resumen ejecutivo'; var f = fila('resumen-ejecutivo'); f.estado = 'curso'; f.detalle = 'Redactando'; refrescarGen();
+      return redactar('resumen-ejecutivo', promptResumen(slides, prevPorId['resumen-ejecutivo']), 'actualizada', f);
+    }).then(function () {
+      renumerar(slides); d.informe.slides = slides;
+      S.gen.fase = 'Revisando la coherencia entre slides'; refrescarGen();
+      return S.abortar.signal.aborted ? null : coherencia().catch(function () { return null; });
+    }).then(function (qa) {
+      if (qa) d.qa = { coherencia: qa, fecha: ahora() };
+      d.estado = 'borrador'; anotar('v' + (d.version || 1) + ' generada' + (S.abortar.signal.aborted ? ' (parada a medias)' : ''));
+      return guardarDoc(0);
+    }).then(function () {
+      S.abortar = null; S.gen = null; S.vista = 'editor'; mensaje(null); render(); window.scrollTo(0, 0);
+    });
+  }
+
+  /* ---------- QA ---------- */
+  function coherencia() {
+    var cuerpo = d0().informe.slides.filter(function (s) { return !s.oculto; }).map(function (s) { return '### ' + s.id + ' · ' + tituloDe(s) + '\n' + textos(s).slice(0, 2200); }).join('\n');
+    var prompt = [
+      'Revisa la coherencia de este informe trimestral para inversores. Busca: el mismo dato (fechas, %, importes, nombres de operador, constructora o financiador) con valores distintos entre slides; referencias al trimestre equivocado; previsiones presentadas como hechos; frases del trimestre anterior que no se hayan actualizado. No propongas cambios de estilo.',
+      contexto(),
+      'Devuelve SOLO un array JSON: [{"slide":"id","problema":"…","sugerencia":"…"}] (máximo 12; [] si no hay problemas).',
+      recortar(cuerpo, 52000)
+    ].join('\n\n');
+    return llamar(prompt).then(function (r) { return Array.isArray(r) ? r.slice(0, 12) : []; });
+  }
+  function d0() { return S.doc; }
+  function qaMecanico(medidas) {
+    var out = [], d = S.doc, sl = d.informe.slides.filter(function (s) { return !s.oculto; });
+    if (!sl.some(function (s) { return s.c === 'Disclaimer'; })) out.push({ nivel: 'error', slide: '', texto: 'Falta el Disclaimer.' });
+    sl.forEach(function (s) {
+      var m = medidas[s.id] || {};
+      if (m.pendientes) out.push({ nivel: 'error', slide: s.id, texto: m.pendientes + ' dato(s) [pendiente] sin resolver.' });
+      if (m.desborde) out.push({ nivel: 'error', slide: s.id, texto: 'El contenido desborda la slide.' });
+      else if (m.relleno != null && m.relleno < 80 && s.c !== 'SlideBloqueado') out.push({ nivel: 'aviso', slide: s.id, texto: 'Relleno ' + m.relleno + ' %: queda hueco.' });
+      if (m.error) out.push({ nivel: 'error', slide: s.id, texto: m.error });
+      recorrer(s, function (v, r) {
+        if (typeof v !== 'string' || r.indexOf('anterior') >= 0) return;
+        var k = r[r.length - 1];
+        if (k === 'trimestre' && v !== d.trimestre) out.push({ nivel: 'error', slide: s.id, texto: 'Trimestre ' + v + ' en lugar de ' + d.trimestre + '.' });
+        if (k === 'siguiente' && v !== d.siguiente) out.push({ nivel: 'error', slide: s.id, texto: 'Trimestre siguiente ' + v + ' en lugar de ' + d.siguiente + '.' });
+      });
+    });
+    return out;
+  }
+
+  /* ================= Editor ================= */
+  var raices = {}, medidasEd = {};
+  function renderEditor(main) {
+    Object.keys(raices).forEach(function (k) { raices[k].unmount(); }); raices = {}; medidasEd = {};
+    var d = S.doc, sl = d.informe.slides, visibles = sl.filter(function (s) { return !s.oculto; }), ocultas = sl.filter(function (s) { return s.oculto; });
+    var opcionesBib = BIB.filter(function (b) { return ['portada', 'indice', 'disclaimer', 'cierre'].indexOf(b.id) < 0; }).map(function (b) { return '<option value="' + b.n + '">' + b.n + ' · ' + esc(b.nombre) + '</option>'; }).join('');
+    main.innerHTML = avisosPlataforma() +
+      '<div class="fila fila-sep"><div><h2>' + esc(d.proyecto) + ' · ' + esc(d.trimestre) + '</h2><p class="sutil">Versión ' + esc(d.version || 1) + ' · ' + chipEstado(d.estado) + ' · actualizado ' + esc(fecha(d.actualizado)) + '</p></div>' +
+      '<div class="fila">' + (S.confirmar === d.id ? confirmarBorrado(d) : '<button class="btn-texto" data-accion="inicio">Volver a la lista</button>' +
+      (C.db ? '<button class="btn btn-min btn-peligro" data-accion="pedir-borrar" data-id="' + esc(d.id) + '">Eliminar informe</button>' : '') +
+      (C.downloads ? '<button class="btn btn-prim" data-accion="ed-pdf">Exportar PDF</button>' : '')) + '</div></div>' +
+      '<div class="tarjeta" id="ed-qa"><p class="sutil">Revisando…</p></div>' +
+      '<div class="tarjeta"><div class="fila">' +
+      '<label class="campo" style="flex:1;min-width:220px">Añadir slide de la biblioteca<select id="ed-bib">' + opcionesBib + '</select></label>' +
+      '<button class="btn" data-accion="ed-anadir"' + (C.sample ? '' : ' disabled') + '>Añadir</button>' +
+      '<button class="btn" data-accion="ed-coherencia"' + (C.sample ? '' : ' disabled') + '>Revisar coherencia</button>' +
+      '<button class="btn" data-accion="ed-version">Guardar versión</button>' +
+      '<button class="btn" data-accion="ed-aprobar">' + (d.estado === 'aprobado' ? 'Volver a borrador' : 'Marcar como aprobado') + '</button></div>' +
+      '<p class="sutil" id="ed-ocupado" aria-live="polite"></p></div>' +
+      '<div class="ed-lista" id="ed-lista">' + visibles.map(function (s, i) { return tarjetaSlide(s, i + 1, visibles.length); }).join('') + '</div>' +
+      (ocultas.length ? '<div class="tarjeta"><h3>Slides ocultas</h3><ul class="lista">' + ocultas.map(function (s) { return '<li>' + esc(tituloDe(s)) + ' <button class="btn-texto" data-accion="ed-ocultar" data-id="' + esc(s.id) + '">Mostrar</button></li>'; }).join('') + '</ul></div>' : '') +
+      (d.cambios && d.cambios.length ? '<details class="tarjeta"><summary>Historial de cambios</summary><ul class="lista">' + d.cambios.slice().reverse().map(function (c) { return '<li><span class="sutil">' + esc(fecha(c.fecha)) + '</span> · ' + esc(c.texto) + '</li>'; }).join('') + '</ul></details>' : '');
+    var fl = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    fl.then(function () { visibles.forEach(function (s, i) { pintarEnEditor(s, i + 1); }); ajustarEscalas(); pintarQa(); });
+    prepararSoltarEditor(); visibles.forEach(function (s) { pintarAdjuntos(s.id); });
+  }
+  function tarjetaSlide(s, pagina, total) {
+    var marcando = S.marcando === s.id;
+    return '<section class="ed-slide' + (marcando ? ' marcando' : '') + '" id="ed-' + esc(s.id) + '"><div class="ed-barra"><b>Slide ' + pagina + '</b><span class="tit">' + esc(tituloDe(s)) + '</span><span class="chips"></span>' +
+      '<span class="acc"><button class="btn btn-min btn-marcar' + (marcando ? ' activo' : '') + '" data-accion="ed-marcar" data-id="' + esc(s.id) + '" aria-pressed="' + marcando + '"' + (C.sample ? '' : ' disabled') + ' title="Pinta, subraya o recuadra sobre la slide lo que quieres cambiar">Marcar</button>' +
+      '<button class="btn btn-min" data-accion="ed-corregir" data-id="' + esc(s.id) + '"' + (C.sample ? '' : ' disabled') + '>Corregir</button>' +
+      '<button class="btn btn-min" data-accion="ed-subir" data-id="' + esc(s.id) + '"' + (pagina === 1 ? ' disabled' : '') + ' aria-label="Subir">↑</button>' +
+      '<button class="btn btn-min" data-accion="ed-bajar" data-id="' + esc(s.id) + '"' + (pagina === total ? ' disabled' : '') + ' aria-label="Bajar">↓</button>' +
+      (['disclaimer', 'cierre'].indexOf(s.id) < 0 ? '<button class="btn btn-min" data-accion="ed-ocultar" data-id="' + esc(s.id) + '">Ocultar</button>' : '') + '</span></div>' +
+      '<div class="marcar-barra' + (marcando ? '' : ' oculto') + '" role="toolbar" aria-label="Herramientas de marcado">' +
+      HERRAMIENTAS.map(function (h) { return '<button class="btn btn-min" data-accion="marca-herr" data-h="' + h.id + '" aria-pressed="' + (S.herramienta === h.id) + '" title="' + esc(h.ayuda) + '">' + h.nombre + '</button>'; }).join('') +
+      '<span class="sutil">Marca sobre la slide lo que quieres cambiar; cada marca lleva un número que puedes citar en el texto.</span>' +
+      '<span class="der"><button class="btn btn-min" data-accion="marca-deshacer" data-id="' + esc(s.id) + '">Deshacer</button>' +
+      '<button class="btn btn-min" data-accion="marca-borrar" data-id="' + esc(s.id) + '">Borrar marcas</button>' +
+      '<button class="btn btn-min btn-prim" data-accion="ed-marcar" data-id="' + esc(s.id) + '">Listo</button></span></div>' +
+      '<div class="v-marco"><div class="v-escala"></div><canvas class="v-marcas" width="' + ANCHO * 2 + '" height="' + ALTO * 2 + '" data-id="' + esc(s.id) + '" aria-label="Capa de marcas de la slide ' + pagina + '"></canvas></div>' +
+      '<div class="ed-corregir oculto"><p class="marcas-lista"></p><label class="campo">¿Qué hay que cambiar en esta slide?<textarea id="corr-' + esc(s.id) + '" placeholder="Ej.: la entrega al operador es en noviembre de 2026; quita el párrafo de seguros. Puedes pegar aquí una tabla copiada de Excel."></textarea></label>' +
+      '<label class="soltar mini soltar-adj" data-id="' + esc(s.id) + '">Adjuntar imágenes, documentos o tablas (JPG, PNG, PDF, Word, PowerPoint, Excel, CSV): arrastra aquí o pulsa para elegir' +
+      '<input type="file" multiple accept="' + ACEPTA_ADJ + '" class="oculto" data-cambio="adj:' + esc(s.id) + '"></label>' +
+      '<div class="adjuntos"></div>' +
+      '<p class="sutil">Las imágenes se guardan con las fotos del informe' + (S.limites && S.limites.images ? ' y Claude las ve al corregir' : '') + '; los documentos y tablas se leen en tu navegador y se añaden a las fuentes del trimestre.</p>' +
+      '<div class="fila"><button class="btn btn-prim btn-min" data-accion="ed-aplicar" data-id="' + esc(s.id) + '">Aplicar corrección</button><span class="sutil estado-corr" aria-live="polite"></span></div></div>' +
+      (s.fuentes ? '<p class="ed-fuentes">Fuentes: ' + esc(s.fuentes) + '</p>' : '') + '</section>';
+  }
+  function pintarEnEditor(s, pagina) {
+    var sec = $('#ed-' + CSS.escape(s.id)); if (!sec) return;
+    var esc2 = $('.v-escala', sec);
+    if (raices[s.id]) raices[s.id].unmount();
+    esc2.innerHTML = ''; esc2.style.transform = '';
+    raices[s.id] = M.pintar(esc2, s, pagina, S.doc.informe.meta);
+    var pend = M.marcarPendientes(esc2), r = null;
+    try { r = raices[s.id].error ? { error: raices[s.id].error } : M.airear(esc2); } catch (e) { r = { error: e.message }; }
+    medidasEd[s.id] = Object.assign({ pendientes: pend }, r || {});
+    var chips = [];
+    if (r && r.error) chips.push('<span class="chip error">Error</span>');
+    else if (r && r.desborde) chips.push('<span class="chip error">Desborda</span>');
+    else if (r && r.relleno != null) chips.push('<span class="chip ' + (r.relleno < 80 ? 'aviso' : 'ok') + '">Relleno ' + r.relleno + ' %</span>');
+    if (pend) chips.push('<span class="chip aviso">' + pend + ' pendiente' + (pend > 1 ? 's' : '') + '</span>');
+    if (s.origen) chips.push('<span class="chip">' + esc(s.origen) + '</span>');
+    $('.chips', sec).innerHTML = chips.join(' ');
+    ajustarEscala(esc2); dibujarMarcas(s.id);
+  }
+  function ajustarEscala(e) { e.style.transform = 'scale(' + (e.parentNode.clientWidth / 960) + ')'; }
+  function ajustarEscalas() { $$('.ed-slide .v-escala').forEach(ajustarEscala); }
+  window.addEventListener('resize', function () { if (S.vista === 'editor') ajustarEscalas(); });
+
+  function pintarQa() {
+    var el = $('#ed-qa'); if (!el) return;
+    var mec = qaMecanico(medidasEd), coh = (S.doc.qa && S.doc.qa.coherencia) || [];
+    var nErr = mec.filter(function (x) { return x.nivel === 'error'; }).length;
+    function ir(id) { return id ? ' <button class="btn-texto" data-accion="ed-ir" data-id="' + esc(id) + '">Ir</button>' : ''; }
+    el.innerHTML = '<h3>Revisión</h3>' +
+      (mec.length ? '<ul class="lista">' + mec.map(function (x) { return '<li><span class="chip ' + (x.nivel === 'error' ? 'error' : 'aviso') + '">' + (x.nivel === 'error' ? 'Bloqueante' : 'Aviso') + '</span> ' + esc(x.slide) + ' · ' + esc(x.texto) + ir(x.slide) + '</li>'; }).join('') + '</ul>'
+        : '<p class="sutil">Sin incidencias mecánicas: nada desborda, sin [pendiente] y los trimestres cuadran.</p>') +
+      (coh.length ? '<h3 style="margin-top:8px">Coherencia entre slides' + (S.doc.qa.fecha ? ' <span class="sutil">· ' + esc(fecha(S.doc.qa.fecha)) + '</span>' : '') + '</h3><ul class="lista">' + coh.map(function (x) { return '<li><b>' + esc(x.slide) + '</b> · ' + esc(x.problema) + (x.sugerencia ? ' <span class="sutil">→ ' + esc(x.sugerencia) + '</span>' : '') + ir(x.slide) + '</li>'; }).join('') + '</ul>' : '') +
+      (nErr ? '<p class="sutil">Resuelve los bloqueantes antes de aprobar y exportar la versión final.</p>' : '');
+  }
+  function ocupadoEd(t) { var el = $('#ed-ocupado'); if (el) el.textContent = t || ''; }
+  function repintarTodo() { renderEditor($('#principal')); }
+
+  /* ---------- Marcar: señalar sobre la slide la parte que hay que cambiar ---------- */
+  var ANCHO = 960, ALTO = 540, ROJO = '#d42a1f';
+  var HERRAMIENTAS = [
+    { id: 'resaltar', nombre: 'Resaltar', ayuda: 'Pinta encima del texto o la zona, como un rotulador fluorescente' },
+    { id: 'subrayar', nombre: 'Subrayar', ayuda: 'Arrastra una línea recta bajo el texto' },
+    { id: 'recuadro', nombre: 'Recuadro', ayuda: 'Arrastra para encerrar una zona (tabla, gráfico, foto, bloque)' },
+    { id: 'lapiz', nombre: 'Lápiz', ayuda: 'Dibujo libre: rodea, tacha o señala con flechas' }
+  ];
+  var NOMBRE_MARCA = { resaltar: 'resaltado', subrayar: 'subrayado', recuadro: 'recuadro', lapiz: 'trazo a mano' };
+  var trazo = null;
+
+  function alternarMarcar(id) {
+    var activar = S.marcando !== id;
+    S.marcando = activar ? id : null;
+    $$('.ed-slide').forEach(function (sec) {
+      var es = activar && sec.id === 'ed-' + id;
+      sec.classList.toggle('marcando', es);
+      $('.marcar-barra', sec).classList.toggle('oculto', !es);
+      var b = $('.btn-marcar', sec); b.classList.toggle('activo', es); b.setAttribute('aria-pressed', String(es));
+    });
+    if (activar) { var c = $('.ed-corregir', $('#ed-' + CSS.escape(id))); c.classList.remove('oculto'); }
+  }
+  function elegirHerramienta(h) {
+    S.herramienta = h;
+    $$('[data-accion="marca-herr"]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-h') === h)); });
+  }
+  function puntoSlide(cv, e) {
+    var r = cv.getBoundingClientRect();
+    return [Math.max(0, Math.min(ANCHO, (e.clientX - r.left) * ANCHO / r.width)), Math.max(0, Math.min(ALTO, (e.clientY - r.top) * ALTO / r.height))];
+  }
+  function cajaMarca(m) {
+    var xs = m.puntos.map(function (p) { return p[0]; }), ys = m.puntos.map(function (p) { return p[1]; });
+    return { x0: Math.min.apply(null, xs), y0: Math.min.apply(null, ys), x1: Math.max.apply(null, xs), y1: Math.max.apply(null, ys) };
+  }
+  /* Dibuja una marca en un contexto cuya unidad es el píxel de slide (960×540). */
+  function trazarMarca(ctx, m, n) {
+    var p = m.puntos; if (!p.length) return;
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (m.tipo === 'recuadro') {
+      var b = cajaMarca(m);
+      ctx.strokeStyle = ROJO; ctx.lineWidth = 2.5; ctx.fillStyle = 'rgba(212,42,31,.06)';
+      ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    } else {
+      ctx.strokeStyle = m.tipo === 'resaltar' ? 'rgba(255,205,0,.45)' : ROJO;
+      ctx.lineWidth = m.tipo === 'resaltar' ? 16 : m.tipo === 'subrayar' ? 3 : 2.5;
+      ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]);
+      if (p.length === 1) ctx.lineTo(p[0][0] + .1, p[0][1]);
+      for (var i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]);
+      ctx.stroke();
+    }
+    if (n) {
+      // Recuadro: en la esquina; trazos: a la izquierda, para no tapar el texto marcado.
+      var b2 = cajaMarca(m), rq = m.tipo === 'recuadro';
+      var x = Math.max(11, Math.min(ANCHO - 11, rq ? b2.x0 - 4 : b2.x0 - 16)), y = Math.max(11, Math.min(ALTO - 11, rq ? b2.y0 - 4 : m.tipo === 'subrayar' ? b2.y0 - 7 : (b2.y0 + b2.y1) / 2));
+      ctx.fillStyle = ROJO; ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Lato, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n), x, y + .5);
+    }
+    ctx.restore();
+  }
+  function dibujarMarcas(id) {
+    var sec = $('#ed-' + CSS.escape(id)), cv = sec && $('.v-marcas', sec); if (!cv) return;
+    var ctx = cv.getContext('2d'), k = cv.width / ANCHO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.setTransform(k, 0, 0, k, 0, 0);
+    (S.marcas[id] || []).forEach(function (m, i) { trazarMarca(ctx, m, i + 1); });
+    if (trazo && trazo.id === id) trazarMarca(ctx, trazo.marca, (S.marcas[id] || []).length + 1);
+    pintarListaMarcas(id);
+  }
+  function pintarListaMarcas(id) {
+    var sec = $('#ed-' + CSS.escape(id)), el = sec && $('.marcas-lista', sec); if (!el) return;
+    var ms = S.marcas[id] || [];
+    el.innerHTML = ms.length ? '<b>Marcas:</b> ' + ms.map(function (m, i) {
+      var t = m.textos && m.textos.length ? m.textos[0].marcado || m.textos[0].texto : (m.imagenes && m.imagenes.length ? 'imagen' : 'zona sin texto');
+      return '<span>' + (i + 1) + ' · ' + esc(NOMBRE_MARCA[m.tipo]) + ' — «' + esc(t.length > 60 ? t.slice(0, 57) + '…' : t) + '»</span>';
+    }).join(' · ') + '. Explica abajo qué cambiar en cada una (p. ej. «1: pon noviembre; 2: quita la fila de seguros»).' : '';
+  }
+  /* Zonas (en px de slide) que cubre una marca, para saber qué texto hay debajo. */
+  function zonasMarca(m) {
+    var p = m.puntos, b = cajaMarca(m), out = [];
+    if (m.tipo === 'recuadro') return [b];
+    if (m.tipo === 'lapiz') {
+      var diag = Math.hypot(b.x1 - b.x0, b.y1 - b.y0), cierre = Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]);
+      if (b.x1 - b.x0 > 20 && b.y1 - b.y0 > 14 && cierre < diag * .3) return [b];   // rodea algo: vale todo lo de dentro
+    }
+    var pts = p;
+    if (m.tipo === 'subrayar') {
+      pts = []; var L = Math.hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]), n = Math.max(1, Math.ceil(L / 6));
+      for (var i = 0; i <= n; i++) pts.push([p[0][0] + (p[1][0] - p[0][0]) * i / n, p[0][1] + (p[1][1] - p[0][1]) * i / n]);
+    }
+    pts.forEach(function (q) {
+      if (m.tipo === 'subrayar') out.push({ x0: q[0] - 3, y0: q[1] - 20, x1: q[0] + 3, y1: q[1] + 4 });   // el texto queda justo encima de la línea
+      else { var r = m.tipo === 'resaltar' ? 9 : 7; out.push({ x0: q[0] - r, y0: q[1] - r, x1: q[0] + r, y1: q[1] + r }); }
+    });
+    return out;
+  }
+  function corta(a, b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1; }
+  function aSlide(rc, base, k) { return { x0: (rc.left - base.left) / k, y0: (rc.top - base.top) / k, x1: (rc.right - base.left) / k, y1: (rc.bottom - base.top) / k }; }
+  /* Texto e imágenes del slide pintado que quedan bajo la marca. */
+  function contenidoBajo(id, m) {
+    var sec = $('#ed-' + CSS.escape(id)), escala = $('.v-escala', sec), base = $('.v-marcas', sec).getBoundingClientRect(), k = base.width / ANCHO;
+    var zonas = zonasMarca(m), textos = [], imagenes = [];
+    function toca(rc) { if (!rc.width || !rc.height) return false; var r = aSlide(rc, base, k); return zonas.some(function (z) { return corta(z, r); }); }
+    var w = document.createTreeWalker(escala, NodeFilter.SHOW_TEXT), nodo, rango = document.createRange();
+    while ((nodo = w.nextNode())) {
+      var t = nodo.nodeValue; if (!t || !t.trim()) continue;
+      rango.selectNodeContents(nodo);
+      if (!Array.prototype.some.call(rango.getClientRects(), toca)) continue;
+      var completo = t.replace(/\s+/g, ' ').trim(), marcado = completo;
+      if (completo.length > 60) {   // párrafo largo: quedarse con las palabras marcadas
+        var re = /\S+/g, x, ini = -1, fin = -1;
+        while ((x = re.exec(t))) {
+          rango.setStart(nodo, x.index); rango.setEnd(nodo, x.index + x[0].length);
+          if (Array.prototype.some.call(rango.getClientRects(), toca)) { if (ini < 0) ini = x.index; fin = x.index + x[0].length; }
+        }
+        if (ini >= 0) marcado = t.slice(ini, fin).replace(/\s+/g, ' ').trim();
+      }
+      if (!textos.some(function (y) { return y.texto === completo && y.marcado === marcado; })) textos.push({ texto: completo, marcado: marcado });
+    }
+    $$('img', escala).forEach(function (im) { if (toca(im.getBoundingClientRect())) imagenes.push(im.getAttribute('src') || ''); });
+    return { textos: textos.slice(0, 12), imagenes: imagenes.slice(0, 4) };
+  }
+  function zonaTexto(m) {
+    var b = cajaMarca(m), cx = (b.x0 + b.x1) / 2 / ANCHO, cy = (b.y0 + b.y1) / 2 / ALTO;
+    return (cy < .33 ? 'arriba' : cy < .66 ? 'centro' : 'abajo') + '-' + (cx < .33 ? 'izquierda' : cx < .66 ? 'centro' : 'derecha') +
+      ' (x ' + Math.round(b.x0 / ANCHO * 100) + '–' + Math.round(b.x1 / ANCHO * 100) + ' %, y ' + Math.round(b.y0 / ALTO * 100) + '–' + Math.round(b.y1 / ALTO * 100) + ' % del slide)';
+  }
+  function marcasTexto(id, conImagen) {
+    var ms = S.marcas[id] || []; if (!ms.length) return '';
+    return '== MARCAS DEL EQUIPO SOBRE EL SLIDE ==\n' +
+      'El equipo ha marcado sobre el slide pintado las partes que quiere cambiar (numeradas; la instrucción puede citarlas por su número). ' +
+      'La corrección se refiere a lo MARCADO: localiza en el JSON los textos o elementos indicados y cámbialos; no toques lo no marcado salvo que la instrucción lo pida o haga falta para que el slide quepa. ' +
+      'Si una marca rodea o recuadra un bloque entero (tabla, gráfico, foto, lista), la instrucción se aplica a ese bloque.' +
+      (conImagen ? ' La PRIMERA imagen adjunta es la captura del slide con las marcas dibujadas (rojo = recuadro, subrayado o trazo; amarillo = resaltado), con su número en un círculo rojo.' : '') + '\n' +
+      ms.map(function (m, i) {
+        var l = 'Marca ' + (i + 1) + ' · ' + NOMBRE_MARCA[m.tipo] + ' · zona ' + zonaTexto(m);
+        if (m.textos && m.textos.length) l += '\n  Texto bajo la marca: ' + m.textos.map(function (x) { return x.marcado !== x.texto ? '«' + x.marcado + '» (dentro de «' + (x.texto.length > 300 ? x.texto.slice(0, 300) + '…' : x.texto) + '»)' : '«' + x.texto + '»'; }).join(' | ');
+        if (m.imagenes && m.imagenes.length) l += '\n  Imágenes bajo la marca: ' + m.imagenes.map(function (s) { return 'src "' + s + '"'; }).join(', ');
+        if (!(m.textos && m.textos.length) && !(m.imagenes && m.imagenes.length)) l += '\n  (zona sin texto: espacio vacío o elemento gráfico; úsala como ubicación)';
+        return l;
+      }).join('\n');
+  }
+  /* Captura del slide (renderizado aparte, sin escala) con las marcas encima, para que Claude la vea. */
+  function capturaMarcada(id) {
+    var d = S.doc, vis = d.informe.slides.filter(function (s) { return !s.oculto; }), pag = vis.findIndex(function (s) { return s.id === id; }) + 1, s = vis[pag - 1];
+    return cargarScript(CDN + 'html2canvas/1.4.1/html2canvas.min.js').then(function () {
+      var el = lienzo(), raiz = M.pintar(el, s, pag, d.informe.meta);
+      try { M.airear(el); } catch (e) { /* se captura tal cual */ }
+      return window.html2canvas(el, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false }).then(function (cv) {
+        raiz.unmount(); el.remove();
+        var out = document.createElement('canvas'); out.width = ANCHO * 1.5; out.height = ALTO * 1.5;
+        var ctx = out.getContext('2d'); ctx.drawImage(cv, 0, 0, out.width, out.height); ctx.setTransform(1.5, 0, 0, 1.5, 0, 0);
+        (S.marcas[id] || []).forEach(function (m, i) { trazarMarca(ctx, m, i + 1); });
+        return new Promise(function (ok) { out.toBlob(ok, 'image/jpeg', .88); });
+      }, function (e) { raiz.unmount(); el.remove(); throw e; });
+    });
+  }
+  function borrarMarcas(id) { delete S.marcas[id]; dibujarMarcas(id); }
+  document.addEventListener('pointerdown', function (e) {
+    var cv = e.target.closest && e.target.closest('.v-marcas'); if (!cv || S.marcando !== cv.getAttribute('data-id') || e.button > 0) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    var p = puntoSlide(cv, e);
+    trazo = { id: cv.getAttribute('data-id'), cv: cv, marca: { tipo: S.herramienta, puntos: S.herramienta === 'resaltar' || S.herramienta === 'lapiz' ? [p] : [p, p] } };
+    dibujarMarcas(trazo.id);
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!trazo) return;
+    var p = puntoSlide(trazo.cv, e), pts = trazo.marca.puntos;
+    if (trazo.marca.tipo === 'subrayar') pts[1] = [p[0], pts[0][1] + (Math.abs(p[1] - pts[0][1]) < 12 ? 0 : p[1] - pts[0][1])];   // recta horizontal salvo que se incline a propósito
+    else if (trazo.marca.tipo === 'recuadro') pts[1] = p;
+    else { var u = pts[pts.length - 1]; if (Math.hypot(p[0] - u[0], p[1] - u[1]) >= 2) pts.push(p); }
+    dibujarMarcas(trazo.id);
+  });
+  function terminarTrazo() {
+    if (!trazo) return;
+    var t = trazo, m = t.marca, b = cajaMarca(m); trazo = null;
+    var util = m.tipo === 'recuadro' ? (b.x1 - b.x0 > 6 && b.y1 - b.y0 > 6) : m.tipo === 'subrayar' ? b.x1 - b.x0 > 6 : true;
+    if (util) { var c = contenidoBajo(t.id, m); m.textos = c.textos; m.imagenes = c.imagenes; (S.marcas[t.id] = S.marcas[t.id] || []).push(m); }
+    dibujarMarcas(t.id);
+  }
+  document.addEventListener('pointerup', terminarTrazo);
+  document.addEventListener('pointercancel', terminarTrazo);
+
+  function corregirSlide(id) {
+    var d = S.doc, sec = $('#ed-' + CSS.escape(id)), ta = $('textarea', sec), est = $('.estado-corr', sec), instr = ta.value.trim();
+    var lista = S.adjuntos[id] || [], marcas = S.marcas[id] || [];
+    if (!instr && marcas.length) { est.textContent = 'Escribe qué hay que cambiar en lo marcado.'; ta.focus(); return; }
+    if (!instr && !lista.length) { ta.focus(); return; }
+    if (!instr) instr = 'Incorpora al slide la información del material adjunto (datos, tablas o imágenes), sin inventar nada.';
+    var i = d.informe.slides.findIndex(function (s) { return s.id === id; }), actual = d.informe.slides[i];
+    var verImagen = marcas.length && S.limites && S.limites.images;
+    if (S.marcando === id) alternarMarcar(id);
+    est.textContent = lista.length || verImagen ? 'Preparando las marcas y los adjuntos…' : 'Claude está aplicando la corrección…'; S.abortar = new AbortController();
+    var captura = verImagen ? capturaMarcada(id).catch(function () { return null; }) : Promise.resolve(null);
+    Promise.all([prepararAdjuntos(id), captura]).then(function (r) {
+      var adj = r[0], img = r[1];
+      if (img) adj.imagenes = [img].concat(adj.imagenes).slice(0, S.limites.images.maxCount || 4);
+      if (marcas.length) adj.texto = marcasTexto(id, !!img) + (adj.texto ? '\n\n' + adj.texto : '');
+      return adj;
+    }).then(function (adj) {
+      if (adj.docs.length) {
+        S.fuentes = S.fuentes || { notas: '', documentos: [] }; S.fuentes.documentos = S.fuentes.documentos || [];
+        adj.docs.forEach(function (a) { S.fuentes.documentos.push({ nombre: '[corrección · ' + id + '] ' + a.nombre, texto: a.texto }); });
+        guardarFuentes(0);
+      }
+      if (adj.imgs.some(function (a) { return a.id; })) guardarDoc(0);
+      est.textContent = 'Claude está aplicando la corrección…';
+      return llamar(promptCorreccion(actual, instr, adj), { imagenes: adj.imagenes });
+    }).then(function (r) {
+      var avisos = r && Array.isArray(r.avisos) ? r.avisos : [];
+      var s = actualizarPeriodo(validarSlide(r, id)); s.origen = actual.origen === 'nueva' ? 'nueva' : 'actualizada';
+      var m = medir(s);
+      if (m.error) throw new Error(m.error);
+      d.informe.slides[i] = s; renumerar(d.informe.slides);
+      anotar(tituloDe(s) + ': ' + instr + (marcas.length ? ' (' + marcas.length + ' marca' + (marcas.length > 1 ? 's' : '') + ')' : '')); guardarDoc(0);
+      var pagina = d.informe.slides.filter(function (x) { return !x.oculto; }).findIndex(function (x) { return x.id === id; }) + 1;
+      pintarEnEditor(s, pagina); pintarQa();
+      est.textContent = (m.desborde ? 'Aplicada, pero ahora desborda: pide acortarla. ' : 'Aplicada. ') + (avisos.length ? 'Revisa también: ' + avisos.join(' · ') : '');
+      ta.value = ''; delete S.adjuntos[id]; pintarAdjuntos(id); borrarMarcas(id);
+    }, function (e) { est.textContent = e && e.code ? errorClaude(e) : 'No se pudo aplicar: ' + (e && e.message || e); });
+  }
+  function moverSlide(id, delta) {
+    var sl = S.doc.informe.slides, vis = sl.filter(function (s) { return !s.oculto; }), j = vis.findIndex(function (s) { return s.id === id; }), otro = vis[j + delta];
+    if (!otro) return;
+    var a = sl.indexOf(vis[j]), b = sl.indexOf(otro); sl[a] = otro; sl[b] = vis[j];
+    renumerar(sl); anotar('Orden: ' + tituloDe(vis[j]) + (delta < 0 ? ' sube' : ' baja')); guardarDoc(0); repintarTodo();
+    var el = $('#ed-' + CSS.escape(id)); if (el) el.scrollIntoView({ block: 'center' });
+  }
+  function alternarOculto(id) {
+    var s = S.doc.informe.slides.filter(function (x) { return x.id === id; })[0]; if (!s) return;
+    s.oculto = !s.oculto; renumerar(S.doc.informe.slides); anotar((s.oculto ? 'Oculta: ' : 'Visible: ') + tituloDe(s)); guardarDoc(0); repintarTodo();
+  }
+  function anadirDesdeBiblioteca() {
+    var n = +$('#ed-bib').value, b = BIB.filter(function (x) { return x.n === n; })[0]; if (!b) return;
+    var sl = S.doc.informe.slides, id = idNuevo(b, sl);
+    ocupadoEd('Claude está redactando «' + b.nombre + '»…'); S.abortar = new AbortController();
+    llamar(promptNueva(id)).then(function (o) {
+      var s = actualizarPeriodo(validarSlide(o, id)); s.origen = 'nueva';
+      var m = medir(s); if (m.error) throw new Error(m.error);
+      sl.push(s); S.doc.informe.slides = ordenar(sl); renumerar(S.doc.informe.slides);
+      anotar('Añadida: ' + b.nombre); guardarDoc(0); repintarTodo();
+      var el = $('#ed-' + CSS.escape(id)); if (el) el.scrollIntoView({ block: 'center' });
+    }, function (e) { ocupadoEd(e && e.code ? errorClaude(e) : 'No se pudo añadir: ' + (e && e.message || e)); });
+  }
+  function revisarCoherencia() {
+    ocupadoEd('Claude está revisando la coherencia del informe…'); S.abortar = new AbortController();
+    coherencia().then(function (qa) { S.doc.qa = { coherencia: qa, fecha: ahora() }; guardarDoc(0); ocupadoEd(qa.length ? '' : 'Sin incoherencias detectadas.'); pintarQa(); },
+      function (e) { ocupadoEd(errorClaude(e)); });
+  }
+  function guardarVersion() {
+    var d = S.doc, v = d.version || 1;
+    ocupadoEd('Guardando la versión ' + v + '…');
+    C.db.doc('versiones/' + d.id + '_v' + v).set({ informeId: d.id, version: v, fecha: ahora(), estado: d.estado, informe: clon(d.informe) }).then(function () {
+      d.version = v + 1; d.informe.meta.version = 'v' + d.version; anotar('Versión ' + v + ' guardada; se trabaja sobre la ' + d.version); guardarDoc(0);
+      ocupadoEd('Versión ' + v + ' guardada. Ahora trabajas en la versión ' + d.version + '.'); repintarTodo();
+    }, function (e) { ocupadoEd('No se pudo guardar la versión (' + (e && e.code || 'error') + ').'); });
+  }
+  function aprobar() {
+    var d = S.doc;
+    if (d.estado !== 'aprobado') {
+      var bloq = qaMecanico(medidasEd).filter(function (x) { return x.nivel === 'error'; });
+      if (bloq.length) { ocupadoEd('Hay ' + bloq.length + ' bloqueante(s) en la revisión: resuélvelos antes de aprobar.'); return; }
+      d.estado = 'aprobado'; d.informe.meta.estado = 'Aprobado'; anotar('Aprobado');
+    } else { d.estado = 'borrador'; d.informe.meta.estado = 'Borrador'; anotar('Vuelve a borrador'); }
+    guardarDoc(0); repintarTodo();
+  }
+
+  /* ---------- Exportar PDF (en el navegador) ---------- */
+  function exportarPdf() {
+    var d = S.doc, vis = d.informe.slides.filter(function (s) { return !s.oculto; });
+    ocupadoEd('Preparando el PDF…');
+    Promise.all([cargarScript(CDN + 'html2canvas/1.4.1/html2canvas.min.js'), cargarScript(CDN + 'jspdf/2.5.1/jspdf.umd.min.js')]).then(function () {
+      var pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: [960, 540], compress: true });
+      var cont = $('#lienzo-oculto'); cont.classList.add('exportando');
+      return vis.reduce(function (p, s, i) {
+        return p.then(function () {
+          ocupadoEd('Generando página ' + (i + 1) + ' de ' + vis.length + '…');
+          var el = lienzo(), raiz = M.pintar(el, s, i + 1, d.informe.meta);
+          try { M.airear(el); } catch (e) { /* se exporta tal cual */ }
+          return window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }).then(function (cv) {
+            if (i > 0) pdf.addPage([960, 540], 'landscape');
+            pdf.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 960, 540);
+            raiz.unmount(); el.remove();
+          });
+        });
+      }, Promise.resolve()).then(function () {
+        cont.classList.remove('exportando');
+        var nombre = qCierre(d.trimestre).replace(/-/g, '') + '_' + d.codigo + '_' + d.trimestre + '_Informe Trimestral Inversores' + (d.estado === 'aprobado' ? '' : ' (borrador v' + (d.version || 1) + ')') + '.pdf';
+        ocupadoEd('Confirma la descarga del PDF…');
+        return C.downloads.save({ filename: nombre, data: pdf.output('blob') }).then(function () { ocupadoEd('PDF descargado.'); },
+          function (e) { ocupadoEd(e && e.code === 'declined' ? 'Descarga cancelada.' : 'No se pudo descargar (' + (e && e.code || 'error') + ').'); });
+      });
+    }).catch(function (e) { $('#lienzo-oculto').classList.remove('exportando'); ocupadoEd('No se pudo generar el PDF: ' + (e && e.message || e)); });
+  }
+})();
+</script>
+
+</html>
