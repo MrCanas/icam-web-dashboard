@@ -147,8 +147,12 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
       s.origen = s.origen || origen;
       let m: MedidaSlide = medirFuera(s, 5, meta);
       if (m.error) throw new Error(m.error);
-      if (m.desborde || (m.relleno != null && m.relleno < 80)) {
-        f.detalle = m.desborde ? "Ajustando: desborda" : `Ajustando: relleno ${m.relleno} %`;
+      // Un ajuste si desborda o queda corta; un segundo solo si sigue desbordando (a menudo por pocos px,
+      // y una slide que desborda bloquea la aprobación).
+      for (let intento = 0; intento < 2; intento++) {
+        const hace = intento === 0 ? m.desborde || (m.relleno != null && m.relleno < 80) : m.desborde;
+        if (!hace) break;
+        f.detalle = m.desborde ? `Ajustando: desborda${intento ? " (2.º intento)" : ""}` : `Ajustando: relleno ${m.relleno} %`;
         refrescar();
         try {
           const { json: j2 } = await pedirClaude(
@@ -165,6 +169,7 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
           }
         } catch (e) {
           if (esCancelado(e)) throw e;
+          break;
         }
       }
       poner(t.id, s);
