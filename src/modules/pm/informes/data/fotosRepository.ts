@@ -24,11 +24,6 @@ function aFoto(f: Record<string, unknown>): Foto {
   };
 }
 
-/** URL con la que las slides referencian una foto (mismo origen: sin CORS en impresión ni capturas). */
-export function urlFoto(id: string): string {
-  return `/api/informes/fotos/${id}`;
-}
-
 export async function listarFotos(ctx: UserContext, informeId: string): Promise<R<Foto[]>> {
   const { data, error } = await getInformesSupabase(ctx)
     .from("informe_foto")

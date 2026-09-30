@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "5mb",
     },
   },
+  // Las referencias que se envían a Claude se leen del disco en el servidor.
+  outputFileTracingIncludes: {
+    "/api/informes/claude": ["./src/modules/pm/informes/referencia/**"],
+    "/dashboard/pm/informes/[id]": ["./src/modules/pm/informes/referencia/**"],
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },

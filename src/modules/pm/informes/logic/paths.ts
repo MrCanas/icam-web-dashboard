@@ -19,3 +19,8 @@ export function rutaImprimir(id: string): string {
 export function rutaInformesProyecto(idActivo: string): string {
   return `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}/informe`;
 }
+
+/** URL con la que las slides referencian una foto (mismo origen: sin CORS en la impresión ni en las capturas). */
+export function urlFoto(id: string): string {
+  return `/api/informes/fotos/${id}`;
+}
