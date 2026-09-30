@@ -22,6 +22,7 @@ export default async function ProyectoLayout({
         idActivo={idActivo}
         showPlanificacion={user ? canAccessRouteKey(user, "pm.planificacion") : true}
         showActas={user ? canAccessRouteKey(user, "pm.actas") : true}
+        showInforme={user ? canAccessRouteKey(user, "pm.informes") : true}
       />
       {children}
     </div>
