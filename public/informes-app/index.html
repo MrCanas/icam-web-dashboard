@@ -749,7 +749,15 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
   /* ================= Eventos ================= */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-accion]'); if (!b || b.disabled) return;
-    var f = ACCIONES[b.getAttribute('data-accion')]; if (f) { e.preventDefault(); f(b); }
+    var f = ACCIONES[b.getAttribute('data-accion')]; if (!f) return;
+    e.preventDefault();
+    try { f(b); } catch (err) { console.error('[informes] acción ' + b.getAttribute('data-accion'), err); fallo('No se ha podido completar la acción')(err); }
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    if (r && r.code === 'cancelled') return;
+    console.error('[informes] promesa sin gestionar', r);
+    if (S.vista !== 'generando' && S.vista !== 'editor') fallo('Algo ha fallado')(r);
   });
   document.addEventListener('input', function (e) { if (e.target.matches('[data-campo]') && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') cambioCampo(e.target, false); });
   document.addEventListener('change', function (e) {
@@ -762,6 +770,8 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
     if (ruta[0] === 'form') {
       S.form[ruta[1]] = v;
       if (ruta[1] === 'qNew') S.form.qAnt = qAnt(v);
+      // Y al revés: al elegir el trimestre anterior, el nuevo pasa a ser el siguiente.
+      if (ruta[1] === 'qAnt') { S.form.qNew = qSig(v); if (final) render(); }
       if (final && ['proyecto', 'qNew', 'variante'].indexOf(ruta[1]) >= 0) render();
     } else if (ruta[0] === 'fuentes') { S.fuentes[ruta[1]] = v; guardarFuentes(1200); }
     else if (ruta[0] === 'doc') { S.doc[ruta[1]] = v; guardarDoc(); if (final) render(); }
@@ -844,7 +854,7 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
       else { S.vista = 'nuevo'; S.paso = e === 'datos' ? 1 : e === 'fuentes' ? 2 : 3; if (e === 'generando') mensaje('La generación anterior no terminó. Revisa la selección y pulsa GO para repetirla.'); }
       render();
       if (S.vista === 'nuevo' && S.paso === 2) cargarFuentesAuto(false);
-    });
+    }).catch(fallo('No se ha podido abrir el informe'));
   }
   function eliminarInforme(id) {
     if (!C.db) return;
@@ -891,8 +901,16 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
         estado: 'datos', version: 1, creado: ahora(), actualizado: ahora(), fotos: [], cambios: [], pie: proyecto.pie || null, idActivo: proyecto.idActivo || null };
       S.fuentes = { notas: '', documentos: [], previoTexto: '', previoNombre: '' };
       guardarDoc(0); guardarFuentes(0);
-      return cargarPrevio().then(function () { mensaje(null); S.paso = 1; render(); });
-    });
+      return cargarPrevio().then(function () { mensaje(null); estadoCab(''); S.paso = 1; render(); });
+    }).catch(fallo('No se ha podido preparar el informe'));
+  }
+  /* Un error en un paso no puede dejar el botón «mudo»: se enseña y se puede reintentar. */
+  function fallo(que) {
+    return function (e) {
+      estadoCab('');
+      mensaje(esc(que) + ': ' + esc((e && (e.message || e.code)) || 'error desconocido') + '. Vuelve a intentarlo; si se repite, recarga la página.', 'error');
+      render(); window.scrollTo(0, 0);
+    };
   }
 
   /* ================= Fuentes automáticas del portal (actas y planificación) ================= */
