@@ -37,6 +37,33 @@ async function esperarTexto(page: Page, texto: string | RegExp, timeout = 120_00
   await page.getByText(texto).first().waitFor({ timeout });
 }
 
+/** Recuadra la zona de texto de la primera slide de contenido redactada por Claude y pide una corrección. */
+async function corregirConMarca(page: Page) {
+  const tarjeta = page
+    .locator("section[id^=ed-]")
+    .filter({ hasText: "Relleno" })
+    .filter({ hasText: /\b(actualizada|nueva)\b/ })
+    .first();
+  const idSlide = await tarjeta.getAttribute("id");
+  await tarjeta.getByRole("button", { name: "Marcar" }).click();
+  await tarjeta.getByRole("button", { name: "Recuadro" }).click();
+  const caja = (await tarjeta.locator("canvas").boundingBox())!;
+  await page.mouse.move(caja.x + caja.width * 0.06, caja.y + caja.height * 0.16);
+  await page.mouse.down();
+  await page.mouse.move(caja.x + caja.width * 0.5, caja.y + caja.height * 0.5, { steps: 8 });
+  await page.mouse.up();
+  log(`Marca en ${idSlide}: ${await tarjeta.locator("p", { hasText: "Marcas:" }).innerText()}`);
+  await tarjeta.locator("textarea").fill("1: pon en negrita la fecha más relevante de lo recuadrado; no cambies nada más.");
+  const t = Date.now();
+  await tarjeta.getByRole("button", { name: "Aplicar corrección" }).click();
+  // El estado de la corrección (no el texto de la slide, que puede contener cualquier cosa).
+  await tarjeta
+    .locator("span[aria-live=polite]")
+    .filter({ hasText: /^(Aplicada|No se pudo|Claude no|Error de Claude|Se ha cortado|Se ha alcanzado|Tu |Demasiada|Parado|La respuesta)/ })
+    .waitFor({ timeout: 600_000 });
+  log(`Corrección (${Math.round((Date.now() - t) / 1000)} s): ${await tarjeta.locator("[aria-live=polite]").last().innerText()}`);
+}
+
 async function main() {
   cargarEnv();
   const email = arg("email", process.env.INFORMES_EMAIL_PRUEBAS);
@@ -58,6 +85,15 @@ async function main() {
       await ctx.close();
     }
     if (!email) return;
+    if (process.argv.includes("--solo-correccion")) {
+      const ctx = await contextoConSesion(navegador, URL_BASE, email);
+      const page = await ctx.newPage();
+      await page.goto(`${URL_BASE}/dashboard/pm/informes/${ACTIVO}_${TRIMESTRE.replace(" ", "-")}`, { waitUntil: "networkidle", timeout: 240_000 });
+      await page.getByRole("heading", { level: 2, name: "Revisión" }).waitFor({ timeout: 120_000 });
+      await page.waitForFunction("!document.body.innerText.includes('Revisando…')", undefined, { timeout: 180_000 });
+      await corregirConMarca(page);
+      return;
+    }
 
     const ctx = await contextoConSesion(navegador, URL_BASE, email);
     const page = await ctx.newPage();
@@ -112,7 +148,7 @@ async function main() {
     let ultimo = "";
     while (Date.now() < fin) {
       if (await page.getByRole("heading", { level: 2, name: "Revisión" }).count()) break;
-      const fase = await page.locator("[aria-live=polite]").first().innerText().catch(() => "");
+      const fase = await page.locator("[data-fase]").first().innerText().catch(() => "");
       if (fase !== ultimo) {
         log(`Generación: ${fase}`);
         ultimo = fase;
@@ -128,25 +164,10 @@ async function main() {
     log(`Revisión:\n${revision}`);
     await page.screenshot({ path: join(SALIDA, "recorrido-editor.png") });
 
-    // Corrección con marcas en la primera slide redactada por Claude.
-    const tarjeta = page.locator("section[id^=ed-]").filter({ hasText: /actualizada|nueva/ }).first();
-    const idSlide = await tarjeta.getAttribute("id");
-    await tarjeta.getByRole("button", { name: "Marcar" }).click();
-    await tarjeta.getByRole("button", { name: "Recuadro" }).click();
-    const lienzo = tarjeta.locator("canvas");
-    const caja = (await lienzo.boundingBox())!;
-    await page.mouse.move(caja.x + caja.width * 0.08, caja.y + caja.height * 0.2);
-    await page.mouse.down();
-    await page.mouse.move(caja.x + caja.width * 0.5, caja.y + caja.height * 0.45, { steps: 8 });
-    await page.mouse.up();
-    log(`Marca en ${idSlide}: ${await tarjeta.locator("p", { hasText: "Marcas:" }).innerText()}`);
-    await tarjeta.locator("textarea").fill("1: pon en negrita la fecha más relevante de lo recuadrado; no cambies nada más.");
-    const t2 = Date.now();
-    await tarjeta.getByRole("button", { name: "Aplicar corrección" }).click();
-    await tarjeta.getByText(/^Aplicada|No se pudo|Claude no|Error de Claude|Se ha/).first().waitFor({ timeout: 600_000 });
-    log(`Corrección (${Math.round((Date.now() - t2) / 1000)} s): ${await tarjeta.locator("[aria-live=polite]").last().innerText()}`);
+    await corregirConMarca(page);
 
     // PDF.
+
     const id = decodeURIComponent(page.url().split("/informes/")[1]!.split(/[?#]/)[0]!);
     await page.goto(`${URL_BASE}/dashboard/pm/informes/${encodeURIComponent(id)}/imprimir`, { waitUntil: "networkidle" });
     await page.waitForSelector(".iq-paginas[data-listo]", { timeout: 180_000 });

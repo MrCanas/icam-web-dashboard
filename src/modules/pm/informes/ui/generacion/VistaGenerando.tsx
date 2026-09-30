@@ -66,7 +66,7 @@ export function VistaGenerando({ h }: { h: HerramientaInforme }) {
       <FuentesInforme />
       <Tarjeta>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-text-primary" aria-live="polite">
+          <p className="text-sm font-semibold text-text-primary" aria-live="polite" data-fase>
             {fase}
           </p>
           {parado ? (
