@@ -19,6 +19,8 @@ export function codigoInforme(texto: string): string {
 export function proyectosConActivosPm(
   configurados: DocumentoConId[],
   activos: { id_activo: string; nombre_display: string | null }[],
+  /** id_activo → nombre (del proyecto de Actas) cuando el activo no tiene nombre_display. */
+  nombres: Record<string, string> = {},
 ): DocumentoConId[] {
   const activosConfigurados = new Set(
     configurados
@@ -36,7 +38,7 @@ export function proyectosConActivosPm(
     pendientes.push({
       id: codigo,
       datos: {
-        nombre: a.nombre_display?.trim() || a.id_activo,
+        nombre: a.nombre_display?.trim() || nombres[a.id_activo] || a.id_activo,
         codigo,
         idActivo: a.id_activo,
         sinConfigurar: true,

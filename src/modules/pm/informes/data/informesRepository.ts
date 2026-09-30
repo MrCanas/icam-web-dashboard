@@ -2,6 +2,7 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 
 import { COLECCIONES } from "../logic/colecciones";
+import { esTablaInexistente, mensajeErrorBd } from "../logic/errores";
 import { proyectosConActivosPm } from "../logic/proyectos";
 import type { ColeccionInforme, DocumentoApp, DocumentoConId } from "../types";
 import { getInformesSupabase } from "./client";
@@ -13,6 +14,7 @@ import { getInformesSupabase } from "./client";
  */
 
 type Fila = Record<string, unknown> & { datos: DocumentoApp };
+type Supabase = ReturnType<typeof getInformesSupabase>;
 
 export async function listarDocumentos(
   ctx: UserContext,
@@ -29,7 +31,11 @@ export async function listarDocumentos(
     consulta = consulta.eq(columna, filtro.valor);
   }
   const { data, error } = await consulta;
-  if (error) return { data: [], error: error.message };
+  // Los proyectos del dashboard se ofrecen aunque falte la tabla de
+  // configuración: la PM tiene que poder ver y elegir su proyecto siempre.
+  if (error && !(coleccion === "proyectos" && esTablaInexistente(error))) {
+    return { data: [], error: mensajeErrorBd(error) };
+  }
 
   const docs = ((data ?? []) as unknown as Fila[]).map((f) => ({
     id: String(f[def.clave]),
@@ -37,22 +43,42 @@ export async function listarDocumentos(
   }));
 
   if (coleccion !== "proyectos") return { data: docs, error: null };
+  return { data: await conProyectosDelDashboard(supabase, docs), error: null };
+}
 
-  // La lista de proyectos del paso 0 también ofrece los activos PM que aún no
-  // tienen configuración de informe: así la PM no tiene que teclear el código.
-  const { data: activos, error: errActivos } = await supabase
-    .from("pm_activos")
-    .select("id_activo, nombre_display, archivado_at")
-    .is("archivado_at", null)
-    .order("orden", { ascending: true });
-  if (errActivos) return { data: docs, error: null };
-  return {
-    data: proyectosConActivosPm(
-      docs,
-      (activos ?? []) as { id_activo: string; nombre_display: string | null }[],
-    ),
-    error: null,
-  };
+/**
+ * La lista de proyectos del paso 0 = los configurados para informe + todos los
+ * activos de Proyectos (pm_activos) que aún no lo están. Como la mayoría de
+ * activos no tiene nombre visible, se toma el de su proyecto de Actas.
+ */
+async function conProyectosDelDashboard(
+  supabase: Supabase,
+  configurados: DocumentoConId[],
+): Promise<DocumentoConId[]> {
+  const [{ data: activos, error }, { data: actas }] = await Promise.all([
+    supabase
+      .from("pm_activos")
+      .select("id, id_activo, nombre_display, archivado_at")
+      .is("archivado_at", null)
+      .order("orden", { ascending: true }),
+    supabase.from("project").select("code, name, pm_activo_id, archived_at"),
+  ]);
+  if (error) {
+    console.error("[informes] pm_activos", error.message);
+    return configurados;
+  }
+
+  const filas = (activos ?? []) as { id: string; id_activo: string; nombre_display: string | null }[];
+  const proyectosActas = (actas ?? []) as { code: string; name: string | null; pm_activo_id: string | null; archived_at: string | null }[];
+  const normal = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const nombres: Record<string, string> = {};
+  for (const a of filas) {
+    const p =
+      proyectosActas.find((x) => x.pm_activo_id === a.id && !x.archived_at) ??
+      proyectosActas.find((x) => x.pm_activo_id == null && !x.archived_at && normal(x.code) === normal(a.id_activo));
+    if (p?.name?.trim()) nombres[a.id_activo] = p.name.trim();
+  }
+  return proyectosConActivosPm(configurados, filas, nombres);
 }
 
 export async function obtenerDocumento(
@@ -67,7 +93,7 @@ export async function obtenerDocumento(
     .select("datos")
     .eq(def.clave, id)
     .maybeSingle();
-  if (error) return { data: null, error: error.message };
+  if (error) return { data: null, error: mensajeErrorBd(error) };
   return { data: ((data as Fila | null)?.datos ?? null) as DocumentoApp | null, error: null };
 }
 
@@ -89,7 +115,7 @@ export async function guardarDocumento(
         .select(def.clave)
         .eq(def.clave, id)
         .maybeSingle();
-      if (errExiste) return { error: errExiste.message };
+      if (errExiste) return { error: mensajeErrorBd(errExiste) };
 
       const fila: Record<string, unknown> = {
         ...def.columnas(datos),
@@ -100,12 +126,12 @@ export async function guardarDocumento(
 
       if (existe) {
         const { error } = await supabase.from(def.tabla).update(fila).eq(def.clave, id);
-        return { error: error?.message ?? null };
+        return { error: error ? mensajeErrorBd(error) : null };
       }
       if (def.autor.alta) fila[def.autor.alta] = ctx.id;
       fila[def.clave] = id;
       const { error } = await supabase.from(def.tabla).insert(fila);
-      return { error: error?.message ?? null };
+      return { error: error ? mensajeErrorBd(error) : null };
     },
   );
 }
@@ -123,7 +149,7 @@ export async function borrarDocumento(
     async () => {
       const supabase = getInformesSupabase(ctx);
       const { error } = await supabase.from(def.tabla).delete().eq(def.clave, id);
-      return { error: error?.message ?? null };
+      return { error: error ? mensajeErrorBd(error) : null };
     },
   );
 }

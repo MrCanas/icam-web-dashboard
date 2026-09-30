@@ -550,7 +550,11 @@ Hechos concretos y, si hay fecha, fechados. 6 recomendados, 9 máximo. El usuari
         S.informes = nuevos;
         S.cargado = true;
         if (S.vista === 'inicio') render();
-      }, function () { S.cargado = true; render(); });
+      }, function (e) {
+        S.cargado = true;
+        if (e && e.message) mensaje('No se ha podido cargar la lista de informes: ' + esc(e.message), 'error');
+        render();
+      });
     } else { S.cargado = true; }
     render();
   });

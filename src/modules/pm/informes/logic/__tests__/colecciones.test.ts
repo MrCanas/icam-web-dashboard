@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { COLECCIONES, esColeccion, esIdValido, validarDocumento } from "../colecciones";
+import { esTablaInexistente, MENSAJE_SIN_MIGRACION, mensajeErrorBd } from "../errores";
 import { codigoInforme, proyectosConActivosPm } from "../proyectos";
 import { codigoSnapshot, parseTrimestre, rangoTrimestre, trimestreAnterior } from "../trimestre";
 
@@ -68,6 +69,23 @@ test("proyectosConActivosPm añade los activos sin configurar y no duplica", () 
     sinConfigurar: true,
   });
   assert.equal(codigoInforme(" SE 84/ "), "SE-84");
+});
+
+test("proyectosConActivosPm usa el nombre de Actas cuando el activo no tiene nombre", () => {
+  const lista = proyectosConActivosPm([], [{ id_activo: "SE84", nombre_display: null }, { id_activo: "GQ8", nombre_display: null }], {
+    SE84: "Santa Engracia 84",
+  });
+  assert.deepEqual(
+    lista.map((d) => d.datos.nombre),
+    ["Santa Engracia 84", "GQ8"],
+  );
+});
+
+test("errores de tabla inexistente se traducen a la migración pendiente", () => {
+  assert.ok(esTablaInexistente({ code: "PGRST205", message: "Could not find the table 'public.informe_fuente' in the schema cache" }));
+  assert.ok(!esTablaInexistente({ code: "23505", message: "duplicate key" }));
+  assert.equal(mensajeErrorBd({ code: "PGRST205", message: "x" }), MENSAJE_SIN_MIGRACION);
+  assert.equal(mensajeErrorBd({ code: "23505", message: "duplicate key" }), "duplicate key");
 });
 
 test("trimestres: rango, anterior y código de snapshot", () => {
