@@ -59,7 +59,7 @@ export function PmProjectTabs({
       ? [
           {
             key: "informe",
-            label: "Informes",
+            label: "Informes Trimestrales",
             href: `${base}/informe`,
             active: pathname === `${base}/informe`,
           },

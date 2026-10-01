@@ -12,7 +12,7 @@ export async function generateMetadata({
   return { title: `${decodeURIComponent(id)} · Informe trimestral` };
 }
 
-/** Subpestaña «Informes» del proyecto: sus informes y «Nuevo informe» con el proyecto ya elegido. */
+/** Subpestaña «Informes Trimestrales» del proyecto: sus informes y «Nuevo informe» con el proyecto ya elegido. */
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireRouteAccess("pm.informes");
   const { id } = await params;

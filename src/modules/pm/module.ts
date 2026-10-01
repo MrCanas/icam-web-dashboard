@@ -60,7 +60,7 @@ export const pmModule: ModuleDefinition = {
       key: "pm.informes",
       path: "/dashboard/pm/informes",
       label: "Informes trimestrales",
-      // Informes para inversores. Cada proyecto tiene su subpestaña «Informes»;
+      // Informes para inversores. Cada proyecto tiene su subpestaña «Informes Trimestrales»;
       // la lista de todos (y el asistente y el editor) cuelgan de Configuración.
       hiddenInNav: true,
       match: (p) =>
