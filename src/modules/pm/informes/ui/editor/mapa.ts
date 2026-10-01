@@ -122,11 +122,9 @@ export function mapaSlide(lienzo: HTMLElement, slide: SlideJson, arbol: NodoArbo
       huecos = cuerpo ? [cuerpo.querySelector<HTMLElement>(":scope > img") ?? cuerpo] : [];
     } else {
       const el =
-        grupo.tipo === "TextoImagen"
-          ? lienzo.querySelector<HTMLElement>(".iq-imagenes-col")
-          : grupo.tipo === "Portada"
-            ? lienzo.querySelector<HTMLElement>(".iq-portada-foto")
-            : (mapa.bloques.find((b) => mismaRuta(b.nodo.ruta, grupo.nodo))?.el ?? null);
+        grupo.tipo === "Portada"
+          ? lienzo.querySelector<HTMLElement>(".iq-portada-foto")
+          : (mapa.bloques.find((b) => mismaRuta(b.nodo.ruta, grupo.nodo))?.el ?? null);
       if (!el) continue;
       const figuras = el.matches("figure.iq-figura") ? [el] : (Array.from(el.querySelectorAll(":scope > figure.iq-figura")) as HTMLElement[]);
       // El hueco de la foto, sin el pie: la imagen o su marcador de «falta foto».

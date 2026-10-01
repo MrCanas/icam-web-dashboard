@@ -1,29 +1,38 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { renderToStaticMarkup } from "react-dom/server";
+
 import {
+  altoDeImagen,
   arbolBloques,
   cambiarFoto,
   camposTexto,
   columnaComoPila,
+  desplegar,
   disposicionGaleria,
   etiquetaRuta,
+  esDesplegable,
   gruposDeImagenes,
+  insertarBloque,
   intercambiarColumnas,
   intercambiarFotos,
   leerRuta,
   localizarCampo,
   moverBloque,
+  nodoImagen,
   nodosDe,
   normalizar,
   ponerTexto,
   proporcionActual,
   proporcionColumnas,
+  quitarBloque,
   reencuadrar,
   rejillaDe,
   srcDeImagen,
-  varianteTextoImagen,
+  vaciarFoto,
 } from "@/modules/pm/informes/logic/edicion";
+import { elemento } from "@/modules/pm/informes/slides/elemento";
 import type { SlideJson } from "@/modules/pm/informes/slides/tipos";
 
 const obra: SlideJson = {
@@ -185,15 +194,6 @@ test("imágenes: grupos, cambio de foto, reencuadre, orden y disposición de la 
   ]);
   assert.throws(() => disposicionGaleria(obra, galeria, "9"));
 
-  // Texto e imagen: al pasar a dos apiladas aparece el segundo hueco, y vuelve a contar una al deshacerlo.
-  const textoImagen: SlideJson = { id: "t", c: "TextoImagen", props: { titulo: "T", parrafos: ["p"], imagenes: [{ src: "/api/informes/fotos/a" }] } };
-  assert.equal(gruposDeImagenes(textoImagen)[0]!.imagenes.length, 1);
-  const dos = varianteTextoImagen(textoImagen, "dos-apiladas");
-  assert.deepEqual(dos.props?.imagenes, [{ src: "/api/informes/fotos/a" }, {}]);
-  assert.deepEqual(gruposDeImagenes(dos)[0]!.imagenes, [["props", "imagenes", 0], ["props", "imagenes", 1]]);
-  assert.equal(gruposDeImagenes(varianteTextoImagen(dos, "una"))[0]!.imagenes.length, 1);
-  assert.equal(gruposDeImagenes({ id: "t", c: "TextoImagen", props: { variante: "dos-apiladas" } })[0]!.imagenes.length, 1);
-
   const marco: SlideJson = { id: "x", compuesto: { contenido: [{ c: "ImagenMarco", props: { ancho: 300, alto: 200 } }] } };
   assert.deepEqual(gruposDeImagenes(marco)[0]!.imagenes, [["compuesto", "contenido", 0, "props"]]);
   assert.equal(
@@ -233,4 +233,110 @@ test("imágenes que la plantilla guarda solo como dirección: portada, ubicació
   assert.equal(bloqueada.props?.vista, undefined);
   // Con contenido propio no lleva página.
   assert.equal(gruposDeImagenes({ id: "x", c: "SlideBloqueado", hijos: [{ c: "Texto" }] }).length, 0);
+});
+
+const meta = { proyecto: "Santa Engracia 84", codigo: "SE84", trimestre: "Q3 2026", pie: { variante: "sl" as const, vehiculo: "Vehículo, S.L.", nif: "B00000000" } };
+const pintar = (slide: SlideJson) => renderToStaticMarkup(elemento(slide, 7, meta));
+
+const resumen: SlideJson = {
+  id: "resumen-ejecutivo",
+  c: "ResumenEjecutivo",
+  origen: "actualizada",
+  fuentes: "actas",
+  props: {
+    trimestre: "Q3 2026",
+    seccion: 1,
+    izquierda: [
+      { icono: "situacion-actual", titulo: "SITUACIÓN ACTUAL", parrafos: ["El activo está **terminado**.", "Se entrega en octubre."] },
+      { icono: "operacion-cronograma", titulo: "OPERACIÓN", vinetas: ["Contrato firmado"] },
+    ],
+    logros: ["Fin de obra el **11/08**", "Tasación recibida"],
+    derecha: [{ icono: "compraventa-financiacion", titulo: "FINANCIACIÓN", parrafos: ["Préstamo dispuesto."] }],
+  },
+};
+
+const kpis: SlideJson = {
+  id: "kpis-riesgos-objetivos",
+  c: "SlideKpisRiesgosObjetivos",
+  props: {
+    trimestre: "Q3 2026",
+    siguiente: "Q4 2026",
+    seccion: 3,
+    kpis: [{ kpi: "% Avance técnico", objetivo: "100 %", real: "100 %", estado: "ok" }],
+    riesgos: [{ riesgo: "Retraso del ascensor", mitigacion: "Seguimiento semanal con OTIS" }],
+    objetivos: ["Entrega al operador", "Obtener la **licencia** de primera ocupación"],
+  },
+};
+
+const textoImagen: SlideJson = {
+  id: "situacion-operador",
+  c: "TextoImagen",
+  props: {
+    seccion: 4,
+    titulo: "Situación de Proyecto. Operador",
+    subtitulo: "Entrega",
+    parrafos: ["El operador recibe el edificio en **octubre**."],
+    nota: "**Nota:** fecha sujeta a la licencia.",
+    variante: "dos-apiladas",
+    imagenes: [{ src: "/api/informes/fotos/a", pie: "Fachada", focalY: 0.2 }, { src: "/api/informes/fotos/b" }],
+  },
+};
+
+test("desplegar: una plantilla cerrada pasa a compuesto y se pinta exactamente igual", () => {
+  for (const slide of [resumen, kpis, textoImagen, { ...textoImagen, props: { titulo: "Sin imágenes", parrafos: ["p"] } } as SlideJson]) {
+    assert.ok(esDesplegable(slide), slide.c);
+    const abierta = desplegar(slide);
+    assert.equal(abierta.c, undefined);
+    assert.ok(abierta.compuesto, slide.c);
+    assert.deepEqual([abierta.id, abierta.origen, abierta.fuentes], [slide.id, slide.origen, slide.fuentes]);
+    assert.equal(pintar(abierta), pintar(slide), `${slide.c} no se pinta igual desplegada`);
+    assert.ok(arbolBloques(abierta), slide.c);
+  }
+  // El original no cambia y lo que ya es compuesto o no se puede abrir se deja como está.
+  assert.equal(resumen.c, "ResumenEjecutivo");
+  assert.equal(esDesplegable({ id: "colaboradores", c: "Colaboradores", props: {} }), false);
+  assert.deepEqual(desplegar(obra), obra);
+});
+
+test("una plantilla desplegada se reorganiza como cualquier compuesto, sin trimestres que confundan a la revisión", () => {
+  const abierta = desplegar(resumen);
+  const arbol = arbolBloques(abierta)!;
+  assert.deepEqual(arbol.contenedor?.hijos.map((c) => c.contenedor?.hijos.map((b) => b.c)), [["BloqueIcono", "BloqueIcono"], ["BloqueIcono", "BloqueIcono"]]);
+  // Los logros (primero de la derecha) pasan a la izquierda.
+  const movida = moverBloque(abierta, ["compuesto", "contenido", 1, "hijos", 0], { contenedor: ["compuesto", "contenido", 0, "hijos"], indice: 0 });
+  assert.equal((leerRuta(movida, ["compuesto", "contenido", 0, "hijos", 0, "props", "titulo"]) as string), "LOGROS Q3 2026");
+  // KPIs: el bloque de objetivos lleva el trimestre siguiente en su rótulo, no en una prop «trimestre».
+  const k = desplegar(kpis);
+  assert.equal(JSON.stringify(k).includes('"trimestre":"Q4 2026"'), false);
+  assert.ok(JSON.stringify(k).includes("OBJETIVOS Q4 2026"));
+  // La nota de «texto e imagen» es un bloque de texto, no un contenedor.
+  const ti = arbolBloques(desplegar(textoImagen))!;
+  assert.deepEqual(ti.contenedor?.hijos.map((c) => c.contenedor?.hijos.map((b) => [b.c, !!b.contenedor])), [
+    [["Subtitulo", false], ["Texto", false], ["div", false]],
+    [["ImagenMarco", false], ["ImagenMarco", false]],
+  ]);
+  assert.equal(gruposDeImagenes(desplegar(textoImagen)).length, 2);
+});
+
+test("imágenes nuevas: añadir, cambiar de tamaño, vaciar y quitar", () => {
+  const abierta = desplegar(resumen);
+  const columna = ["compuesto", "contenido", 0, "hijos"];
+  const conImagen = insertarBloque(abierta, { contenedor: columna, indice: 99 }, nodoImagen("/api/informes/fotos/n", 395.4, 237.2));
+  const ruta = [...columna, 2];
+  assert.deepEqual(leerRuta(conImagen, ruta), { c: "ImagenMarco", props: { src: "/api/informes/fotos/n", ancho: 395, alto: 237 } });
+  assert.equal((leerRuta(abierta, columna) as unknown[]).length, 2);
+
+  assert.equal((leerRuta(altoDeImagen(conImagen, ruta, 30), [...ruta, "props", "alto"]) as number), 267);
+  assert.equal((leerRuta(altoDeImagen(conImagen, ruta, -500), [...ruta, "props", "alto"]) as number), 60);
+  assert.equal((leerRuta(altoDeImagen(conImagen, ruta, 500), [...ruta, "props", "alto"]) as number), 400);
+  assert.throws(() => altoDeImagen(conImagen, [...columna, 0], 30));
+
+  const grupo = gruposDeImagenes(conImagen)[0]!;
+  assert.deepEqual(leerRuta(vaciarFoto(conImagen, grupo, grupo.imagenes[0]!), [...ruta, "props"]), { ancho: 395, alto: 237 });
+  const portada: SlideJson = { id: "portada", c: "Portada", props: { trimestre: "Q3 2026", proyecto: "SE84", imagen: "/api/informes/fotos/p" } };
+  const gp = gruposDeImagenes(portada)[0]!;
+  assert.deepEqual(vaciarFoto(portada, gp, gp.imagenes[0]!).props, { trimestre: "Q3 2026", proyecto: "SE84" });
+
+  assert.deepEqual(quitarBloque(conImagen, ruta), abierta);
+  assert.throws(() => quitarBloque(conImagen, ["compuesto"]));
 });

@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   admiteProporcion,
+  ALTO_IMAGEN,
+  altoDeImagen,
   arbolBloques,
   cambiarFoto,
   camposTexto,
   columnaComoPila,
+  desplegar,
   disposicionGaleria,
   DISPOSICIONES_GALERIA,
   esEnvoltorio,
+  insertarBloque,
   etiquetaRuta,
   intercambiarColumnas,
   intercambiarFotos,
@@ -18,16 +22,18 @@ import {
   localizarCampo,
   mismaRuta,
   moverBloque,
+  nodoImagen,
   pilaInterior,
   ponerTexto,
   proporcionActual,
   proporcionColumnas,
   PROPORCIONES,
+  quitarBloque,
   reencuadrar,
   rejillaDe,
   sinFormato,
   srcDeImagen,
-  varianteTextoImagen,
+  vaciarFoto,
   type CampoTexto,
   type GrupoImagenes,
   type NodoArbol,
@@ -61,6 +67,9 @@ interface Props {
   informeId: string;
   trimestre: string;
   alSubirFoto: (f: Foto) => void;
+  /** Se ha pulsado «Añadir imagen»: se abre el diálogo y lo elegido entra como un bloque nuevo. */
+  anadiendo: boolean;
+  alTerminarAnadir: () => void;
   trabajando: boolean;
   aplicar: (nueva: SlideJson, cambio: string) => void;
   avisar: (texto: string) => void;
@@ -93,6 +102,8 @@ interface Destino {
 type Seleccion = { tipo: "bloque" | "imagen"; ruta: Ruta };
 
 interface Pulso extends Seleccion {
+  /** Imagen pulsada cuando lo que se arrastra es su bloque (una imagen suelta). */
+  imagen?: Ruta;
   x0: number;
   y0: number;
   x: number;
@@ -188,10 +199,26 @@ function destinosDe(geo: Geometria, origen: BloquePintado): Destino[] {
  * columnas e imágenes). No llama a Claude: cada cambio sale como un slide nuevo
  * por `aplicar`.
  */
-export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubirFoto, trabajando, aplicar, avisar, abrirLista }: Props) {
+export function CapaEdicion({
+  slide,
+  lienzo,
+  modo,
+  informeId,
+  trimestre,
+  alSubirFoto,
+  anadiendo,
+  alTerminarAnadir,
+  trabajando,
+  aplicar,
+  avisar,
+  abrirLista,
+}: Props) {
   const capa = useRef<HTMLDivElement>(null);
   const titulo = tituloDe(slide);
-  const arbol = useMemo(() => arbolBloques(slide), [slide]);
+  // La disposición trabaja sobre la plantilla desplegada: se pinta igual, y lo que se guarde ya es un
+  // slide compuesto de este informe. Los textos se editan sobre el slide tal como está.
+  const trabajo = useMemo(() => (modo === "disposicion" ? desplegar(slide) : slide), [slide, modo]);
+  const arbol = useMemo(() => arbolBloques(trabajo), [trabajo]);
 
   /* ---------- Textos ---------- */
   const [resalte, setResalte] = useState<Caja | null>(null);
@@ -264,7 +291,7 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
         setGeo({ ancho: c.clientWidth, alto: c.clientHeight, unidades: [], imagenes: [], contenedores: [], desajustes: 0 });
         return;
       }
-      const mapa = mapaSlide(lienzo, slide, arbol);
+      const mapa = mapaSlide(lienzo, trabajo, arbol);
       setGeo({
         ancho: c.clientWidth,
         alto: c.clientHeight,
@@ -281,10 +308,14 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     const ro = new ResizeObserver(medir);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [lienzo, slide, arbol, modo]);
+  }, [lienzo, trabajo, arbol, modo]);
 
-  const unidad = sel?.tipo === "bloque" ? (geo?.unidades.find((u) => mismaRuta(u.b.nodo.ruta, sel.ruta)) ?? null) : null;
   const imagen = sel?.tipo === "imagen" ? (geo?.imagenes.find((x) => mismaRuta(x.im.ruta, sel.ruta)) ?? null) : null;
+  /** Bloque de una imagen suelta (ImagenMarco): se mueve, se redimensiona y se quita como bloque. */
+  const bloqueDe = (im: ImagenPintada) =>
+    im.grupo.tipo === "ImagenMarco" ? (geo?.unidades.find((u) => empiezaPor(im.grupo.nodo, u.b.nodo.ruta)) ?? null) : null;
+  const unidad =
+    sel?.tipo === "bloque" ? (geo?.unidades.find((u) => mismaRuta(u.b.nodo.ruta, sel.ruta)) ?? null) : imagen ? bloqueDe(imagen.im) : null;
   const origenArrastre = pulso?.arrastrando && pulso.tipo === "bloque" ? (geo?.unidades.find((u) => mismaRuta(u.b.nodo.ruta, pulso.ruta)) ?? null) : null;
   const destinos = useMemo(() => (geo && origenArrastre ? destinosDe(geo, origenArrastre.b) : []), [geo, origenArrastre]);
   const destino =
@@ -306,13 +337,12 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
 
   function alPulsar(e: React.PointerEvent) {
     // Los eventos del diálogo de imagen suben hasta aquí por el árbol de React aunque se pinte fuera.
-    if (!geo || trabajando || fotosAbiertas || e.button > 0) return;
+    if (!geo || trabajando || fotosAbiertas || anadiendo || e.button > 0) return;
     const [x, y] = punto(e);
     const im = geo.imagenes.find((i) => dentro(i.caja, x, y));
     // El bloque más pequeño que contiene el punto.
     const u = geo.unidades.filter((b) => dentro(b.caja, x, y)).sort((a, b) => a.caja.w * a.caja.h - b.caja.w * b.caja.h)[0];
     const nuevo: Seleccion | null = im ? { tipo: "imagen", ruta: im.im.ruta } : u ? { tipo: "bloque", ruta: u.b.nodo.ruta } : null;
-    setFotosAbiertas(false);
     if (!nuevo) {
       setSel(null);
       setReencuadrando(false);
@@ -322,7 +352,10 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     e.preventDefault();
     capa.current!.setPointerCapture(e.pointerId);
     setSel(nuevo);
-    setPulso({ ...nuevo, x0: x, y0: y, x, y, arrastrando: false });
+    // Una imagen suelta se arrastra como bloque; las de una galería se intercambian entre sí.
+    const suelta = im ? bloqueDe(im.im) : null;
+    const arrastre: Seleccion = suelta ? { tipo: "bloque", ruta: suelta.b.nodo.ruta } : nuevo;
+    setPulso({ ...arrastre, imagen: im?.im.ruta, x0: x, y0: y, x, y, arrastrando: false });
   }
 
   function alMover(e: React.PointerEvent) {
@@ -339,28 +372,28 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
       if (p.tipo === "bloque" && destino) soltar(p.ruta, destino);
       if (p.tipo === "imagen" && imagenDestino) {
         const origen = geo.imagenes.find((x) => mismaRuta(x.im.ruta, p.ruta));
-        if (origen && mismaRuta(origen.im.grupo.nodo, imagenDestino.im.grupo.nodo)) {
+        if (origen && origen.im.grupo.tipo === "Galeria" && mismaRuta(origen.im.grupo.nodo, imagenDestino.im.grupo.nodo)) {
           setSel({ tipo: "imagen", ruta: imagenDestino.im.ruta });
-          aplicar(intercambiarFotos(slide, p.ruta, imagenDestino.im.ruta), `${titulo}: fotos reordenadas`);
-        } else avisar("Las fotos solo se intercambian dentro de la misma galería. Para llevar una foto a otro sitio, usa «Cambiar foto».");
+          aplicar(intercambiarFotos(trabajo, p.ruta, imagenDestino.im.ruta), `${titulo}: fotos reordenadas`);
+        } else avisar("Las fotos solo se intercambian dentro de la misma galería. Para poner esa imagen en otro hueco, usa «Cambiar imagen».");
       }
       return;
     }
-    if (p.tipo === "imagen" && reencuadrando) {
-      const im = geo.imagenes.find((x) => mismaRuta(x.im.ruta, p.ruta));
+    if (p.imagen && reencuadrando) {
+      const im = geo.imagenes.find((x) => mismaRuta(x.im.ruta, p.imagen!));
       if (!im || !(im.im.el instanceof HTMLImageElement)) return;
-      const datos = leerRuta(slide, p.ruta) as { focalX?: number; focalY?: number } | undefined;
+      const datos = leerRuta(trabajo, im.im.ruta) as { focalX?: number; focalY?: number } | undefined;
       const f = encuadreAlPulsar(im.im.el, (p.x - im.caja.x) / im.caja.w, (p.y - im.caja.y) / im.caja.h, {
         x: datos?.focalX ?? 0.5,
         y: datos?.focalY ?? 0.5,
       });
-      aplicar(reencuadrar(slide, p.ruta, f.x, f.y), `${titulo}: foto reencuadrada`);
+      aplicar(reencuadrar(trabajo, im.im.ruta, f.x, f.y), `${titulo}: foto reencuadrada`);
     }
   }
 
   function soltar(origen: Ruta, d: Destino) {
     try {
-      let s = slide;
+      let s = trabajo;
       let contenedor = d.contenedor;
       if (d.envolver) {
         const r = columnaComoPila(s, d.envolver);
@@ -374,15 +407,21 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     }
   }
 
-  /** Mueve el bloque seleccionado un puesto en su pila (dy) o a la columna de al lado (dx). */
+  /** Tras mover la unidad seleccionada, la selección la sigue a su nuevo sitio (también si es una imagen suelta). */
+  function seguir(anterior: Ruta, nueva: Ruta) {
+    if (sel?.tipo === "imagen") setSel({ tipo: "imagen", ruta: [...nueva, ...sel.ruta.slice(anterior.length)] });
+    else setSel({ tipo: "bloque", ruta: nueva });
+  }
+
+  /** Mueve la unidad seleccionada un puesto en su pila (dy) o a la columna de al lado (dx). */
   function moverSeleccion(dx: number, dy: number) {
     if (!unidad) return;
     const { nodo, padre } = unidad.b;
     const c = padre.contenedor!;
     const i = c.hijos.indexOf(nodo);
     if (dy) {
-      setSel({ tipo: "bloque", ruta: [...c.ruta, i + dy] });
-      aplicar(moverBloque(slide, nodo.ruta, { contenedor: c.ruta, indice: dy < 0 ? i - 1 : i + 2 }), `${titulo}: bloque movido`);
+      seguir(nodo.ruta, [...c.ruta, i + dy]);
+      aplicar(moverBloque(trabajo, nodo.ruta, { contenedor: c.ruta, indice: dy < 0 ? i - 1 : i + 2 }), `${titulo}: bloque movido`);
       return;
     }
     const r = rejillaDe(arbol, nodo.ruta);
@@ -390,14 +429,75 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     const columnas = r.rejilla.contenedor!;
     if (padre === r.rejilla) {
       // El bloque es una columna entera: cambia de sitio con la de al lado.
-      setSel({ tipo: "bloque", ruta: [...columnas.ruta, r.columna + dx] });
-      aplicar(moverBloque(slide, nodo.ruta, { contenedor: columnas.ruta, indice: dx < 0 ? r.columna - 1 : r.columna + 2 }), `${titulo}: columna movida`);
+      seguir(nodo.ruta, [...columnas.ruta, r.columna + dx]);
+      aplicar(moverBloque(trabajo, nodo.ruta, { contenedor: columnas.ruta, indice: dx < 0 ? r.columna - 1 : r.columna + 2 }), `${titulo}: columna movida`);
       return;
     }
     const otra = columnas.hijos[r.columna + dx];
     if (!otra) return;
     const pila = pilaInterior(otra);
     soltar(nodo.ruta, pila ? { contenedor: pila.ruta, indice: pila.hijos.length, linea: unidad.caja } : { contenedor: [...otra.ruta, "hijos"], indice: 1, envolver: otra.ruta, linea: unidad.caja });
+  }
+
+  /**
+   * Dónde entra una imagen nueva: debajo del bloque seleccionado o, si no hay
+   * ninguno, al final de la columna con más hueco. Con el tamaño que cabe ahí,
+   * en unidades de slide.
+   */
+  function sitioParaImagen(): { slide: SlideJson; contenedor: Ruta; indice: number; ancho: number; alto: number } | null {
+    if (!geo || !arbol) return null;
+    const k = geo.ancho / 960;
+    const medida = (caja: Caja, libre: number) => {
+      const ancho = Math.max(120, Math.round(caja.w / k));
+      const cabe = libre / k - 14;
+      const alto = Math.round(Math.max(90, Math.min(260, ancho * 0.6, cabe >= 90 ? cabe : 260)));
+      return { ancho, alto };
+    };
+    const libreEn = (c: Geometria["contenedores"][number]) => {
+      const ultimo = c.hijos[c.hijos.length - 1];
+      return c.caja.y + c.caja.h - (ultimo ? ultimo.y + ultimo.h : c.caja.y);
+    };
+    const pilas = geo.contenedores.filter((c) => c.nodo.contenedor!.orientacion === "pila" && !esEnvoltorio(c.nodo.contenedor!));
+    const propia = unidad ? pilas.find((c) => c.nodo === unidad.b.padre) : null;
+    if (unidad && propia) {
+      const i = propia.nodo.contenedor!.hijos.indexOf(unidad.b.nodo);
+      return { slide: trabajo, contenedor: propia.nodo.contenedor!.ruta, indice: i + 1, ...medida(propia.caja, libreEn(propia)) };
+    }
+    const mejor = [...pilas].sort((a, b) => libreEn(b) - libreEn(a))[0];
+    if (mejor) return { slide: trabajo, contenedor: mejor.nodo.contenedor!.ruta, indice: mejor.nodo.contenedor!.hijos.length, ...medida(mejor.caja, libreEn(mejor)) };
+    // Solo hay columnas que son un componente suelto: la imagen se apila bajo la que tenga más hueco.
+    let candidata: { ruta: Ruta; caja: Caja; libre: number } | null = null;
+    for (const c of geo.contenedores) {
+      c.nodo.contenedor!.hijos.forEach((h, i) => {
+        const caja = c.hijos[i]!;
+        const libre = c.caja.y + c.caja.h - (caja.y + caja.h);
+        if (!h.contenedor && h.c && (!candidata || libre > candidata.libre)) candidata = { ruta: h.ruta, caja, libre };
+      });
+    }
+    const elegida = candidata as { ruta: Ruta; caja: Caja; libre: number } | null;
+    if (!elegida) return null;
+    const r = columnaComoPila(trabajo, elegida.ruta);
+    return { slide: r.slide, contenedor: r.contenedor, indice: 1, ...medida(elegida.caja, elegida.libre) };
+  }
+
+  function anadirImagen(src: string) {
+    alTerminarAnadir();
+    const sitio = sitioParaImagen();
+    if (!sitio) {
+      avisar("La plantilla de esta slide no admite imágenes nuevas. Pide el cambio con «Corregir» adjuntando la imagen.");
+      return;
+    }
+    setSel({ tipo: "imagen", ruta: [...sitio.contenedor, sitio.indice, "props"] });
+    aplicar(
+      insertarBloque(sitio.slide, { contenedor: sitio.contenedor, indice: sitio.indice }, nodoImagen(src, sitio.ancho, sitio.alto)),
+      `${titulo}: imagen añadida`,
+    );
+  }
+
+  function abrirImagen(im: ImagenPintada) {
+    setSel({ tipo: "imagen", ruta: im.ruta });
+    setReencuadrando(false);
+    setFotosAbiertas(true);
   }
 
   const rejilla = unidad ? rejillaDe(arbol, unidad.b.nodo.ruta) : null;
@@ -410,6 +510,8 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     const otra = columnas.hijos[rejilla.columna + dx];
     return !!otra && (unidad?.b.padre === rejilla.rejilla || otra.contenedor?.orientacion !== "columnas");
   };
+  const srcElegida = imagen ? srcDeImagen(trabajo, imagen.im.grupo, imagen.im.ruta) : null;
+  const altoElegida = imagen?.im.grupo.tipo === "ImagenMarco" ? ((leerRuta(trabajo, [...imagen.im.grupo.nodo, "props", "alto"]) as number | undefined) ?? 200) : null;
 
   const boton = "rounded border border-subtle bg-card px-1.5 py-0.5 text-xs font-medium text-text-primary hover:bg-page disabled:opacity-40";
   const barra = "absolute z-20 flex flex-wrap items-center gap-1 rounded-md border border-subtle bg-card px-1.5 py-1 text-xs shadow-md";
@@ -419,6 +521,32 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
     const W = geo?.ancho ?? 0;
     return { left: Math.max(4, Math.min(c.x, W - ancho - 4)), top: c.y >= 34 ? c.y - 32 : c.y + 4, maxWidth: W - 8 };
   }
+
+  /** Flechas para mover la unidad seleccionada (un bloque o una imagen suelta). */
+  const flechas = unidad ? (
+    <>
+      {enPila ? (
+        <>
+          <button type="button" className={boton} aria-label="Subir bloque" disabled={trabajando || indice <= 0} onClick={() => moverSeleccion(0, -1)}>
+            ↑
+          </button>
+          <button type="button" className={boton} aria-label="Bajar bloque" disabled={trabajando || indice >= (pila?.hijos.length ?? 0) - 1} onClick={() => moverSeleccion(0, 1)}>
+            ↓
+          </button>
+        </>
+      ) : null}
+      {rejilla ? (
+        <>
+          <button type="button" className={boton} aria-label="Pasar a la columna de la izquierda" disabled={trabajando || !otraColumna(-1)} onClick={() => moverSeleccion(-1, 0)}>
+            ←
+          </button>
+          <button type="button" className={boton} aria-label="Pasar a la columna de la derecha" disabled={trabajando || !otraColumna(1)} onClick={() => moverSeleccion(1, 0)}>
+            →
+          </button>
+        </>
+      ) : null}
+    </>
+  ) : null;
 
   return (
     <div
@@ -432,13 +560,10 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
         modo === "disposicion"
           ? (e) => {
               // Doble clic sobre una imagen o un hueco vacío: directamente a elegir imagen.
-              if (!geo || trabajando || fotosAbiertas) return;
+              if (!geo || trabajando || fotosAbiertas || anadiendo) return;
               const r = e.currentTarget.getBoundingClientRect();
               const im = geo.imagenes.find((i) => dentro(i.caja, e.clientX - r.left, e.clientY - r.top));
-              if (!im) return;
-              setSel({ tipo: "imagen", ruta: im.im.ruta });
-              setReencuadrando(false);
-              setFotosAbiertas(true);
+              if (im) abrirImagen(im.im);
             }
           : undefined
       }
@@ -484,6 +609,7 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
           })}
           {geo.imagenes.map(({ im, caja }) => {
             const elegida = imagen?.im === im;
+            const vacia = !srcDeImagen(trabajo, im.grupo, im.ruta);
             return (
               <div
                 key={"im" + im.ruta.join("/")}
@@ -491,7 +617,21 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
                   imagenDestino?.im === im ? "bg-amber-400/30" : ""
                 } ${elegida && reencuadrando ? "cursor-crosshair" : "cursor-pointer"}`}
                 style={{ left: caja.x, top: caja.y, width: caja.w, height: caja.h }}
-              />
+              >
+                {/* Siempre a la vista: es la forma de subir o cambiar la imagen de este hueco. */}
+                {pulso?.arrastrando || (elegida && reencuadrando) ? null : (
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 rounded bg-icam-900/90 px-1.5 py-0.5 text-[11px] font-medium text-white shadow hover:bg-icam-900 disabled:opacity-40"
+                    disabled={trabajando}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onClick={() => abrirImagen(im)}
+                  >
+                    {vacia ? "＋ Poner imagen" : "Cambiar imagen"}
+                  </button>
+                )}
+              </div>
             );
           })}
           {destino ? (
@@ -512,54 +652,33 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
             </div>
           ) : null}
 
-          {unidad && !pulso?.arrastrando ? (
+          {unidad && !imagen && !pulso?.arrastrando ? (
             <div className={barra} style={sobre(unidad.caja, 330)} onPointerDown={(e) => e.stopPropagation()}>
               <span className="px-1 font-medium text-text-muted">{NOMBRE_BLOQUE[unidad.b.nodo.c ?? ""] ?? unidad.b.nodo.c}</span>
-              {enPila ? (
-                <>
-                  <button type="button" className={boton} aria-label="Subir bloque" disabled={trabajando || indice <= 0} onClick={() => moverSeleccion(0, -1)}>
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={boton}
-                    aria-label="Bajar bloque"
-                    disabled={trabajando || indice >= (pila?.hijos.length ?? 0) - 1}
-                    onClick={() => moverSeleccion(0, 1)}
-                  >
-                    ↓
-                  </button>
-                </>
-              ) : null}
+              {flechas}
               {rejilla ? (
                 <>
-                  <button type="button" className={boton} aria-label="Pasar a la columna de la izquierda" disabled={trabajando || !otraColumna(-1)} onClick={() => moverSeleccion(-1, 0)}>
-                    ←
-                  </button>
-                  <button type="button" className={boton} aria-label="Pasar a la columna de la derecha" disabled={trabajando || !otraColumna(1)} onClick={() => moverSeleccion(1, 0)}>
-                    →
-                  </button>
                   <button
                     type="button"
                     className={boton}
                     disabled={trabajando}
                     onClick={() => {
                       setSel(null);
-                      aplicar(intercambiarColumnas(slide, columnas!.ruta), `${titulo}: columnas intercambiadas`);
+                      aplicar(intercambiarColumnas(trabajo, columnas!.ruta), `${titulo}: columnas intercambiadas`);
                     }}
                   >
                     Intercambiar columnas
                   </button>
-                  {columnas!.hijos.length === 2 && admiteProporcion(slide, columnas!.ruta) ? (
+                  {columnas!.hijos.length === 2 && admiteProporcion(trabajo, columnas!.ruta) ? (
                     <select
                       className="rounded border border-subtle bg-card px-1 py-0.5 text-xs"
                       aria-label="Ancho de las columnas"
                       disabled={trabajando}
-                      value={proporcionActual(slide, columnas!.ruta)}
-                      onChange={(e) => aplicar(proporcionColumnas(slide, columnas!.ruta, e.target.value), `${titulo}: ancho de columnas`)}
+                      value={proporcionActual(trabajo, columnas!.ruta)}
+                      onChange={(e) => aplicar(proporcionColumnas(trabajo, columnas!.ruta, e.target.value), `${titulo}: ancho de columnas`)}
                     >
-                      {PROPORCIONES.some((p) => p.valor === proporcionActual(slide, columnas!.ruta)) ? null : (
-                        <option value={proporcionActual(slide, columnas!.ruta)}>A medida</option>
+                      {PROPORCIONES.some((p) => p.valor === proporcionActual(trabajo, columnas!.ruta)) ? null : (
+                        <option value={proporcionActual(trabajo, columnas!.ruta)}>A medida</option>
                       )}
                       {PROPORCIONES.map((p) => (
                         <option key={p.valor} value={p.valor}>
@@ -574,9 +693,9 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
           ) : null}
 
           {imagen && !pulso?.arrastrando ? (
-            <div className={barra} style={sobre(imagen.caja, 360)} onPointerDown={(e) => e.stopPropagation()}>
+            <div className={barra} style={sobre(imagen.caja, 420)} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
               <button type="button" className={boton} disabled={trabajando} onClick={() => setFotosAbiertas(true)}>
-                {srcDeImagen(slide, imagen.im.grupo, imagen.im.ruta) ? "Cambiar imagen" : "Elegir imagen"}
+                {srcElegida ? "Cambiar imagen" : "Poner imagen"}
               </button>
               <button
                 type="button"
@@ -597,10 +716,10 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
                   className="rounded border border-subtle bg-card px-1 py-0.5 text-xs"
                   aria-label="Disposición de la galería"
                   disabled={trabajando}
-                  value={String((leerRuta(slide, [...imagen.im.grupo.nodo, "props", "disposicion"]) as string | undefined) ?? "4")}
+                  value={String((leerRuta(trabajo, [...imagen.im.grupo.nodo, "props", "disposicion"]) as string | undefined) ?? "4")}
                   onChange={(e) => {
                     setSel(null);
-                    aplicar(disposicionGaleria(slide, imagen.im.grupo.nodo, e.target.value), `${titulo}: disposición de la galería`);
+                    aplicar(disposicionGaleria(trabajo, imagen.im.grupo.nodo, e.target.value), `${titulo}: disposición de la galería`);
                   }}
                 >
                   {DISPOSICIONES_GALERIA.map((d) => (
@@ -610,20 +729,52 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
                   ))}
                 </select>
               ) : null}
-              {imagen.im.grupo.tipo === "TextoImagen" ? (
-                <select
-                  className="rounded border border-subtle bg-card px-1 py-0.5 text-xs"
-                  aria-label="Número de imágenes"
-                  disabled={trabajando}
-                  value={imagen.im.grupo.imagenes.length === 2 ? "dos-apiladas" : "una"}
-                  onChange={(e) => {
+              {altoElegida != null ? (
+                <>
+                  <button
+                    type="button"
+                    className={boton}
+                    aria-label="Imagen más pequeña"
+                    disabled={trabajando || altoElegida <= ALTO_IMAGEN.min}
+                    onClick={() => aplicar(altoDeImagen(trabajo, imagen.im.grupo.nodo, -ALTO_IMAGEN.paso), `${titulo}: tamaño de la imagen`)}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    className={boton}
+                    aria-label="Imagen más grande"
+                    disabled={trabajando || altoElegida >= ALTO_IMAGEN.max}
+                    onClick={() => aplicar(altoDeImagen(trabajo, imagen.im.grupo.nodo, ALTO_IMAGEN.paso), `${titulo}: tamaño de la imagen`)}
+                  >
+                    +
+                  </button>
+                </>
+              ) : null}
+              {flechas}
+              {imagen.im.grupo.tipo === "ImagenMarco" || imagen.im.grupo.tipo === "Galeria" ? (
+                <button
+                  type="button"
+                  className={boton}
+                  // Solo se quita lo que es un elemento de una lista de bloques.
+                  disabled={trabajando || typeof imagen.im.grupo.nodo[imagen.im.grupo.nodo.length - 1] !== "number"}
+                  onClick={() => {
                     setSel(null);
-                    aplicar(varianteTextoImagen(slide, e.target.value as "una" | "dos-apiladas"), `${titulo}: imágenes del slide`);
+                    aplicar(quitarBloque(trabajo, imagen.im.grupo.nodo), `${titulo}: ${imagen.im.grupo.tipo === "Galeria" ? "galería quitada" : "imagen quitada"}`);
                   }}
                 >
-                  <option value="una">Una imagen</option>
-                  <option value="dos-apiladas">Dos imágenes apiladas</option>
-                </select>
+                  {imagen.im.grupo.tipo === "Galeria" ? "Quitar galería" : "Quitar"}
+                </button>
+              ) : null}
+              {imagen.im.grupo.tipo !== "ImagenMarco" && srcElegida ? (
+                <button
+                  type="button"
+                  className={boton}
+                  disabled={trabajando}
+                  onClick={() => aplicar(vaciarFoto(trabajo, imagen.im.grupo, imagen.im.ruta), `${titulo}: imagen quitada`)}
+                >
+                  Vaciar hueco
+                </button>
               ) : null}
               {reencuadrando ? <span className="text-text-muted">Pulsa en la foto el punto que debe quedar centrado.</span> : null}
             </div>
@@ -631,24 +782,37 @@ export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubir
 
           {imagen && fotosAbiertas ? (
             <DialogoImagen
+              titulo={srcElegida ? "Cambiar imagen" : "Elegir imagen"}
               informeId={informeId}
               trimestre={trimestre}
-              actual={srcDeImagen(slide, imagen.im.grupo, imagen.im.ruta)}
+              actual={srcElegida}
               categoria={categoriaDe(imagen.im.grupo, slide.id)}
               para={imagen.im.grupo.tipo === "SlideBloqueado" && esPaginaDeFinanzas(slide.id) ? slide.id : null}
               onSubida={alSubirFoto}
               onCerrar={() => setFotosAbiertas(false)}
               onElegir={(src) => {
                 setFotosAbiertas(false);
-                aplicar(cambiarFoto(slide, imagen.im.grupo, imagen.im.ruta, src), `${titulo}: imagen cambiada`);
+                aplicar(cambiarFoto(trabajo, imagen.im.grupo, imagen.im.ruta, src), `${titulo}: imagen cambiada`);
               }}
+            />
+          ) : null}
+          {anadiendo ? (
+            <DialogoImagen
+              titulo="Añadir imagen"
+              informeId={informeId}
+              trimestre={trimestre}
+              actual={null}
+              categoria="Obra"
+              onSubida={alSubirFoto}
+              onCerrar={alTerminarAnadir}
+              onElegir={anadirImagen}
             />
           ) : null}
 
           {!arbol || geo.desajustes ? (
-            <p className="pointer-events-none absolute right-2 top-2 max-w-[60%] rounded-md border border-subtle bg-card px-2 py-1 text-xs text-text-muted shadow-sm">
+            <p className="pointer-events-none absolute left-2 top-2 max-w-[60%] rounded-md border border-subtle bg-card px-2 py-1 text-xs text-text-muted shadow-sm">
               {!arbol
-                ? "Esta slide tiene una plantilla fija: se cambian sus textos y sus imágenes, pero los bloques no se mueven."
+                ? "La plantilla de esta slide no tiene bloques que mover: se cambian sus textos y sus imágenes."
                 : "Parte de esta slide no se puede reordenar a mano: pide ese cambio con «Corregir»."}
             </p>
           ) : null}
