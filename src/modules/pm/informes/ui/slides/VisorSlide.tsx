@@ -17,8 +17,8 @@ interface VisorSlideProps {
   slide: SlideJson;
   pagina: number;
   meta: MetaInforme | null | undefined;
-  /** Se llama tras pintar, marcar pendientes y airear. */
-  onPintado?: (r: ResultadoVisor, lienzo: HTMLElement) => void;
+  /** Se llama tras pintar, marcar pendientes y airear, con el lienzo y el slide que se ha pintado en él. */
+  onPintado?: (r: ResultadoVisor, lienzo: HTMLElement, slide: SlideJson) => void;
   /** Sin sello de bloqueo ni marcas de pendiente (impresión y PDF). */
   sinMarcas?: boolean;
   /** Capa encima de la slide (marcas del editor). */
@@ -70,7 +70,7 @@ export function VisorSlide({ slide, pagina, meta, onPintado, sinMarcas, children
       escala.replaceChildren(lienzo);
       const r = pintarYMedir(lienzo, slide, pagina, meta);
       desmontar = () => r.raiz.root.unmount();
-      avisar.current?.({ pendientes: r.pendientes, medida: r.medida, error: r.error }, lienzo);
+      avisar.current?.({ pendientes: r.pendientes, medida: r.medida, error: r.error }, lienzo, slide);
     }, 0);
     return () => {
       cancelado = true;

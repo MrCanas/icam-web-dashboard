@@ -113,14 +113,21 @@ async function main() {
     log(`Informe: ${page.url()}`);
 
     // Paso 1.
-    await esperarTexto(page, /Informe anterior ·|Información del|Estructura propuesta|Revisión/);
-    if (await page.getByText("guardado en el portal").count()) {
-      log(`Paso 1: ${(await page.getByText("guardado en el portal").innerText()).replace(/\s+/g, " ")}`);
+    await esperarTexto(page, /Es el punto de partida|Información del|Estructura propuesta|Revisión/);
+    if (await page.getByText("Es el punto de partida").count()) {
+      const elegido = page.getByRole("radio", { checked: true });
+      log(`Paso 1: ${(await elegido.locator("xpath=ancestor::label").allInnerTexts()).map((t) => t.replace(/\s+/g, " ")).join(" → ")}`);
       await page.getByRole("button", { name: "Continuar" }).click();
     }
 
-    // Paso 2: fuentes automáticas.
-    await esperarTexto(page, /cargadas del portal|no está vinculado|No se han podido/, 180_000);
+    // Paso 2: las actas y la planificación se incorporan al responder que sí.
+    await esperarTexto(page, /¿Quieres incorporar las actas|no está vinculado/);
+    for (const pregunta of ["¿Quieres incorporar las actas del trimestre?", "¿Quieres incorporar la planificación?"]) {
+      const grupo = page.getByRole("group", { name: pregunta });
+      if (!(await grupo.count())) continue;
+      await grupo.getByRole("button", { name: "Sí" }).click();
+      await page.waitForFunction("!document.body.innerText.includes('del portal…')", undefined, { timeout: 180_000 });
+    }
     const fuentes = await page.locator("li").filter({ hasText: "caracteres" }).allInnerTexts();
     log(`Paso 2: ${fuentes.map((f) => f.replace(/\s+/g, " ")).join(" | ")}`);
     await page.screenshot({ path: join(SALIDA, "recorrido-paso2.png"), fullPage: true });

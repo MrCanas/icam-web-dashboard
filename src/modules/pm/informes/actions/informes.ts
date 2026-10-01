@@ -5,6 +5,8 @@ import {
   actualizarFuente,
   anadirFuente,
   borrarFuente,
+  copiarNoReportar,
+  guardarNoReportar,
   guardarNotas,
   listarFuentes,
   reemplazarAutomaticas,
@@ -19,6 +21,7 @@ import {
   guardarVersion,
   listarCambios,
   obtenerInforme,
+  obtenerPrevio,
   obtenerProyecto,
   type CambiosInforme,
 } from "../data/informesRepository";
@@ -32,9 +35,11 @@ import {
   type Cambio,
   type Foto,
   type Fuente,
+  type PrevioEstructurado,
   type Resultado,
   type ResumenUso,
   type TipoFuente,
+  type TipoFuenteAuto,
 } from "../types";
 import { usuarioEscritura, usuarioLectura } from "./acceso";
 
@@ -43,6 +48,8 @@ import { usuarioEscritura, usuarioLectura } from "./acceso";
  * admin de pm (usuarioEscritura) y queda en audit_log desde el repositorio.
  * Nunca lanzan: devuelven {ok:false, error} para que la UI lo enseñe.
  */
+
+const TIPOS_AUTO: TipoFuenteAuto[] = ["planificacion", "actas"];
 
 function mal(error: string): { ok: false; error: string } {
   return { ok: false, error };
@@ -116,7 +123,13 @@ export async function accionCrearInforme(e: EntradaNuevoInforme): Promise<Result
 
     const r = await crearInforme(ctx, codigo, e.trimestre);
     if (r.error !== null) return mal(r.error);
-    if (!r.data.existia) await anotarCambio(ctx, r.data.id, "Informe creado");
+    if (!r.data.existia) {
+      await anotarCambio(ctx, r.data.id, "Informe creado");
+      // El informe ya existe: si la precarga falla, la PM escribe «No reportar» a mano en el paso 2.
+      const copia = await copiarNoReportar(ctx, codigo, e.trimestre, r.data.id);
+      if (copia.error !== null) console.error("[informes] precargar «No reportar»", copia.error);
+      else if (copia.data) await anotarCambio(ctx, r.data.id, `«No reportar» copiado del informe ${copia.data}`);
+    }
     return { ok: true, data: r.data };
   } catch (err) {
     console.error("[informes] crear", err);
@@ -132,6 +145,8 @@ export async function accionActualizarInforme(
 ): Promise<Resultado<{ actualizado: string }>> {
   try {
     if (!esIdInforme(id)) return mal("Informe no válido.");
+    if (cambios.trimestreAnterior !== undefined && !parseTrimestre(cambios.trimestreAnterior)) return mal("Trimestre no válido.");
+    if (cambios.base?.tipo === "estructurado" && !esIdInforme(cambios.base.id)) return mal("Informe anterior no válido.");
     const acceso = await usuarioEscritura();
     if ("error" in acceso) return mal(acceso.error);
     const r = await actualizarInforme(acceso.user, id, cambios);
@@ -179,6 +194,25 @@ export async function accionHistorial(id: string): Promise<Resultado<{ cambios: 
   return { ok: true, data: { cambios: c.data, uso: u.data } };
 }
 
+/** Informe del portal elegido como informe anterior: tiene que ser del mismo proyecto. */
+export async function accionObtenerPrevio(id: string, previoId: string): Promise<Resultado<PrevioEstructurado>> {
+  try {
+    if (!esIdInforme(id) || !esIdInforme(previoId) || id === previoId) return mal("Informe no válido.");
+    const acceso = await usuarioLectura();
+    if ("error" in acceso) return mal(acceso.error);
+    const inf = await obtenerInforme(acceso.user, id);
+    if (inf.error !== null) return mal(inf.error);
+    if (!inf.data) return mal("El informe ya no existe.");
+    const r = await obtenerPrevio(acceso.user, inf.data.codigo, previoId);
+    if (r.error !== null) return mal(r.error);
+    if (!r.data) return mal("Ese informe ya no está disponible como informe anterior.");
+    return { ok: true, data: r.data };
+  } catch (err) {
+    console.error("[informes] informe anterior", err);
+    return mal(err instanceof Error ? err.message : "No se ha podido leer el informe anterior");
+  }
+}
+
 /* ------------------------------------------------------------------ fuentes */
 
 export async function accionListarFuentes(id: string): Promise<Resultado<Fuente[]>> {
@@ -188,11 +222,20 @@ export async function accionListarFuentes(id: string): Promise<Resultado<Fuente[
   return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
 }
 
-export async function accionGuardarNotas(id: string, texto: string): Promise<Resultado> {
+/** Devuelve la fuente guardada (null si no había notas y siguen vacías). */
+export async function accionGuardarNotas(id: string, texto: string): Promise<Resultado<Fuente | null>> {
   const acceso = await usuarioEscritura();
   if ("error" in acceso) return mal(acceso.error);
   const r = await guardarNotas(acceso.user, id, texto);
-  return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
+  return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
+}
+
+/** Lo que no debe aparecer en el informe: se aplica en todas las peticiones a Claude. */
+export async function accionGuardarNoReportar(id: string, texto: string): Promise<Resultado<Fuente | null>> {
+  const acceso = await usuarioEscritura();
+  if ("error" in acceso) return mal(acceso.error);
+  const r = await guardarNoReportar(acceso.user, id, typeof texto === "string" ? texto : "");
+  return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
 }
 
 export async function accionAnadirFuente(
@@ -220,9 +263,15 @@ export async function accionBorrarFuente(id: string, fuenteId: number): Promise<
   return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
 }
 
-/** Carga (o recarga) las actas y la planificación del trimestre como fuentes «del portal». */
-export async function accionCargarFuentesAuto(id: string): Promise<Resultado<{ fuentes: Fuente[]; avisos: string[] }>> {
+/** Incorpora (o recarga) las actas o la planificación del trimestre como fuentes «del portal». */
+export async function accionCargarFuentesAuto(
+  id: string,
+  tipos: TipoFuenteAuto[],
+): Promise<Resultado<{ fuentes: Fuente[]; avisos: string[] }>> {
   try {
+    if (!esIdInforme(id)) return mal("Informe no válido.");
+    const pedidos = TIPOS_AUTO.filter((t) => Array.isArray(tipos) && tipos.includes(t));
+    if (!pedidos.length) return mal("Indica qué quieres incorporar.");
     const acceso = await usuarioEscritura();
     if ("error" in acceso) return mal(acceso.error);
     const ctx = acceso.user;
@@ -240,7 +289,7 @@ export async function accionCargarFuentesAuto(id: string): Promise<Resultado<{ f
       };
     }
     const t = parseTrimestre(inf.data.trimestre)!;
-    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre);
+    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre, pedidos);
     const g = await reemplazarAutomaticas(ctx, id, r.documentos);
     if (g.error !== null) return mal(g.error);
     const fuentes = await listarFuentes(ctx, id);

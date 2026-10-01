@@ -2,6 +2,8 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 
 import { mensajeErrorBd } from "../logic/errores";
+import { ORDEN_AUTO } from "../logic/fuentes-auto";
+import { compararTrimestres } from "../logic/trimestre";
 import type { Fuente, FuenteAutomatica, TipoFuente } from "../types";
 import { getInformesSupabase } from "./client";
 
@@ -64,14 +66,27 @@ export async function anadirFuente(
   return { data: aFuente(data as Record<string, unknown>), error: null };
 }
 
-/** Notas libres: una sola fuente «notas» por informe, que se crea o se reescribe. */
-export async function guardarNotas(ctx: UserContext, informeId: string, texto: string): Promise<R<Fuente | null>> {
+/** Textos libres de los que hay uno solo por informe, que se crea o se reescribe. */
+const TEXTOS_UNICOS = {
+  notas: { nombre: "Notas del equipo", orden: 50 },
+  no_reportar: { nombre: "No reportar", orden: 5 },
+} as const;
+
+/** Tope de «No reportar»: va entero en cada petición a Claude. */
+export const MAX_CARACTERES_NO_REPORTAR = 4_000;
+
+async function guardarTextoUnico(
+  ctx: UserContext,
+  informeId: string,
+  tipo: keyof typeof TEXTOS_UNICOS,
+  texto: string,
+): Promise<R<Fuente | null>> {
   const sb = getInformesSupabase(ctx);
-  const { data: ya, error: e0 } = await sb.from("informe_fuente").select("id").eq("informe_id", informeId).eq("tipo", "notas").maybeSingle();
+  const { data: ya, error: e0 } = await sb.from("informe_fuente").select("id").eq("informe_id", informeId).eq("tipo", tipo).maybeSingle();
   if (e0) return { data: null, error: mensajeErrorBd(e0) };
   if (!ya) {
     if (!texto.trim()) return { data: null, error: null };
-    return anadirFuente(ctx, informeId, { tipo: "notas", nombre: "Notas del equipo", texto, orden: 50 });
+    return anadirFuente(ctx, informeId, { tipo, ...TEXTOS_UNICOS[tipo], texto });
   }
   const { data, error } = await sb
     .from("informe_fuente")
@@ -81,6 +96,45 @@ export async function guardarNotas(ctx: UserContext, informeId: string, texto: s
     .single();
   if (error) return { data: null, error: mensajeErrorBd(error) };
   return { data: aFuente(data as Record<string, unknown>), error: null };
+}
+
+/** Notas libres del equipo. */
+export async function guardarNotas(ctx: UserContext, informeId: string, texto: string): Promise<R<Fuente | null>> {
+  return guardarTextoUnico(ctx, informeId, "notas", texto);
+}
+
+/** Lo que el equipo pide dejar fuera del informe aunque esté en la información aportada. */
+export async function guardarNoReportar(ctx: UserContext, informeId: string, texto: string): Promise<R<Fuente | null>> {
+  return guardarTextoUnico(ctx, informeId, "no_reportar", texto.slice(0, MAX_CARACTERES_NO_REPORTAR));
+}
+
+/**
+ * Precarga «No reportar» en un informe recién creado con lo que decía el
+ * informe más reciente del proyecto de un trimestre anterior: lo que no se
+ * contaba el trimestre pasado suele seguir sin contarse, y la PM lo revisa en
+ * el paso 2. Devuelve el trimestre del que se ha copiado, o null si no había nada.
+ */
+export async function copiarNoReportar(ctx: UserContext, codigo: string, trimestre: string, informeId: string): Promise<R<string | null>> {
+  const sb = getInformesSupabase(ctx);
+  const { data: informes, error: e0 } = await sb.from("informe").select("id, trimestre").eq("codigo", codigo);
+  if (e0) return { data: null, error: mensajeErrorBd(e0) };
+  const anterior = (informes ?? [])
+    .map((f) => ({ id: f.id as string, trimestre: f.trimestre as string }))
+    .filter((f) => f.id !== informeId && compararTrimestres(f.trimestre, trimestre) < 0)
+    .sort((a, b) => compararTrimestres(b.trimestre, a.trimestre))[0];
+  if (!anterior) return { data: null, error: null };
+  const { data: fuente, error: e1 } = await sb
+    .from("informe_fuente")
+    .select("texto")
+    .eq("informe_id", anterior.id)
+    .eq("tipo", "no_reportar")
+    .maybeSingle();
+  if (e1) return { data: null, error: mensajeErrorBd(e1) };
+  const texto = ((fuente?.texto as string | undefined) ?? "").trim();
+  if (!texto) return { data: null, error: null };
+  const g = await guardarNoReportar(ctx, informeId, texto);
+  if (g.error !== null) return { data: null, error: g.error };
+  return { data: anterior.trimestre, error: null };
 }
 
 export async function actualizarFuente(
@@ -116,39 +170,35 @@ export async function borrarFuente(ctx: UserContext, informeId: string, id: numb
 }
 
 /**
- * Sustituye las fuentes automáticas (actas, planificación) por las recién
- * cargadas. Van primero (orden 0 y 1): si hay que recortar, se recorta lo
- * aportado a mano, que va detrás. Conserva «incluida» si la PM la había quitado.
+ * Sustituye las fuentes del portal (actas, planificación) por las recién
+ * cargadas, que la PM ha pedido incorporar: quedan incluidas. Solo toca los
+ * tipos que han llegado: si una no se ha podido leer, se conserva la que había.
+ * Van primero (ORDEN_AUTO): si hay que recortar, se recorta lo aportado a mano.
  */
 export async function reemplazarAutomaticas(
   ctx: UserContext,
   informeId: string,
   docs: FuenteAutomatica[],
 ): Promise<R<null>> {
+  if (!docs.length) return { data: null, error: null };
   const sb = getInformesSupabase(ctx);
-  const { data: previas, error: e0 } = await sb
-    .from("informe_fuente")
-    .select("id, tipo, incluida")
-    .eq("informe_id", informeId)
-    .eq("auto", true);
-  if (e0) return { data: null, error: mensajeErrorBd(e0) };
-  const excluidas = new Set((previas ?? []).filter((p) => !p.incluida).map((p) => p.tipo as string));
+  const tipos = docs.map((d) => d.tipo);
   const { error } = await withAudit(
     ctx,
     "pm.informe.fuente.auto",
-    { resourceType: "informe", resourceId: informeId, payload: { tipos: docs.map((d) => d.tipo) } },
+    { resourceType: "informe", resourceId: informeId, payload: { tipos } },
     async () => {
-      const del = await sb.from("informe_fuente").delete().eq("informe_id", informeId).eq("auto", true);
-      if (del.error || !docs.length) return del;
+      const del = await sb.from("informe_fuente").delete().eq("informe_id", informeId).eq("auto", true).in("tipo", tipos);
+      if (del.error) return del;
       return sb.from("informe_fuente").insert(
-        docs.map((d, i) => ({
+        docs.map((d) => ({
           informe_id: informeId,
           tipo: d.tipo,
           nombre: d.nombre,
           texto: d.texto.slice(0, MAX_CARACTERES_FUENTE),
           auto: true,
-          orden: i,
-          incluida: !excluidas.has(d.tipo),
+          orden: ORDEN_AUTO[d.tipo],
+          incluida: true,
           created_by: ctx.id,
         })),
       );

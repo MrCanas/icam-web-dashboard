@@ -9,8 +9,8 @@ import { ESTRUCTURALES } from "../../logic/biblioteca";
 import { actualizarPeriodo, clon, idNuevo, ordenar, qaMecanico, renumerar, tituloDe, validarSlide, type MedidaQa } from "../../logic/informe";
 import { rutaImprimir, rutaListaInformes } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
-import { medirFuera } from "../../slides/motor";
-import type { InformeJson, SlideJson } from "../../slides/tipos";
+import { medirFuera, type MedidaSlide } from "../../slides/motor";
+import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
 import type { Cambio, IncidenciaCoherencia, ResumenUso } from "../../types";
 import { Aviso, Boton, ChipEstado, claseCampo, fechaCorta, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
@@ -49,6 +49,18 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   }, [contenido, cache]);
   const visibles = slides.filter((s) => !s.oculto);
   const ocultas = slides.filter((s) => s.oculto);
+  // Lo mismo con los datos comunes del informe: cada guardado trae un objeto nuevo aunque no hayan cambiado.
+  const [cacheMeta] = useState(() => new Map<string, MetaInforme | null>());
+  const meta = useMemo(() => {
+    const json = JSON.stringify(contenido?.meta ?? null);
+    if (!cacheMeta.has(json)) {
+      cacheMeta.clear();
+      cacheMeta.set(json, contenido?.meta ?? null);
+    }
+    return cacheMeta.get(json) ?? null;
+  }, [contenido, cacheMeta]);
+  // Slides anteriores a cada cambio de esta sesión, para «Deshacer» (la más reciente, al final).
+  const [anteriores, setAnteriores] = useState<Record<string, SlideJson[]>>({});
 
   // Historial y coste: se recargan tras cada guardado.
   useEffect(() => {
@@ -89,6 +101,29 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     if (r) c.slides = r;
     renumerar(c.slides);
     void h.guardar({ contenido: c }, cambio);
+  }
+
+  /**
+   * Sustituye una slide (corrección de Claude o cambio a mano): comprueba que
+   * pinta, la guarda y deja la anterior para «Deshacer». Devuelve su medida.
+   */
+  async function cambiarSlide(id: string, pagina: number, nueva: SlideJson, cambio: string, deshaciendo = false): Promise<MedidaSlide> {
+    const anterior = contenido!.slides.find((s) => s.id === id);
+    if (!anterior) throw new Error("la slide ya no existe");
+    const m = medirFuera(nueva, pagina, contenido!.meta);
+    if (m.error) throw new Error(m.error);
+    const c: InformeJson = clon(contenido!);
+    c.slides = c.slides.map((x) => (x.id === id ? clon(nueva) : x));
+    renumerar(c.slides);
+    if (!(await h.guardar({ contenido: c }, cambio))) throw new Error("no se ha podido guardar");
+    setAnteriores((p) => ({ ...p, [id]: deshaciendo ? (p[id] ?? []).slice(0, -1) : [...(p[id] ?? []).slice(-19), anterior] }));
+    return m;
+  }
+
+  function deshacer(id: string, pagina: number): Promise<MedidaSlide> {
+    const previa = anteriores[id]?.at(-1);
+    if (!previa) return Promise.reject(new Error("no hay cambios que deshacer"));
+    return cambiarSlide(id, pagina, previa, `${tituloDe(previa)}: cambio deshecho`, true);
   }
 
   function mover(id: string, delta: number) {
@@ -195,7 +230,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const coh = informe.qa?.coherencia ?? [];
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-[1440px] space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">
@@ -327,10 +362,13 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
             slide={s}
             pagina={i + 1}
             total={visibles.length}
+            meta={meta!}
             medida={medidas[s.id]}
             onPintado={(r) => setMedidas((m) => ({ ...m, [s.id]: r }))}
             mover={(d) => mover(s.id, d)}
             ocultar={() => alternarOculto(s.id)}
+            cambiar={(nueva, cambio) => cambiarSlide(s.id, i + 1, nueva, cambio)}
+            deshacer={anteriores[s.id]?.length ? () => deshacer(s.id, i + 1) : null}
           />
         ))}
       </div>

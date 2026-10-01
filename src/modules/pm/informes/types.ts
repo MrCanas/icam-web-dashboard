@@ -69,6 +69,8 @@ export interface Analisis {
   sugeridas: number[];
   faltan: string[];
   contradicciones: string[];
+  /** Lo que Claude ha dejado fuera por «No reportar». Solo para el equipo: no va a los prompts de slide. */
+  omitidos?: string[];
 }
 
 export interface Seleccion {
@@ -104,7 +106,8 @@ export interface Informe {
   actualizado: string;
 }
 
-export type TipoFuente = "notas" | "documento" | "actas" | "planificacion" | "previo" | "correccion";
+/** «no_reportar» no es material para redactar: es lo que el equipo pide dejar fuera del informe. */
+export type TipoFuente = "notas" | "documento" | "actas" | "planificacion" | "previo" | "correccion" | "no_reportar";
 
 export interface Fuente {
   id: number;
@@ -158,6 +161,16 @@ export interface PrevioEstructurado {
   slides: SlideJson[];
 }
 
+/** Informe del portal que puede hacer de informe anterior: mismo proyecto, trimestre previo y con slides. */
+export interface PrevioCandidato {
+  id: string;
+  trimestre: string;
+  estado: EstadoInforme;
+  version: number;
+  slides: number;
+  actualizado: string;
+}
+
 /** Tipo de petición a Claude, para desglosar el coste en informe_uso. */
 export type TipoPeticionClaude = "analisis" | "slide" | "ajuste" | "resumen" | "correccion" | "coherencia";
 
@@ -172,6 +185,7 @@ export type CodigoErrorClaude =
   | "refused"
   | "max_tokens"
   | "not_configured"
+  | "invalid_key"
   | "not_found"
   | "api_error";
 
@@ -205,6 +219,8 @@ export interface FuenteAutomatica {
   nombre: string;
   texto: string;
 }
+
+export type TipoFuenteAuto = FuenteAutomatica["tipo"];
 
 export interface FuentesAutomaticasResultado {
   documentos: FuenteAutomatica[];

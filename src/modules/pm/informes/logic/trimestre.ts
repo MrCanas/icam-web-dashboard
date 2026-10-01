@@ -38,6 +38,15 @@ export function qSig(q: string): string {
   return t ? textoTrimestre(trimestreSiguiente(t)) : q;
 }
 
+/** Orden cronológico de dos trimestres «Qn AAAA»; los que no lo son van al principio. */
+export function compararTrimestres(a: string, b: string): number {
+  const n = (q: string) => {
+    const t = parseTrimestre(q);
+    return t ? t.anio * 4 + t.q : 0;
+  };
+  return n(a) - n(b);
+}
+
 /** Código de snapshot de planificación (pm_snapshot_fechas.snapshot_code). */
 export function codigoSnapshot(t: Trimestre): string {
   return `${t.anio}_Q${t.q}`;

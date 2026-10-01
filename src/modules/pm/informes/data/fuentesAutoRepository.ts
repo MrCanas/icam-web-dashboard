@@ -10,13 +10,13 @@ import { fetchPmPortfolio } from "@/modules/pm/data/pmRepository";
 import { formatearActas, type EstadoElemento } from "../logic/fuentes-actas";
 import { formatearPlanificacion } from "../logic/fuentes-planificacion";
 import { rangoTrimestre, trimestreAnterior, type Trimestre } from "../logic/trimestre";
-import type { FuenteAutomatica, FuentesAutomaticasResultado } from "../types";
+import type { FuenteAutomatica, FuentesAutomaticasResultado, TipoFuenteAuto } from "../types";
 import { getInformesSupabase } from "./client";
 
 /**
- * Fuentes automáticas del paso 2 de la app: las actas del trimestre y la
- * planificación del activo. Cada una falla por separado: si una no se puede
- * leer, la otra llega igual y la PM ve un aviso.
+ * Fuentes del portal del paso 2 de la app: las actas del trimestre y la
+ * planificación del activo, que se incorporan si la PM lo pide. Cada una falla
+ * por separado: si una no se puede leer, la otra llega igual y la PM ve un aviso.
  */
 
 function diaAnterior(ymd: string): string {
@@ -141,23 +141,26 @@ async function fuentePlanificacion(
   };
 }
 
+const CARGADORES: Record<TipoFuenteAuto, { nombre: string; cargar: typeof fuenteActas }> = {
+  planificacion: { nombre: "la planificación", cargar: fuentePlanificacion },
+  actas: { nombre: "las actas", cargar: fuenteActas },
+};
+
+/** Carga las fuentes del portal que la PM ha pedido incorporar. */
 export async function cargarFuentesAutomaticas(
   ctx: UserContext,
   idActivo: string,
   trimestre: Trimestre,
   etiqueta: string,
+  tipos: TipoFuenteAuto[],
 ): Promise<FuentesAutomaticasResultado> {
-  const resultados = await Promise.allSettled([
-    fuentePlanificacion(ctx, idActivo, trimestre, etiqueta),
-    fuenteActas(ctx, idActivo, trimestre, etiqueta),
-  ]);
+  const resultados = await Promise.allSettled(tipos.map((t) => CARGADORES[t].cargar(ctx, idActivo, trimestre, etiqueta)));
   const documentos: FuenteAutomatica[] = [];
   const avisos: string[] = [];
-  const nombres = ["la planificación", "las actas"];
   resultados.forEach((r, i) => {
     if (r.status === "rejected") {
       console.error("[informes/fuentes-auto]", r.reason);
-      avisos.push(`No se han podido cargar ${nombres[i]}.`);
+      avisos.push(`No se han podido cargar ${CARGADORES[tipos[i]!].nombre}.`);
       return;
     }
     if (r.value.doc) documentos.push(r.value.doc);

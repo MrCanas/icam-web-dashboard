@@ -6,8 +6,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { accionActualizarInforme } from "../actions/informes";
 import type { CambiosInforme } from "../data/informesRepository";
 import type { EntradaBiblioteca } from "../logic/biblioteca";
-import { rutaListaInformes } from "../logic/paths";
-import type { Foto, Fuente, Informe, PrevioEstructurado, ResumenUso } from "../types";
+import { rutaInformesProyecto, rutaListaInformes } from "../logic/paths";
+import type { Foto, Fuente, Informe, PrevioCandidato, PrevioEstructurado, ResumenUso } from "../types";
 import { Aviso, Pasos } from "./componentes";
 import { PasoBiblioteca } from "./asistente/PasoBiblioteca";
 import { PasoFuentes } from "./asistente/PasoFuentes";
@@ -21,9 +21,13 @@ export interface HerramientaInforme {
   informe: Informe;
   fuentes: Fuente[];
   fotos: Foto[];
+  /** Informe anterior elegido en el paso 1, si es uno del portal. */
   previo: PrevioEstructurado | null;
+  /** Informes del portal que pueden hacer de informe anterior. */
+  candidatos: PrevioCandidato[];
   biblioteca: EntradaBiblioteca[];
   puedeEditar: boolean;
+  setPrevio: (p: PrevioEstructurado | null) => void;
   setFuentes: (f: Fuente[] | ((x: Fuente[]) => Fuente[])) => void;
   setFotos: (f: Foto[] | ((x: Foto[]) => Foto[])) => void;
   /** Aplica los cambios en local y los guarda (en cola: una escritura cada vez). */
@@ -37,6 +41,7 @@ interface Props {
   fuentes: Fuente[];
   fotos: Foto[];
   previo: PrevioEstructurado | null;
+  candidatos: PrevioCandidato[];
   biblioteca: EntradaBiblioteca[];
   puedeEditar: boolean;
   existia: boolean;
@@ -62,6 +67,7 @@ export function InformeApp(props: Props) {
   const [informe, setInforme] = useState(props.informe);
   const [fuentes, setFuentes] = useState(props.fuentes);
   const [fotos, setFotos] = useState(props.fotos);
+  const [previo, setPrevio] = useState(props.previo);
   const [vista, setVista] = useState<Vista>(() => vistaInicial(props.informe));
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: "aviso" | "error" | "ok" } | null>(() =>
     props.existia
@@ -114,16 +120,18 @@ export function InformeApp(props: Props) {
       informe,
       fuentes,
       fotos,
-      previo: props.previo,
+      previo,
+      candidatos: props.candidatos,
       biblioteca: props.biblioteca,
       puedeEditar: props.puedeEditar,
+      setPrevio,
       setFuentes,
       setFotos,
       guardar,
       ir,
       avisar,
     }),
-    [informe, fuentes, fotos, props.previo, props.biblioteca, props.puedeEditar, guardar, ir, avisar],
+    [informe, fuentes, fotos, previo, props.candidatos, props.biblioteca, props.puedeEditar, guardar, ir, avisar],
   );
 
   const paso = vista === "paso1" ? 1 : vista === "paso2" ? 2 : vista === "paso3" ? 3 : null;
@@ -139,7 +147,10 @@ export function InformeApp(props: Props) {
             <span className="text-xs text-text-muted" aria-live="polite">
               {estadoGuardado}
             </span>
-            <Link href={rutaListaInformes()} className="text-sm font-medium text-icam-900 hover:underline">
+            <Link
+              href={informe.proyecto.idActivo ? rutaInformesProyecto(informe.proyecto.idActivo) : rutaListaInformes()}
+              className="text-sm font-medium text-icam-900 hover:underline"
+            >
               Volver a la lista
             </Link>
           </div>

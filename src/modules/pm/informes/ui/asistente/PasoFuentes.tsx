@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRef, useState } from "react";
 
 import {
   accionActualizarFoto,
@@ -8,13 +9,17 @@ import {
   accionBorrarFoto,
   accionBorrarFuente,
   accionCargarFuentesAuto,
+  accionGuardarNoReportar,
   accionGuardarNotas,
   accionIncluirFuente,
 } from "../../actions/informes";
+import { fechaEs } from "../../logic/fuentes-actas";
+import { respuestaAuto } from "../../logic/fuentes-auto";
 import { normalizarEstructura } from "../../logic/informe";
-import { urlFoto } from "../../logic/paths";
-import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto } from "../../types";
-import { Boton, Chip, claseCampo, fechaCorta, Tarjeta } from "../componentes";
+import { rutaActasTrimestre, rutaPlanificacionProyecto, urlFoto } from "../../logic/paths";
+import { parseTrimestre, rangoTrimestre } from "../../logic/trimestre";
+import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto, type Fuente, type TipoFuenteAuto } from "../../types";
+import { Aviso, Boton, Chip, claseCampo, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
 import { mensajeErrorClaude, pedirClaude } from "../lib/claude";
 import { ACEPTA_DOCUMENTOS, ACEPTA_FOTOS, extraerTexto, redimensionar } from "../lib/ficheros";
@@ -37,46 +42,117 @@ export async function subirFotoInforme(informeId: string, file: File, categoria:
   return cuerpo.foto;
 }
 
+const ETIQUETA_AUTO: Record<TipoFuenteAuto, string> = { actas: "las actas", planificacion: "la planificación" };
+
+/** Pregunta de sí o no sobre una fuente del portal. */
+function PreguntaAuto({
+  pregunta,
+  detalle,
+  enlace,
+  textoEnlace,
+  respuesta,
+  cargada,
+  deshabilitada,
+  onResponder,
+  onRecargar,
+}: {
+  pregunta: string;
+  detalle: string;
+  enlace: string;
+  textoEnlace: string;
+  respuesta: boolean | null;
+  cargada: boolean;
+  deshabilitada: boolean;
+  onResponder: (si: boolean) => void;
+  onRecargar: () => void;
+}) {
+  const clase = (activa: boolean) =>
+    `rounded-md border px-3.5 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      activa ? "border-icam-900 bg-icam-900 text-white" : "border-subtle bg-card text-text-primary hover:bg-page"
+    }`;
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-subtle/60 p-3">
+      <div className="min-w-0 flex-1 basis-72 space-y-1">
+        <p className="text-sm font-medium text-text-primary">{pregunta}</p>
+        <p className="text-sm text-text-muted">
+          {detalle}{" "}
+          <Link href={enlace} target="_blank" className="font-medium text-icam-900 hover:underline">
+            {textoEnlace}
+          </Link>
+        </p>
+        {cargada ? (
+          <button type="button" className="text-sm font-medium text-icam-900 underline disabled:opacity-40" disabled={deshabilitada} onClick={onRecargar}>
+            Volver a cargar
+          </button>
+        ) : null}
+      </div>
+      <div className="flex gap-2" role="group" aria-label={pregunta}>
+        <button type="button" className={clase(respuesta === true)} aria-pressed={respuesta === true} disabled={deshabilitada} onClick={() => onResponder(true)}>
+          Sí
+        </button>
+        <button type="button" className={clase(respuesta === false)} aria-pressed={respuesta === false} disabled={deshabilitada} onClick={() => onResponder(false)}>
+          No
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Paso 2 · Información del trimestre. */
 export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const { informe, fuentes, fotos, puedeEditar } = h;
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const [avisosAuto, setAvisosAuto] = useState<string[] | null>(null);
+  const [avisosAuto, setAvisosAuto] = useState<string[]>([]);
+  // Lo respondido en esta visita que todavía no ha dejado fuente guardada (un «no», o un «sí» que no se pudo cargar).
+  const [respondido, setRespondido] = useState<Partial<Record<TipoFuenteAuto, boolean>>>({});
   const [analizando, setAnalizando] = useState<string | null>(null);
   const notasIniciales = fuentes.find((f) => f.tipo === "notas")?.texto ?? "";
   const [notas, setNotas] = useState(notasIniciales);
   const tNotas = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noReportarInicial = fuentes.find((f) => f.tipo === "no_reportar")?.texto ?? "";
+  const [noReportar, setNoReportar] = useState(noReportarInicial);
+  const tNoReportar = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortar = useRef<AbortController | null>(null);
-  const cargada = useRef(false);
 
-  const auto = fuentes.filter((f) => f.auto);
-  const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo");
+  const idActivo = informe.proyecto.idActivo;
+  const trimestre = parseTrimestre(informe.trimestre);
+  const rango = trimestre ? rangoTrimestre(trimestre) : null;
+  const respuesta = (tipo: TipoFuenteAuto) => respuestaAuto(fuentes, tipo) ?? respondido[tipo] ?? null;
+  const sinResponder = !!idActivo && (respuesta("actas") === null || respuesta("planificacion") === null);
+  const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo" && f.tipo !== "no_reportar");
 
-  async function cargarAuto(forzar: boolean) {
-    if (!puedeEditar) return;
-    if (!forzar && auto.length) return;
-    setOcupado("Cargando las actas y la planificación del portal…");
+  async function cargarAuto(tipo: TipoFuenteAuto) {
+    setOcupado(`Cargando ${ETIQUETA_AUTO[tipo]} del portal…`);
     try {
-      const r = await accionCargarFuentesAuto(informe.id);
+      const r = await accionCargarFuentesAuto(informe.id, [tipo]);
       if (!r.ok) setAvisosAuto([r.error]);
       else {
         h.setFuentes(r.data.fuentes);
         setAvisosAuto(r.data.avisos);
       }
     } catch (e) {
-      setAvisosAuto([`No se han podido cargar las actas y la planificación (${e instanceof Error ? e.message : "error"}). Puedes añadirlas a mano.`]);
+      setAvisosAuto([`No se han podido cargar ${ETIQUETA_AUTO[tipo]} (${e instanceof Error ? e.message : "error"}). Puedes añadir esa información a mano.`]);
     } finally {
       setOcupado(null);
     }
   }
 
-  useEffect(() => {
-    if (cargada.current) return;
-    cargada.current = true;
-    void cargarAuto(false);
-    // Solo al entrar en el paso.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  async function responder(tipo: TipoFuenteAuto, si: boolean) {
+    setRespondido((r) => ({ ...r, [tipo]: si }));
+    setAvisosAuto([]);
+    const fuente = fuentes.find((f) => f.auto && f.tipo === tipo);
+    if (si && (!fuente || !fuente.incluida)) await cargarAuto(tipo);
+    else if (!si && fuente?.incluida) {
+      h.setFuentes((fs) => fs.map((x) => (x.id === fuente.id ? { ...x, incluida: false } : x)));
+      const r = await accionIncluirFuente(informe.id, fuente.id, false);
+      if (!r.ok) h.avisar(r.error, "error");
+    }
+  }
+
+  // Lo guardado pasa a las fuentes del informe: al volver a este paso se ve lo último escrito.
+  function ponerFuente(guardada: Fuente | null) {
+    if (guardada) h.setFuentes((fs) => [...fs.filter((f) => f.tipo !== guardada.tipo), guardada]);
+  }
 
   function cambiarNotas(v: string) {
     setNotas(v);
@@ -84,6 +160,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     tNotas.current = setTimeout(async () => {
       const r = await accionGuardarNotas(informe.id, v);
       if (!r.ok) h.avisar(`No se han podido guardar las notas: ${r.error}`, "error");
+      else ponerFuente(r.data);
     }, 1200);
   }
 
@@ -92,6 +169,27 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     if (notas !== notasIniciales || !fuentes.some((f) => f.tipo === "notas")) {
       const r = await accionGuardarNotas(informe.id, notas);
       if (!r.ok) throw new Error(r.error);
+      ponerFuente(r.data);
+    }
+  }
+
+  function cambiarNoReportar(v: string) {
+    setNoReportar(v);
+    if (tNoReportar.current) clearTimeout(tNoReportar.current);
+    tNoReportar.current = setTimeout(async () => {
+      const r = await accionGuardarNoReportar(informe.id, v);
+      if (!r.ok) h.avisar(`No se ha podido guardar «No reportar»: ${r.error}`, "error");
+      else ponerFuente(r.data);
+    }, 1200);
+  }
+
+  // Sin esto guardado, el análisis saldría sin la restricción: si falla, no se analiza.
+  async function guardarNoReportarYa() {
+    if (tNoReportar.current) clearTimeout(tNoReportar.current);
+    if (noReportar !== noReportarInicial) {
+      const r = await accionGuardarNoReportar(informe.id, noReportar);
+      if (!r.ok) throw new Error(`no se ha podido guardar «No reportar» (${r.error})`);
+      ponerFuente(r.data);
     }
   }
 
@@ -137,6 +235,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     abortar.current = new AbortController();
     try {
       await guardarNotasYa();
+      await guardarNoReportarYa();
       const { json } = await pedirClaude(
         { tipo: "analisis", informeId: informe.id },
         {
@@ -148,6 +247,8 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
       for (const k of ["resumen", "objetivosPrevios", "hechos", "estructura", "sugeridas", "faltan", "contradicciones"]) {
         if (!Array.isArray(a[k])) a[k] = [];
       }
+      // Sin indicaciones de «No reportar» no hay lista: así el paso 3 distingue «nada afectado» de «no se aplicaron».
+      a.omitidos = noReportar.trim() ? (Array.isArray(a.omitidos) ? a.omitidos : []) : undefined;
       const analisis = a as unknown as Analisis;
       analisis.estructura = normalizarEstructura(a.estructura, h.previo);
       const ok = await h.guardar(
@@ -168,27 +269,47 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     <>
       <Tarjeta>
         <h2 className="text-sm font-semibold text-text-primary">Información del {informe.trimestre}</h2>
-        <div
-          className={`rounded-md border px-3.5 py-2.5 text-sm ${
-            avisosAuto?.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-900"
-          }`}
-        >
-          {auto.length
-            ? `Actas y planificación del ${informe.trimestre} cargadas del portal (${fechaCorta(auto[0]!.actualizado)}). Están en la lista de documentos: puedes quitarlas o añadir más.`
-            : "Las actas y la planificación del trimestre se cargan del portal."}
-          {avisosAuto?.length ? (
-            <ul className="mt-1 list-disc pl-5">
+        {idActivo ? (
+          <div className="space-y-2">
+            <PreguntaAuto
+              pregunta="¿Quieres incorporar las actas del trimestre?"
+              detalle={
+                rango
+                  ? `Se añaden todas las anotaciones de las actas del ${fechaEs(rango.desde)} al ${fechaEs(rango.hasta)}, con el estado de cada elemento al inicio y al cierre.`
+                  : "Se añaden todas las anotaciones de las actas del trimestre."
+              }
+              enlace={rutaActasTrimestre(idActivo, informe.trimestre)}
+              textoEnlace="Ver las actas del trimestre"
+              respuesta={respuesta("actas")}
+              cargada={respuestaAuto(fuentes, "actas") === true}
+              deshabilitada={!puedeEditar || !!ocupado || !!analizando}
+              onResponder={(si) => void responder("actas", si)}
+              onRecargar={() => void cargarAuto("actas")}
+            />
+            <PreguntaAuto
+              pregunta="¿Quieres incorporar la planificación?"
+              detalle="Se añaden los hitos con su fecha vigente, la comparación con la previsión anterior y el avance de obra al cierre del trimestre."
+              enlace={rutaPlanificacionProyecto(idActivo)}
+              textoEnlace="Ver la planificación"
+              respuesta={respuesta("planificacion")}
+              cargada={respuestaAuto(fuentes, "planificacion") === true}
+              deshabilitada={!puedeEditar || !!ocupado || !!analizando}
+              onResponder={(si) => void responder("planificacion", si)}
+              onRecargar={() => void cargarAuto("planificacion")}
+            />
+          </div>
+        ) : (
+          <Aviso>Este proyecto no está vinculado a un activo de Proyectos: añade las actas y la planificación a mano.</Aviso>
+        )}
+        {avisosAuto.length ? (
+          <Aviso>
+            <ul className="list-disc pl-5">
               {avisosAuto.map((a) => (
                 <li key={a}>{a}</li>
               ))}
             </ul>
-          ) : null}{" "}
-          {puedeEditar ? (
-            <button type="button" className="font-medium underline" disabled={!!ocupado} onClick={() => void cargarAuto(true)}>
-              Volver a cargar
-            </button>
-          ) : null}
-        </div>
+          </Aviso>
+        ) : null}
         <p className="text-sm text-text-muted">
           Pega todo lo que tengas: notas, correos, actas, informes del PM, del asesor BREEAM o de Finanzas. No hace falta ordenarlo.
         </p>
@@ -241,6 +362,26 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
             ))}
           </ul>
         ) : null}
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="text-sm font-semibold text-text-primary">Qué no debe aparecer en el informe</h2>
+        <p className="text-sm text-text-muted">
+          Indica lo que no hay que contar a los inversores aunque salga en las actas, la planificación, los documentos o el informe anterior. Una
+          indicación por línea. Se aplica al análisis, a la redacción de cada slide, a las correcciones y a la revisión final.
+          Si el informe anterior del proyecto ya tenía indicaciones, aparecen aquí copiadas: revisa que sigan vigentes.
+        </p>
+        <textarea
+          className={`${claseCampo} min-h-28 leading-normal`}
+          value={noReportar}
+          maxLength={4000}
+          onChange={(e) => cambiarNoReportar(e.target.value)}
+          placeholder={
+            "No mencionar la negociación con el operador hasta que se firme\nNo dar el importe de la oferta recibida por el local\nNo citar las incidencias con la comunidad de vecinos"
+          }
+          aria-label="Qué no debe aparecer en el informe"
+          disabled={!puedeEditar}
+        />
       </Tarjeta>
 
       <Tarjeta>
@@ -323,11 +464,15 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
         <Boton onClick={() => h.ir("paso1")} disabled={!!analizando}>
           Atrás
         </Boton>
-        <Boton variante="primario" onClick={() => void analizar()} disabled={!puedeEditar || !!ocupado || !!analizando}>
+        <Boton variante="primario" onClick={() => void analizar()} disabled={!puedeEditar || !!ocupado || !!analizando || sinResponder}>
           Analizar la información
         </Boton>
         {analizando ? <Boton onClick={() => abortar.current?.abort()}>Parar</Boton> : null}
-        <span className="text-sm text-text-muted">Claude lee todo y propone la estructura (1–3 minutos).</span>
+        <span className="text-sm text-text-muted">
+          {sinResponder
+            ? "Antes de analizar, indica si quieres incorporar las actas y la planificación."
+            : "Claude lee todo y propone la estructura (1–3 minutos)."}
+        </span>
       </div>
     </>
   );

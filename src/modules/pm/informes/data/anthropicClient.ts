@@ -38,12 +38,13 @@ export class ErrorPeticionClaude extends Error {
 let cliente: Anthropic | null = null;
 
 function getCliente(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
     throw new ErrorPeticionClaude("not_configured", "Falta ANTHROPIC_API_KEY en el entorno del portal.", 503);
   }
   // Un solo reintento del SDK: la orquestación ya reintenta a su manera (ajuste,
   // repetir GO) y reintentar aquí una petición larga duplica su coste.
-  cliente ??= new Anthropic({ maxRetries: 1, timeout: 280_000 });
+  // trim(): una clave pegada en Vercel con un salto de línea al final rompe la cabecera.
+  cliente ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim(), maxRetries: 1, timeout: 280_000 });
   return cliente;
 }
 
@@ -56,7 +57,7 @@ function traducirError(err: unknown): ErrorPeticionClaude {
   if (err instanceof Anthropic.APIUserAbortError) return new ErrorPeticionClaude("cancelled", "Petición cancelada", 499);
   if (err instanceof Anthropic.RateLimitError) return new ErrorPeticionClaude("rate_limited", "Límite de uso de la API alcanzado", 429);
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    return new ErrorPeticionClaude("not_configured", "La API key de Anthropic no es válida", 503);
+    return new ErrorPeticionClaude("invalid_key", `Anthropic rechaza la clave (${err.status}): ${err.message}`, 503);
   }
   if (err instanceof Anthropic.BadRequestError) {
     const texto = err.message.toLowerCase();

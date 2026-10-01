@@ -126,7 +126,7 @@ export function ListaInformes({ informes, puedeEditar, idActivo, error }: Props)
       </Tarjeta>
       <p className="text-sm text-text-muted">
         Flujo: datos del informe → informe anterior → información del trimestre → biblioteca y GO → revisión y correcciones → PDF.
-        Las actas y la planificación del trimestre se cargan solas.
+        Las actas y la planificación del trimestre se incorporan del portal si lo indicas.
       </p>
     </div>
   );

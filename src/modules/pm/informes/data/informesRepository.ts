@@ -3,7 +3,7 @@ import { withAudit } from "@/lib/audit/withAudit";
 
 import { mensajeErrorBd } from "../logic/errores";
 import { nombresDeActivos, proyectosParaInforme, type ActivoPm, type ProyectoActas } from "../logic/proyectos";
-import { idInforme, qAnt, qSig } from "../logic/trimestre";
+import { compararTrimestres, idInforme, qAnt, qSig } from "../logic/trimestre";
 import type { InformeJson, Pie } from "../slides/tipos";
 import type {
   Analisis,
@@ -13,6 +13,7 @@ import type {
   EstadoInforme,
   Informe,
   InformeResumen,
+  PrevioCandidato,
   PrevioEstructurado,
   ProyectoInforme,
   QaInforme,
@@ -212,6 +213,8 @@ export async function crearInforme(
 export interface CambiosInforme {
   estado?: EstadoInforme;
   version?: number;
+  /** Trimestre del informe anterior elegido: el de Q-1 salvo que la PM parta de otro. */
+  trimestreAnterior?: string;
   base?: BaseInforme | null;
   analisis?: Analisis | null;
   seleccion?: Seleccion | null;
@@ -221,7 +224,9 @@ export interface CambiosInforme {
 
 export async function actualizarInforme(ctx: UserContext, id: string, cambios: CambiosInforme): Promise<R<{ actualizado: string }>> {
   const fila: Record<string, unknown> = { updated_by: ctx.id, updated_at: new Date().toISOString() };
-  for (const [k, v] of Object.entries(cambios)) if (v !== undefined) fila[k] = v;
+  for (const [k, v] of Object.entries(cambios)) {
+    if (v !== undefined) fila[k === "trimestreAnterior" ? "trimestre_anterior" : k] = v;
+  }
   const { data, error } = await withAudit(
     ctx,
     "pm.informe.update",
@@ -253,10 +258,42 @@ export async function borrarInforme(ctx: UserContext, id: string): Promise<R<nul
   return { data: null, error: null };
 }
 
-/** Informe del trimestre anterior guardado en el portal, si tiene slides. */
-export async function obtenerPrevio(ctx: UserContext, codigo: string, trimestreAnterior: string): Promise<R<PrevioEstructurado | null>> {
-  const id = idInforme(codigo, trimestreAnterior);
-  const { data, error } = await getInformesSupabase(ctx).from("informe").select("id, version, contenido").eq("id", id).maybeSingle();
+/**
+ * Informes del proyecto que pueden hacer de informe anterior del trimestre
+ * dado: los de trimestres previos que ya tienen slides, del más reciente al
+ * más antiguo.
+ */
+export async function listarPrevios(ctx: UserContext, codigo: string, trimestre: string): Promise<R<PrevioCandidato[]>> {
+  const { data, error } = await getInformesSupabase(ctx)
+    .from("informe")
+    .select("id, trimestre, estado, version, updated_at, contenido")
+    .eq("codigo", codigo);
+  if (error) return { data: null, error: mensajeErrorBd(error) };
+  const candidatos: PrevioCandidato[] = [];
+  for (const f of data ?? []) {
+    const slides = (f.contenido as InformeJson | null)?.slides?.length ?? 0;
+    if (!slides || compararTrimestres(f.trimestre as string, trimestre) >= 0) continue;
+    candidatos.push({
+      id: f.id as string,
+      trimestre: f.trimestre as string,
+      estado: f.estado as EstadoInforme,
+      version: f.version as number,
+      slides,
+      actualizado: f.updated_at as string,
+    });
+  }
+  candidatos.sort((a, b) => compararTrimestres(b.trimestre, a.trimestre));
+  return { data: candidatos, error: null };
+}
+
+/** Informe anterior elegido (uno del mismo proyecto guardado en el portal), si tiene slides. */
+export async function obtenerPrevio(ctx: UserContext, codigo: string, id: string): Promise<R<PrevioEstructurado | null>> {
+  const { data, error } = await getInformesSupabase(ctx)
+    .from("informe")
+    .select("id, version, contenido")
+    .eq("id", id)
+    .eq("codigo", codigo)
+    .maybeSingle();
   if (error) return { data: null, error: mensajeErrorBd(error) };
   const contenido = data?.contenido as InformeJson | null | undefined;
   if (!data || !contenido?.slides?.length) return { data: null, error: null };

@@ -33,6 +33,7 @@ function Lista({ items }: { items: string[] }) {
 export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
   const { informe, biblioteca, puedeEditar } = h;
   const a = informe.analisis;
+  const hayNoReportar = h.fuentes.some((f) => f.tipo === "no_reportar" && f.texto.trim());
   const sel: Seleccion = informe.seleccion ?? { estructura: a?.estructura ?? [], anadir: [] };
   const presentes = new Set(sel.estructura.map((e) => e.id));
   const sugeridas = a?.sugeridas ?? [];
@@ -57,6 +58,25 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
         <h2 className="text-sm font-semibold text-text-primary">Lo que he entendido del trimestre</h2>
         <Lista items={a.resumen} />
       </Tarjeta>
+
+      {hayNoReportar || a.omitidos?.length ? (
+        <Tarjeta>
+          <h2 className="text-sm font-semibold text-text-primary">Lo que he dejado fuera</h2>
+          <p className="text-sm text-text-muted">
+            Por tus indicaciones de «No reportar». Comprueba que es lo que querías dejar fuera antes de generar el informe.
+          </p>
+          {a.omitidos?.length ? (
+            <Lista items={a.omitidos} />
+          ) : (
+            <p className="text-sm">
+              {a.omitidos
+                ? "Nada de la información aportada estaba afectado por tus indicaciones."
+                : "Este análisis es anterior a tus indicaciones: vuelve a analizar la información para que se apliquen."}
+            </p>
+          )}
+          <Boton onClick={() => h.ir("paso2")}>Revisar las indicaciones</Boton>
+        </Tarjeta>
+      ) : null}
 
       {a.objetivosPrevios.length ? (
         <Tarjeta>
