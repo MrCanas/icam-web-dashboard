@@ -69,6 +69,8 @@ export interface Analisis {
   sugeridas: number[];
   faltan: string[];
   contradicciones: string[];
+  /** Lo que Claude ha dejado fuera por «No reportar». Solo para el equipo: no va a los prompts de slide. */
+  omitidos?: string[];
 }
 
 export interface Seleccion {
@@ -104,7 +106,8 @@ export interface Informe {
   actualizado: string;
 }
 
-export type TipoFuente = "notas" | "documento" | "actas" | "planificacion" | "previo" | "correccion";
+/** «no_reportar» no es material para redactar: es lo que el equipo pide dejar fuera del informe. */
+export type TipoFuente = "notas" | "documento" | "actas" | "planificacion" | "previo" | "correccion" | "no_reportar";
 
 export interface Fuente {
   id: number;

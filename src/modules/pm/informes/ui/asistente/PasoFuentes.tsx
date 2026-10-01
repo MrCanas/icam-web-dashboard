@@ -9,6 +9,7 @@ import {
   accionBorrarFoto,
   accionBorrarFuente,
   accionCargarFuentesAuto,
+  accionGuardarNoReportar,
   accionGuardarNotas,
   accionIncluirFuente,
 } from "../../actions/informes";
@@ -17,7 +18,7 @@ import { respuestaAuto } from "../../logic/fuentes-auto";
 import { normalizarEstructura } from "../../logic/informe";
 import { rutaActasTrimestre, rutaPlanificacionProyecto, urlFoto } from "../../logic/paths";
 import { parseTrimestre, rangoTrimestre } from "../../logic/trimestre";
-import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto, type TipoFuenteAuto } from "../../types";
+import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto, type Fuente, type TipoFuenteAuto } from "../../types";
 import { Aviso, Boton, Chip, claseCampo, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
 import { mensajeErrorClaude, pedirClaude } from "../lib/claude";
@@ -108,6 +109,9 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const notasIniciales = fuentes.find((f) => f.tipo === "notas")?.texto ?? "";
   const [notas, setNotas] = useState(notasIniciales);
   const tNotas = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noReportarInicial = fuentes.find((f) => f.tipo === "no_reportar")?.texto ?? "";
+  const [noReportar, setNoReportar] = useState(noReportarInicial);
+  const tNoReportar = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortar = useRef<AbortController | null>(null);
 
   const idActivo = informe.proyecto.idActivo;
@@ -115,7 +119,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const rango = trimestre ? rangoTrimestre(trimestre) : null;
   const respuesta = (tipo: TipoFuenteAuto) => respuestaAuto(fuentes, tipo) ?? respondido[tipo] ?? null;
   const sinResponder = !!idActivo && (respuesta("actas") === null || respuesta("planificacion") === null);
-  const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo");
+  const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo" && f.tipo !== "no_reportar");
 
   async function cargarAuto(tipo: TipoFuenteAuto) {
     setOcupado(`Cargando ${ETIQUETA_AUTO[tipo]} del portal…`);
@@ -145,12 +149,18 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     }
   }
 
+  // Lo guardado pasa a las fuentes del informe: al volver a este paso se ve lo último escrito.
+  function ponerFuente(guardada: Fuente | null) {
+    if (guardada) h.setFuentes((fs) => [...fs.filter((f) => f.tipo !== guardada.tipo), guardada]);
+  }
+
   function cambiarNotas(v: string) {
     setNotas(v);
     if (tNotas.current) clearTimeout(tNotas.current);
     tNotas.current = setTimeout(async () => {
       const r = await accionGuardarNotas(informe.id, v);
       if (!r.ok) h.avisar(`No se han podido guardar las notas: ${r.error}`, "error");
+      else ponerFuente(r.data);
     }, 1200);
   }
 
@@ -159,6 +169,27 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     if (notas !== notasIniciales || !fuentes.some((f) => f.tipo === "notas")) {
       const r = await accionGuardarNotas(informe.id, notas);
       if (!r.ok) throw new Error(r.error);
+      ponerFuente(r.data);
+    }
+  }
+
+  function cambiarNoReportar(v: string) {
+    setNoReportar(v);
+    if (tNoReportar.current) clearTimeout(tNoReportar.current);
+    tNoReportar.current = setTimeout(async () => {
+      const r = await accionGuardarNoReportar(informe.id, v);
+      if (!r.ok) h.avisar(`No se ha podido guardar «No reportar»: ${r.error}`, "error");
+      else ponerFuente(r.data);
+    }, 1200);
+  }
+
+  // Sin esto guardado, el análisis saldría sin la restricción: si falla, no se analiza.
+  async function guardarNoReportarYa() {
+    if (tNoReportar.current) clearTimeout(tNoReportar.current);
+    if (noReportar !== noReportarInicial) {
+      const r = await accionGuardarNoReportar(informe.id, noReportar);
+      if (!r.ok) throw new Error(`no se ha podido guardar «No reportar» (${r.error})`);
+      ponerFuente(r.data);
     }
   }
 
@@ -204,6 +235,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     abortar.current = new AbortController();
     try {
       await guardarNotasYa();
+      await guardarNoReportarYa();
       const { json } = await pedirClaude(
         { tipo: "analisis", informeId: informe.id },
         {
@@ -215,6 +247,8 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
       for (const k of ["resumen", "objetivosPrevios", "hechos", "estructura", "sugeridas", "faltan", "contradicciones"]) {
         if (!Array.isArray(a[k])) a[k] = [];
       }
+      // Sin indicaciones de «No reportar» no hay lista: así el paso 3 distingue «nada afectado» de «no se aplicaron».
+      a.omitidos = noReportar.trim() ? (Array.isArray(a.omitidos) ? a.omitidos : []) : undefined;
       const analisis = a as unknown as Analisis;
       analisis.estructura = normalizarEstructura(a.estructura, h.previo);
       const ok = await h.guardar(
@@ -328,6 +362,26 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
             ))}
           </ul>
         ) : null}
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="text-sm font-semibold text-text-primary">Qué no debe aparecer en el informe</h2>
+        <p className="text-sm text-text-muted">
+          Indica lo que no hay que contar a los inversores aunque salga en las actas, la planificación, los documentos o el informe anterior. Una
+          indicación por línea. Se aplica al análisis, a la redacción de cada slide, a las correcciones y a la revisión final.
+          Si el informe anterior del proyecto ya tenía indicaciones, aparecen aquí copiadas: revisa que sigan vigentes.
+        </p>
+        <textarea
+          className={`${claseCampo} min-h-28 leading-normal`}
+          value={noReportar}
+          maxLength={4000}
+          onChange={(e) => cambiarNoReportar(e.target.value)}
+          placeholder={
+            "No mencionar la negociación con el operador hasta que se firme\nNo dar el importe de la oferta recibida por el local\nNo citar las incidencias con la comunidad de vecinos"
+          }
+          aria-label="Qué no debe aparecer en el informe"
+          disabled={!puedeEditar}
+        />
       </Tarjeta>
 
       <Tarjeta>

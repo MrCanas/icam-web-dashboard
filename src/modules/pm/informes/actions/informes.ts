@@ -5,6 +5,8 @@ import {
   actualizarFuente,
   anadirFuente,
   borrarFuente,
+  copiarNoReportar,
+  guardarNoReportar,
   guardarNotas,
   listarFuentes,
   reemplazarAutomaticas,
@@ -121,7 +123,13 @@ export async function accionCrearInforme(e: EntradaNuevoInforme): Promise<Result
 
     const r = await crearInforme(ctx, codigo, e.trimestre);
     if (r.error !== null) return mal(r.error);
-    if (!r.data.existia) await anotarCambio(ctx, r.data.id, "Informe creado");
+    if (!r.data.existia) {
+      await anotarCambio(ctx, r.data.id, "Informe creado");
+      // El informe ya existe: si la precarga falla, la PM escribe «No reportar» a mano en el paso 2.
+      const copia = await copiarNoReportar(ctx, codigo, e.trimestre, r.data.id);
+      if (copia.error !== null) console.error("[informes] precargar «No reportar»", copia.error);
+      else if (copia.data) await anotarCambio(ctx, r.data.id, `«No reportar» copiado del informe ${copia.data}`);
+    }
     return { ok: true, data: r.data };
   } catch (err) {
     console.error("[informes] crear", err);
@@ -214,11 +222,20 @@ export async function accionListarFuentes(id: string): Promise<Resultado<Fuente[
   return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
 }
 
-export async function accionGuardarNotas(id: string, texto: string): Promise<Resultado> {
+/** Devuelve la fuente guardada (null si no había notas y siguen vacías). */
+export async function accionGuardarNotas(id: string, texto: string): Promise<Resultado<Fuente | null>> {
   const acceso = await usuarioEscritura();
   if ("error" in acceso) return mal(acceso.error);
   const r = await guardarNotas(acceso.user, id, texto);
-  return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
+  return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
+}
+
+/** Lo que no debe aparecer en el informe: se aplica en todas las peticiones a Claude. */
+export async function accionGuardarNoReportar(id: string, texto: string): Promise<Resultado<Fuente | null>> {
+  const acceso = await usuarioEscritura();
+  if ("error" in acceso) return mal(acceso.error);
+  const r = await guardarNoReportar(acceso.user, id, typeof texto === "string" ? texto : "");
+  return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
 }
 
 export async function accionAnadirFuente(

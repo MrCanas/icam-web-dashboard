@@ -22,6 +22,17 @@ export function esTablaInexistente(error: ErrorBd | null | undefined): boolean {
   );
 }
 
+export const MENSAJE_SIN_MIGRACION_044 =
+  "La base de datos todavía no admite el apartado «No reportar»: falta aplicar la migración 044 " +
+  "(npm run pm:apply-migration-044 -- --apply).";
+
+/** La restricción de tipos de informe_fuente rechaza «no_reportar» hasta que se aplica la 044. */
+export function esTipoFuenteNoAdmitido(error: ErrorBd | null | undefined): boolean {
+  return error?.code === "23514" && /informe_fuente_tipo_chk/.test(error.message ?? "");
+}
+
 export function mensajeErrorBd(error: ErrorBd): string {
-  return esTablaInexistente(error) ? MENSAJE_SIN_MIGRACION : (error.message ?? "Error de base de datos");
+  if (esTablaInexistente(error)) return MENSAJE_SIN_MIGRACION;
+  if (esTipoFuenteNoAdmitido(error)) return MENSAJE_SIN_MIGRACION_044;
+  return error.message ?? "Error de base de datos";
 }

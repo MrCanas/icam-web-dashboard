@@ -18,6 +18,10 @@ import { qCierre } from "./trimestre";
  *      fijo para que el bloque no cambie entre peticiones) → caché;
  *   3. la tarea concreta.
  * Así, las 20–30 peticiones de un informe leen de caché los bloques 1 y 2.
+ *
+ * «No reportar» (lo que el equipo pide dejar fuera) no es una fuente: va como
+ * instrucción en el bloque de la tarea de cada petición, en el análisis y en la
+ * revisión de coherencia, para que cambiarlo no invalide la caché.
  */
 
 export interface BloquePrompt {
@@ -59,6 +63,7 @@ export interface MaterialInforme {
 /** Tope de las fuentes del trimestre en cada petición (bytes UTF-8). */
 export const MAX_BYTES_FUENTES = 60_000;
 const MAX_BYTES_ESQUEMA_PREVIO = 22_000;
+const MAX_BYTES_NO_REPORTAR = 6_000;
 const MAX_BYTES_PREVIO_NUEVA = 14_000;
 
 const codificador = new TextEncoder();
@@ -90,7 +95,7 @@ export function contexto(d: ContextoInforme): string {
 
 /** Fuentes del trimestre: notas, luego las del portal (actas, planificación), luego lo aportado a mano. */
 export function fuentesTexto(fuentes: Fuente[]): string {
-  const incl = fuentes.filter((f) => f.incluida && f.tipo !== "previo" && f.texto.trim());
+  const incl = fuentes.filter((f) => f.incluida && f.tipo !== "previo" && f.tipo !== "no_reportar" && f.texto.trim());
   const notas = incl.filter((f) => f.tipo === "notas");
   const auto = incl.filter((f) => f.tipo !== "notas" && f.auto);
   const resto = incl.filter((f) => f.tipo !== "notas" && !f.auto);
@@ -98,6 +103,28 @@ export function fuentesTexto(fuentes: Fuente[]): string {
   for (const f of notas) out += `### NOTAS DEL EQUIPO\n${f.texto}\n\n`;
   for (const f of [...auto, ...resto]) out += `### DOCUMENTO: ${f.nombre}\n${f.texto}\n\n`;
   return out || "(sin notas)";
+}
+
+/** Lo que el equipo ha pedido dejar fuera del informe aunque esté en la información aportada. */
+export function noReportarTexto(fuentes: Fuente[]): string {
+  return fuentes
+    .filter((f) => f.tipo === "no_reportar" && f.incluida)
+    .map((f) => f.texto.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Instrucción de «No reportar» para las peticiones que redactan; null si el equipo no ha indicado nada. */
+export function bloqueNoReportar(fuentes: Fuente[]): string | null {
+  const t = noReportarTexto(fuentes);
+  if (!t) return null;
+  return (
+    "== NO REPORTAR ==\n" +
+    "El equipo ha indicado que lo siguiente NO puede aparecer en el informe para inversores. Prevalece sobre las fuentes, los hechos del trimestre y el informe anterior:\n" +
+    recortar(t, MAX_BYTES_NO_REPORTAR) +
+    "\nNo lo menciones ni lo insinúes, tampoco con otras palabras ni como dato suelto (nombres, importes, fechas). Si el informe anterior lo contaba, quítalo. " +
+    'No pongas "[pendiente: …]" en su lugar ni digas que se ha omitido algo: redacta con el resto de la información.'
+  );
 }
 
 export function fotosTexto(fotos: Foto[]): string {
@@ -181,7 +208,14 @@ function conTarea(m: MaterialInforme, tarea: string, extra: string[] = []): Bloq
     ...baseSlide(m),
     {
       cachear: false,
-      texto: ["== TAREA ==\n" + tarea, ...extra, "Responde solo con el JSON pedido, siguiendo las reglas de salida."].join("\n\n"),
+      texto: [
+        "== TAREA ==\n" + tarea,
+        ...extra,
+        bloqueNoReportar(m.fuentes),
+        "Responde solo con el JSON pedido, siguiendo las reglas de salida.",
+      ]
+        .filter((x): x is string => !!x)
+        .join("\n\n"),
     },
   ];
 }
@@ -252,6 +286,7 @@ export function promptCorreccion(
 export function promptAnalisis(m: MaterialInforme): BloquePrompt[] {
   const d = m.informe;
   const estructurado = !!m.previo;
+  const noReportar = bloqueNoReportar(m.fuentes);
   return [
     {
       cachear: false,
@@ -266,19 +301,28 @@ export function promptAnalisis(m: MaterialInforme): BloquePrompt[] {
           '"objetivosPrevios":[{"objetivo":"…","estado":"cumplido|parcial|no cumplido|ya no aplica","evidencia":"…"}],' +
           '"hechos":[{"tipo":"logro|hito|kpi|riesgo|riesgo-resuelto|objetivo-siguiente|incidencia|decision|estado|colaborador","texto":"…","fecha":"…","modulo":"obra|licencia|operador|breeam|desinversion|financiacion|…","fuente":"…"}],' +
           '"estructura":[{"id":"…","titulo":"…","accion":"mantener|actualizar|ocultar|nueva","motivo":"…"}],' +
-          '"sugeridas":[números de la biblioteca, máximo 3, que NO estén ya en la estructura],"faltan":["…"],"contradicciones":["…"]}',
+          '"sugeridas":[números de la biblioteca, máximo 3, que NO estén ya en la estructura],"faltan":["…"],"contradicciones":["…"]' +
+          (noReportar ? ',"omitidos":["…"]}' : "}"),
         "REGLAS:\n- No inventes nada: hechos, fechas y cifras solo de las fuentes o del informe anterior. Máximo 45 hechos, los más relevantes, con fecha si la hay.\n" +
           (estructurado
             ? '- "estructura" recorre TODAS las slides del informe anterior en su orden, con su mismo id. "mantener" solo para slides legales o sin información nueva que no citen el trimestre (disclaimer, cierre, colaboradores sin cambios); "actualizar" para las que deben reflejar el nuevo trimestre (portada, índice y financieras se tratan aparte, márcalas "actualizar"); "ocultar" si ya no aplican. Añade al final con "nueva" las slides que el material pida y no existan (id de la biblioteca).\n'
             : '- "estructura" propone el informe completo usando ids de la biblioteca en el orden canónico (portada, indice, resumen-ejecutivo, … , disclaimer, cierre), todas con "nueva" salvo disclaimer y cierre ("mantener").\n') +
-          `- Evalúa cada objetivo que el informe anterior fijó para ${d.trimestre}.\n- "faltan": datos necesarios que no están en las fuentes. "contradicciones": datos que no cuadran entre fuentes.`,
+          `- Evalúa cada objetivo que el informe anterior fijó para ${d.trimestre}.\n- "faltan": datos necesarios que no están en las fuentes. "contradicciones": datos que no cuadran entre fuentes.` +
+          (noReportar
+            ? '\n- Lo indicado en NO REPORTAR no entra en "resumen", "hechos" ni en la evidencia de los objetivos, no justifica slides nuevas y no se pide en "faltan".' +
+              '\n- "omitidos": lo que has dejado fuera por NO REPORTAR, una frase por cada cosa: qué era y en qué fuente o slide del informe anterior aparecía. Solo lo ve el equipo, para comprobar que has entendido cada indicación. [] si nada de lo aportado estaba afectado.'
+            : ""),
         "== FUENTES DEL TRIMESTRE ==\n" + recortar(fuentesTexto(m.fuentes), MAX_BYTES_FUENTES),
-      ].join("\n\n"),
+        noReportar,
+      ]
+        .filter((x): x is string => !!x)
+        .join("\n\n"),
     },
   ];
 }
 
-export function promptCoherencia(d: ContextoInforme, slides: SlideJson[]): BloquePrompt[] {
+export function promptCoherencia(d: ContextoInforme, slides: SlideJson[], fuentes: Fuente[] = []): BloquePrompt[] {
+  const noReportar = noReportarTexto(fuentes);
   const cuerpo = slides
     .filter((s) => !s.oculto)
     .map((s) => `### ${s.id} · ${tituloDe(s)}\n${textos(s).slice(0, 2200)}`)
@@ -289,9 +333,16 @@ export function promptCoherencia(d: ContextoInforme, slides: SlideJson[]): Bloqu
       texto: [
         "Revisa la coherencia de este informe trimestral para inversores. Busca: el mismo dato (fechas, %, importes, nombres de operador, constructora o financiador) con valores distintos entre slides; referencias al trimestre equivocado; previsiones presentadas como hechos; frases del trimestre anterior que no se hayan actualizado. No propongas cambios de estilo.",
         contexto(d),
+        noReportar
+          ? "NO REPORTAR. El equipo pidió que esto no apareciera en el informe:\n" +
+            recortar(noReportar, MAX_BYTES_NO_REPORTAR) +
+            "\nComprueba también que ningún slide lo menciona ni lo insinúa. Cada aparición es un problema («Contenido que el equipo pidió no reportar: …»), con la sugerencia de quitarlo, y va antes que los demás."
+          : null,
         'Devuelve SOLO un array JSON: [{"slide":"id","problema":"…","sugerencia":"…"}] (máximo 12; [] si no hay problemas).',
         recortar(cuerpo, 52_000),
-      ].join("\n\n"),
+      ]
+        .filter((x): x is string => !!x)
+        .join("\n\n"),
     },
   ];
 }

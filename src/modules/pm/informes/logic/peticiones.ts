@@ -95,6 +95,6 @@ export function montarPrompt(p: PeticionClaude, m: MaterialInforme): BloquePromp
     case "correccion":
       return promptCorreccion(m, p.slide, p.instruccion, { marcas: p.marcas, adjuntos: p.adjuntos });
     case "coherencia":
-      return promptCoherencia(m.informe, p.slides);
+      return promptCoherencia(m.informe, p.slides, m.fuentes);
   }
 }
