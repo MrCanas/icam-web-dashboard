@@ -19,6 +19,7 @@ import {
   guardarVersion,
   listarCambios,
   obtenerInforme,
+  obtenerPrevio,
   obtenerProyecto,
   type CambiosInforme,
 } from "../data/informesRepository";
@@ -32,9 +33,11 @@ import {
   type Cambio,
   type Foto,
   type Fuente,
+  type PrevioEstructurado,
   type Resultado,
   type ResumenUso,
   type TipoFuente,
+  type TipoFuenteAuto,
 } from "../types";
 import { usuarioEscritura, usuarioLectura } from "./acceso";
 
@@ -43,6 +46,8 @@ import { usuarioEscritura, usuarioLectura } from "./acceso";
  * admin de pm (usuarioEscritura) y queda en audit_log desde el repositorio.
  * Nunca lanzan: devuelven {ok:false, error} para que la UI lo enseñe.
  */
+
+const TIPOS_AUTO: TipoFuenteAuto[] = ["planificacion", "actas"];
 
 function mal(error: string): { ok: false; error: string } {
   return { ok: false, error };
@@ -132,6 +137,8 @@ export async function accionActualizarInforme(
 ): Promise<Resultado<{ actualizado: string }>> {
   try {
     if (!esIdInforme(id)) return mal("Informe no válido.");
+    if (cambios.trimestreAnterior !== undefined && !parseTrimestre(cambios.trimestreAnterior)) return mal("Trimestre no válido.");
+    if (cambios.base?.tipo === "estructurado" && !esIdInforme(cambios.base.id)) return mal("Informe anterior no válido.");
     const acceso = await usuarioEscritura();
     if ("error" in acceso) return mal(acceso.error);
     const r = await actualizarInforme(acceso.user, id, cambios);
@@ -179,6 +186,25 @@ export async function accionHistorial(id: string): Promise<Resultado<{ cambios: 
   return { ok: true, data: { cambios: c.data, uso: u.data } };
 }
 
+/** Informe del portal elegido como informe anterior: tiene que ser del mismo proyecto. */
+export async function accionObtenerPrevio(id: string, previoId: string): Promise<Resultado<PrevioEstructurado>> {
+  try {
+    if (!esIdInforme(id) || !esIdInforme(previoId) || id === previoId) return mal("Informe no válido.");
+    const acceso = await usuarioLectura();
+    if ("error" in acceso) return mal(acceso.error);
+    const inf = await obtenerInforme(acceso.user, id);
+    if (inf.error !== null) return mal(inf.error);
+    if (!inf.data) return mal("El informe ya no existe.");
+    const r = await obtenerPrevio(acceso.user, inf.data.codigo, previoId);
+    if (r.error !== null) return mal(r.error);
+    if (!r.data) return mal("Ese informe ya no está disponible como informe anterior.");
+    return { ok: true, data: r.data };
+  } catch (err) {
+    console.error("[informes] informe anterior", err);
+    return mal(err instanceof Error ? err.message : "No se ha podido leer el informe anterior");
+  }
+}
+
 /* ------------------------------------------------------------------ fuentes */
 
 export async function accionListarFuentes(id: string): Promise<Resultado<Fuente[]>> {
@@ -220,9 +246,15 @@ export async function accionBorrarFuente(id: string, fuenteId: number): Promise<
   return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
 }
 
-/** Carga (o recarga) las actas y la planificación del trimestre como fuentes «del portal». */
-export async function accionCargarFuentesAuto(id: string): Promise<Resultado<{ fuentes: Fuente[]; avisos: string[] }>> {
+/** Incorpora (o recarga) las actas o la planificación del trimestre como fuentes «del portal». */
+export async function accionCargarFuentesAuto(
+  id: string,
+  tipos: TipoFuenteAuto[],
+): Promise<Resultado<{ fuentes: Fuente[]; avisos: string[] }>> {
   try {
+    if (!esIdInforme(id)) return mal("Informe no válido.");
+    const pedidos = TIPOS_AUTO.filter((t) => Array.isArray(tipos) && tipos.includes(t));
+    if (!pedidos.length) return mal("Indica qué quieres incorporar.");
     const acceso = await usuarioEscritura();
     if ("error" in acceso) return mal(acceso.error);
     const ctx = acceso.user;
@@ -240,7 +272,7 @@ export async function accionCargarFuentesAuto(id: string): Promise<Resultado<{ f
       };
     }
     const t = parseTrimestre(inf.data.trimestre)!;
-    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre);
+    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre, pedidos);
     const g = await reemplazarAutomaticas(ctx, id, r.documentos);
     if (g.error !== null) return mal(g.error);
     const fuentes = await listarFuentes(ctx, id);

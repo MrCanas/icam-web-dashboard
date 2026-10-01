@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { accionCrearInforme } from "../../actions/informes";
-import { rutaInforme, rutaListaInformes } from "../../logic/paths";
+import { rutaInforme, rutaInformesProyecto, rutaListaInformes } from "../../logic/paths";
 import { qAnt, qSig } from "../../logic/trimestre";
 import type { Pie } from "../../slides/tipos";
 import { ARQUETIPOS, type Arquetipo, type ProyectoInforme } from "../../types";
@@ -27,7 +27,11 @@ const NUEVO = "__nuevo";
 export function PasoDatos({ proyectos, activoInicial, trimestres, trimestrePorDefecto, puedeEditar, error }: Props) {
   const router = useRouter();
   const inicial = useMemo(() => {
-    const porActivo = activoInicial ? proyectos.find((p) => p.idActivo === activoInicial) : null;
+    // Por el activo vinculado o, si el proyecto de informes aún no lo está, por su código.
+    const normal = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const porActivo = activoInicial
+      ? (proyectos.find((p) => p.idActivo === activoInicial) ?? proyectos.find((p) => normal(p.codigo) === normal(activoInicial)))
+      : null;
     return porActivo?.codigo ?? proyectos[0]?.codigo ?? NUEVO;
   }, [proyectos, activoInicial]);
 
@@ -90,7 +94,10 @@ export function PasoDatos({ proyectos, activoInicial, trimestres, trimestrePorDe
     <div className="space-y-4 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-text-primary">Nuevo informe</h1>
-        <Link href={rutaListaInformes()} className="text-sm font-medium text-icam-900 hover:underline">
+        <Link
+          href={activoInicial ? rutaInformesProyecto(activoInicial) : rutaListaInformes()}
+          className="text-sm font-medium text-icam-900 hover:underline"
+        >
           Volver a la lista
         </Link>
       </div>

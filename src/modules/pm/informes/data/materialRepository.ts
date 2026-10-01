@@ -25,7 +25,7 @@ export async function cargarMaterial(
     listarFuentes(ctx, informeId),
     listarFotos(ctx, informeId),
     informe.base?.tipo === "estructurado"
-      ? obtenerPrevio(ctx, informe.codigo, informe.trimestreAnterior)
+      ? obtenerPrevio(ctx, informe.codigo, informe.base.id)
       : Promise.resolve({ data: null, error: null } as const),
   ]);
   if (fuentes.error !== null) return { data: null, error: fuentes.error };

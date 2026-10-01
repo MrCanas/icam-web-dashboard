@@ -158,6 +158,16 @@ export interface PrevioEstructurado {
   slides: SlideJson[];
 }
 
+/** Informe del portal que puede hacer de informe anterior: mismo proyecto, trimestre previo y con slides. */
+export interface PrevioCandidato {
+  id: string;
+  trimestre: string;
+  estado: EstadoInforme;
+  version: number;
+  slides: number;
+  actualizado: string;
+}
+
 /** Tipo de petición a Claude, para desglosar el coste en informe_uso. */
 export type TipoPeticionClaude = "analisis" | "slide" | "ajuste" | "resumen" | "correccion" | "coherencia";
 
@@ -206,6 +216,8 @@ export interface FuenteAutomatica {
   nombre: string;
   texto: string;
 }
+
+export type TipoFuenteAuto = FuenteAutomatica["tipo"];
 
 export interface FuentesAutomaticasResultado {
   documentos: FuenteAutomatica[];

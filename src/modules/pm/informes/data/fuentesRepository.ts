@@ -2,6 +2,7 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 
 import { mensajeErrorBd } from "../logic/errores";
+import { ORDEN_AUTO } from "../logic/fuentes-auto";
 import type { Fuente, FuenteAutomatica, TipoFuente } from "../types";
 import { getInformesSupabase } from "./client";
 
@@ -116,39 +117,35 @@ export async function borrarFuente(ctx: UserContext, informeId: string, id: numb
 }
 
 /**
- * Sustituye las fuentes automáticas (actas, planificación) por las recién
- * cargadas. Van primero (orden 0 y 1): si hay que recortar, se recorta lo
- * aportado a mano, que va detrás. Conserva «incluida» si la PM la había quitado.
+ * Sustituye las fuentes del portal (actas, planificación) por las recién
+ * cargadas, que la PM ha pedido incorporar: quedan incluidas. Solo toca los
+ * tipos que han llegado: si una no se ha podido leer, se conserva la que había.
+ * Van primero (ORDEN_AUTO): si hay que recortar, se recorta lo aportado a mano.
  */
 export async function reemplazarAutomaticas(
   ctx: UserContext,
   informeId: string,
   docs: FuenteAutomatica[],
 ): Promise<R<null>> {
+  if (!docs.length) return { data: null, error: null };
   const sb = getInformesSupabase(ctx);
-  const { data: previas, error: e0 } = await sb
-    .from("informe_fuente")
-    .select("id, tipo, incluida")
-    .eq("informe_id", informeId)
-    .eq("auto", true);
-  if (e0) return { data: null, error: mensajeErrorBd(e0) };
-  const excluidas = new Set((previas ?? []).filter((p) => !p.incluida).map((p) => p.tipo as string));
+  const tipos = docs.map((d) => d.tipo);
   const { error } = await withAudit(
     ctx,
     "pm.informe.fuente.auto",
-    { resourceType: "informe", resourceId: informeId, payload: { tipos: docs.map((d) => d.tipo) } },
+    { resourceType: "informe", resourceId: informeId, payload: { tipos } },
     async () => {
-      const del = await sb.from("informe_fuente").delete().eq("informe_id", informeId).eq("auto", true);
-      if (del.error || !docs.length) return del;
+      const del = await sb.from("informe_fuente").delete().eq("informe_id", informeId).eq("auto", true).in("tipo", tipos);
+      if (del.error) return del;
       return sb.from("informe_fuente").insert(
-        docs.map((d, i) => ({
+        docs.map((d) => ({
           informe_id: informeId,
           tipo: d.tipo,
           nombre: d.nombre,
           texto: d.texto.slice(0, MAX_CARACTERES_FUENTE),
           auto: true,
-          orden: i,
-          incluida: !excluidas.has(d.tipo),
+          orden: ORDEN_AUTO[d.tipo],
+          incluida: true,
           created_by: ctx.id,
         })),
       );
