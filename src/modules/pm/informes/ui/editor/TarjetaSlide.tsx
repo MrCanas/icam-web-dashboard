@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { accionAnadirFuente } from "../../actions/informes";
-import { normalizar } from "../../logic/edicion";
+import { arbolBloques, desplegar, normalizar } from "../../logic/edicion";
 import { actualizarPeriodo, tituloDe, validarSlide } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
@@ -43,10 +43,14 @@ interface Props {
   cambiar: (nueva: SlideJson, cambio: string) => Promise<MedidaSlide>;
   /** Vuelve a la slide anterior al último cambio; null si no hay nada que deshacer. */
   deshacer: (() => Promise<MedidaSlide>) | null;
+  /** Documentos dirigidos a esta slide que todavía no se han usado para montarla. */
+  dirigida: string[] | null;
+  /** Monta esta slide con su información dirigida; null mientras ya se está montando alguna. */
+  montarDirigida: (() => void) | null;
 }
 
 /** Una slide del editor: vista, chips de relleno/pendientes/origen, edición a mano, marcas y corrección con Claude. */
-export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer }: Props) {
+export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer, dirigida, montarDirigida }: Props) {
   const { informe, puedeEditar } = h;
   const [marcando, setMarcando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
@@ -65,6 +69,10 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   const normalizado = useMemo(() => normalizar(slide), [slide]);
   const pintado = useMemo(() => (pintada ? normalizar(pintada.slide) : null), [pintada]);
   const abrirLista = useCallback(() => setListaAbierta(true), []);
+  const [anadiendo, setAnadiendo] = useState(false);
+  const terminarAnadir = useCallback(() => setAnadiendo(false), []);
+  // Plantillas sin área de bloques (portada, índice, financieras…): ahí no cabe una imagen nueva.
+  const admiteImagenNueva = useMemo(() => !!arbolBloques(desplegar(slide)), [slide]);
 
   /** Cambio hecho a mano (texto, bloque o foto): sin Claude. */
   async function aplicarManual(nueva: SlideJson, cambio: string) {
@@ -197,6 +205,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   else if (medida?.medida) chips.push(<Chip key="r" tono={medida.medida.relleno < 80 ? "aviso" : "ok"}>Relleno {medida.medida.relleno} %</Chip>);
   if (medida?.pendientes) chips.push(<Chip key="p" tono="aviso">{medida.pendientes} pendiente{medida.pendientes > 1 ? "s" : ""}</Chip>);
   if (slide.origen) chips.push(<Chip key="o">{slide.origen}</Chip>);
+  if (dirigida?.length) chips.push(<Chip key="i" tono="marca">información nueva</Chip>);
 
   return (
     <section className="flex scroll-mt-4 flex-col gap-2" id={`ed-${slide.id}`}>
@@ -206,6 +215,17 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         <span className="flex flex-wrap gap-1">{chips}</span>
         {puedeEditar ? (
           <span className="ml-auto flex flex-wrap gap-1.5">
+            {dirigida?.length ? (
+              <Boton
+                pequeno
+                variante="primario"
+                disabled={!montarDirigida || trabajando}
+                title={`Claude rehace esta slide por completo con: ${dirigida.join(", ")}`}
+                onClick={() => montarDirigida?.()}
+              >
+                Montar con la información
+              </Boton>
+            ) : null}
             <Boton
               pequeno
               aria-pressed={marcando}
@@ -301,10 +321,25 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               {nombre}
             </Boton>
           ))}
+          <Boton
+            pequeno
+            disabled={trabajando || !admiteImagenNueva || pintada?.slide !== slide}
+            title={
+              admiteImagenNueva
+                ? "Sube una imagen de tu ordenador o elígela de la biblioteca del proyecto: entra como un bloque más de la slide"
+                : "La plantilla de esta slide no admite imágenes nuevas; las que ya tiene se cambian pulsando sobre ellas"
+            }
+            onClick={() => {
+              setEditando("disposicion");
+              setAnadiendo(true);
+            }}
+          >
+            ＋ Añadir imagen
+          </Boton>
           <span className="text-text-muted">
             {editando === "textos"
               ? "Pulsa sobre un texto de la slide para cambiarlo."
-              : "Pulsa un bloque o una foto para moverlo con los botones, o arrástralo a su nuevo sitio."}
+              : "Pulsa un bloque para moverlo con los botones o arrástralo. Cada imagen tiene su botón para cambiarla."}
           </span>
           <span className="ml-auto flex gap-1.5">
             <Boton pequeno aria-pressed={listaAbierta} onClick={() => setListaAbierta(!listaAbierta)}>
@@ -316,6 +351,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               onClick={() => {
                 setEditando(null);
                 setListaAbierta(false);
+                setAnadiendo(false);
               }}
             >
               Listo
@@ -360,6 +396,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               informeId={informe.id}
               trimestre={informe.trimestre}
               alSubirFoto={(f) => h.setFotos((fs) => [...fs, f])}
+              anadiendo={anadiendo}
+              alTerminarAnadir={terminarAnadir}
               trabajando={trabajando || pintada.slide !== slide}
               aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)}
               avisar={setEstado}

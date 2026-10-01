@@ -166,9 +166,14 @@ function esColumnas(clase: unknown): boolean {
   return typeof clase === "string" && /\biq-cols\b/.test(clase);
 }
 
+const EN_LINEA = new Set(["span", "strong", "em", "br"]);
+
 function arbolDeNodo(n: Objeto, ruta: Ruta): NodoArbol {
   const c = typeof n.c === "string" ? n.c : null;
   if (c !== "div" || !Array.isArray(n.hijos)) return { ruta, c, contenedor: null };
+  // Un `div` con texto o etiquetas en línea es un bloque de texto (una nota), no un contenedor de bloques.
+  const deTexto = n.hijos.some((x) => (typeof x === "string" && x.trim()) || (esObjeto(x) && EN_LINEA.has(String(x.c))));
+  if (deTexto) return { ruta, c, contenedor: null };
   const props = esObjeto(n.props) ? n.props : {};
   return { ruta, c, contenedor: listaDeNodos(n.hijos, [...ruta, "hijos"], esColumnas(props.className) ? "columnas" : "pila") };
 }
@@ -199,6 +204,135 @@ export function normalizar(slide: SlideJson): SlideJson {
     }
   }
   return s;
+}
+
+/** Texto enriquecido («**negrita**») como nodos, para un `div` que la plantilla pintaba con su propio formato. */
+function nodosDeTexto(t: string): unknown[] {
+  return t
+    .split(/\*\*(.+?)\*\*/g)
+    .map((p, i) => (i % 2 ? { c: "strong", hijos: [p] } : p))
+    .filter((p) => p !== "");
+}
+
+/**
+ * Plantillas cerradas que se pueden escribir, pieza a pieza, con los mismos
+ * componentes que usan por dentro. `desplegar` las convierte en un slide
+ * compuesto que se pinta exactamente igual (lo comprueba un test), y sobre esa
+ * forma ya se pueden mover bloques o añadir imágenes. El cambio queda en la
+ * slide de este informe: la plantilla no se toca.
+ */
+const DESPLIEGUES: Record<string, (p: Objeto) => NonNullable<SlideJson["compuesto"]>> = {
+  ResumenEjecutivo: (p) => {
+    const bloques = (lista: unknown) => (Array.isArray(lista) ? lista : []).map((b) => ({ c: "BloqueIcono", props: b }));
+    const logros = { c: "BloqueIcono", props: { icono: "logros", titulo: "LOGROS " + (p.trimestre || ""), vinetas: p.logros } };
+    return {
+      layout: "resumen-ejecutivo",
+      seccion: (p.seccion as number | undefined) || 1,
+      titulo: "Resumen Ejecutivo del Proyecto. " + (p.trimestre || ""),
+      clase: "iq-cols",
+      contenido: [
+        { c: "div", hijos: bloques(p.izquierda) },
+        { c: "div", hijos: [logros, ...bloques(p.derecha)] },
+      ],
+    };
+  },
+  SlideKpisRiesgosObjetivos: (p) => ({
+    layout: "kpis-riesgos-objetivos",
+    seccion: (p.seccion as number | undefined) || 3,
+    titulo: "Resumen de Proyecto. KPIs, Riesgos y Mitigaciones & Objetivos " + p.siguiente,
+    clase: "iq-apilado",
+    contenido: [
+      { c: "Subtitulo", hijos: ["INDICADORES CLAVE (KPIs)"] },
+      { c: "TablaKpis", props: { trimestre: p.trimestre, siguiente: p.siguiente, filas: p.kpis, cabeceraObjetivo: p.cabeceraObjetivo } },
+      { c: "Subtitulo", hijos: ["RIESGOS Y MITIGACIONES"] },
+      { c: "TablaRiesgos", props: { filas: p.riesgos } },
+      // Lo que pinta ListaObjetivos, sin su prop «trimestre»: ahí lleva el trimestre siguiente y la revisión lo daría por errata.
+      {
+        c: "div",
+        props: { className: "iq-objetivos" },
+        hijos: [
+          { c: "Subtitulo", hijos: ["OBJETIVOS " + p.siguiente] },
+          { c: "Vinetas", props: { items: p.objetivos, compacta: true } },
+        ],
+      },
+    ],
+  }),
+  TextoImagen: (p) => {
+    const apiladas = p.variante === "dos-apiladas";
+    const imagenes = (Array.isArray(p.imagenes) ? p.imagenes : [{}]).slice(0, apiladas ? 2 : 1);
+    const texto: unknown[] = [];
+    if (p.subtitulo) texto.push({ c: "Subtitulo", hijos: [p.subtitulo] });
+    texto.push({ c: "Texto", props: { parrafos: p.parrafos } });
+    if (typeof p.nota === "string" && p.nota) texto.push({ c: "div", props: { className: "iq-nota-inline" }, hijos: nodosDeTexto(p.nota) });
+    return {
+      layout: "texto-imagen",
+      seccion: p.seccion as number | undefined,
+      titulo: String(p.titulo ?? ""),
+      clase: "iq-cols",
+      contenido: [
+        { c: "div", hijos: texto },
+        {
+          c: "div",
+          props: { className: "iq-imagenes-col" },
+          hijos: imagenes.map((im) => ({ c: "ImagenMarco", props: { ancho: 348, alto: apiladas ? 180 : 290, ...(esObjeto(im) ? im : {}) } })),
+        },
+      ],
+    } as NonNullable<SlideJson["compuesto"]>;
+  },
+  Colaboradores: (p) => {
+    const roles = (Array.isArray(p.roles) ? p.roles : []).filter(esObjeto);
+    const mitad = Math.ceil(roles.length / 2);
+    const columna = (rs: Objeto[]) => ({
+      c: "div",
+      hijos: rs.map((r) => {
+        const hijos: unknown[] = [{ c: "Subtitulo", hijos: [r.rol] }];
+        if (r.parrafos) hijos.push({ c: "Texto", props: { parrafos: r.parrafos } });
+        if (r.vinetas) hijos.push({ c: "Vinetas", props: { items: r.vinetas, compacta: true } });
+        return { c: "div", props: { className: "iq-colab-rol" }, hijos };
+      }),
+    });
+    const contenido: unknown[] = [];
+    if (p.intro) contenido.push({ c: "Texto", props: { parrafos: [p.intro] } });
+    contenido.push({ c: "div", props: { className: "iq-cols" }, hijos: [columna(roles.slice(0, mitad)), columna(roles.slice(mitad))] });
+    return {
+      layout: "colaboradores",
+      seccion: (p.seccion as number | undefined) || 5,
+      titulo: "Colaboradores",
+      contenido,
+      // Los logos van al pie de la slide, fuera del área de contenido.
+      fuera: [{ c: "LogosColaboradores", props: { logos: p.logos } }],
+    } as NonNullable<SlideJson["compuesto"]>;
+  },
+  VehiculoInversion: (p) => {
+    const contenido: unknown[] = [
+      { c: "Subtitulo", hijos: ["DETALLES DEL VEHÍCULO DE INVERSIÓN"] },
+      { c: "Vinetas", props: { items: p.detalles } },
+      { c: "FichasVehiculo", props: { fichas: p.fichas } },
+    ];
+    if (typeof p.nota === "string" && p.nota) contenido.push({ c: "div", props: { className: "iq-nota-inline" }, hijos: nodosDeTexto(p.nota) });
+    return {
+      layout: "vehiculo",
+      seccion: (p.seccion as number | undefined) || 6,
+      titulo: String(p.titulo || "Vehículo de inversión. Detalles"),
+      contenido,
+    } as NonNullable<SlideJson["compuesto"]>;
+  },
+};
+
+/** ¿Es una plantilla cerrada que `desplegar` puede abrir? */
+export function esDesplegable(slide: SlideJson): boolean {
+  return !!slide.c && slide.c in DESPLIEGUES && !slide.hijos?.length;
+}
+
+/**
+ * Forma con la que trabaja la edición de la disposición: el slide normalizado
+ * y, si es una plantilla cerrada desplegable, convertido en compuesto.
+ */
+export function desplegar(slide: SlideJson): SlideJson {
+  const s = normalizar(slide);
+  if (!esDesplegable(s)) return s;
+  const { c, props, hijos: _hijos, ...resto } = s;
+  return clon({ ...resto, compuesto: DESPLIEGUES[c!]!(esObjeto(props) ? props : {}) });
 }
 
 /** Área de contenido de un slide (ya normalizado) como árbol de bloques; null si su plantilla es fija. */
@@ -281,6 +415,25 @@ export function moverBloque(slide: SlideJson, desde: Ruta, hacia: DestinoBloque)
   // En la misma lista, los índices posteriores al hueco han bajado uno.
   const indice = origen === destino && hacia.indice > i ? hacia.indice - 1 : hacia.indice;
   destino.splice(Math.max(0, Math.min(destino.length, indice)), 0, bloque);
+  return s;
+}
+
+/** Añade un bloque nuevo (una imagen) en una posición de un contenedor. */
+export function insertarBloque(slide: SlideJson, hacia: DestinoBloque, nodo: Record<string, unknown>): SlideJson {
+  const s = normalizar(slide);
+  const destino = leerRuta(s, hacia.contenedor);
+  if (!Array.isArray(destino)) throw new Error("Ahí no se puede añadir un bloque.");
+  destino.splice(Math.max(0, Math.min(destino.length, hacia.indice)), 0, clon(nodo));
+  return s;
+}
+
+/** Quita un bloque de su contenedor. */
+export function quitarBloque(slide: SlideJson, ruta: Ruta): SlideJson {
+  const s = normalizar(slide);
+  const lista = leerRuta(s, ruta.slice(0, -1));
+  const i = ruta[ruta.length - 1];
+  if (!Array.isArray(lista) || typeof i !== "number") throw new Error("Ese bloque no se puede quitar.");
+  lista.splice(i, 1);
   return s;
 }
 
@@ -371,9 +524,9 @@ export const DISPOSICIONES_GALERIA: { valor: string; nombre: string; huecos: num
 ];
 
 export interface GrupoImagenes {
-  /** Nodo que pinta las imágenes (o [] si es el propio slide: TextoImagen, Portada, SlideBloqueado). */
+  /** Nodo que pinta las imágenes (o [] si es el propio slide: Portada, SlideBloqueado). */
   nodo: Ruta;
-  tipo: "Galeria" | "ImagenMarco" | "TextoImagen" | "Portada" | "MapaLateral" | "SlideBloqueado";
+  tipo: "Galeria" | "ImagenMarco" | "Portada" | "MapaLateral" | "SlideBloqueado";
   /** Sitio de cada imagen en el JSON, por orden de aparición. */
   imagenes: Ruta[];
   /**
@@ -386,13 +539,6 @@ export interface GrupoImagenes {
 /** Imágenes de un slide que la PM puede cambiar y, donde la plantilla lo admite, reencuadrar o reordenar. */
 export function gruposDeImagenes(slide: SlideJson): GrupoImagenes[] {
   const out: GrupoImagenes[] = [];
-  if (slide.c === "TextoImagen") {
-    // Como la plantilla: sin lista pinta un hueco; con lista, hasta una o dos de sus imágenes.
-    const props = esObjeto(slide.props) ? slide.props : {};
-    const tope = props.variante === "dos-apiladas" ? 2 : 1;
-    const n = Array.isArray(props.imagenes) ? Math.min(props.imagenes.length, tope) : 1;
-    out.push({ nodo: [], tipo: "TextoImagen", objetos: true, imagenes: Array.from({ length: n }, (_, i) => ["props", "imagenes", i]) });
-  }
   if (slide.c === "Portada") out.push({ nodo: [], tipo: "Portada", objetos: false, imagenes: [["props", "imagen"]] });
   // Una slide bloqueada con contenido propio (hijos) no lleva página aportada.
   if (slide.c === "SlideBloqueado" && !slide.hijos?.length) out.push({ nodo: [], tipo: "SlideBloqueado", objetos: false, imagenes: [["props", "vista"]] });
@@ -462,7 +608,40 @@ export function reencuadrar(slide: SlideJson, imagen: Ruta, x: number, y: number
   return s;
 }
 
-/** Intercambia dos fotos del mismo grupo (galería o columna de imágenes). */
+/** Vacía un hueco de imagen: vuelve a verse el marcador de «falta foto». */
+export function vaciarFoto(slide: SlideJson, grupo: GrupoImagenes, imagen: Ruta): SlideJson {
+  const s = clon(slide);
+  if (grupo.objetos) {
+    const im = imagenEn(s, imagen);
+    delete im.src;
+    delete im.focalX;
+    delete im.focalY;
+    return s;
+  }
+  delete imagenEn(s, imagen.slice(0, -1))[String(imagen[imagen.length - 1])];
+  return s;
+}
+
+/** Bloque de imagen nuevo, con su tamaño en unidades de slide (960 × 540). */
+export function nodoImagen(src: string, ancho: number, alto: number): Record<string, unknown> {
+  return { c: "ImagenMarco", props: { src, ancho: Math.round(ancho), alto: Math.round(alto) } };
+}
+
+export const ALTO_IMAGEN = { min: 60, max: 400, paso: 30 };
+
+/** Cambia el alto de una imagen suelta (ImagenMarco), dentro de unos límites; el ancho no cambia. */
+export function altoDeImagen(slide: SlideJson, nodo: Ruta, delta: number): SlideJson {
+  const s = clon(slide);
+  const n = leerRuta(s, nodo);
+  if (!esObjeto(n) || n.c !== "ImagenMarco") throw new Error("Solo se cambia el tamaño de una imagen suelta.");
+  if (!esObjeto(n.props)) n.props = {};
+  const props = n.props as Objeto;
+  const alto = typeof props.alto === "number" ? props.alto : 200;
+  props.alto = Math.max(ALTO_IMAGEN.min, Math.min(ALTO_IMAGEN.max, alto + delta));
+  return s;
+}
+
+/** Intercambia dos fotos del mismo grupo (galería). */
 export function intercambiarFotos(slide: SlideJson, a: Ruta, b: Ruta): SlideJson {
   const s = clon(slide);
   const ia = { ...imagenEn(s, a) };
@@ -479,16 +658,5 @@ export function disposicionGaleria(slide: SlideJson, nodo: Ruta, valor: string):
   if (!esObjeto(n) || n.c !== "Galeria" || !DISPOSICIONES_GALERIA.some((d) => d.valor === valor)) throw new Error("Disposición no válida.");
   if (!esObjeto(n.props)) n.props = {};
   (n.props as Objeto).disposicion = valor;
-  return s;
-}
-
-/** Una imagen o dos apiladas en un slide de texto e imagen. */
-export function varianteTextoImagen(slide: SlideJson, valor: "una" | "dos-apiladas"): SlideJson {
-  const s = clon(slide);
-  if (s.c !== "TextoImagen") throw new Error("Este slide no es de texto e imagen.");
-  const imagenes = Array.isArray(s.props?.imagenes) ? [...(s.props.imagenes as unknown[])] : [{}];
-  // La plantilla solo pinta las imágenes que hay en la lista: el segundo hueco tiene que existir para poder rellenarlo.
-  while (valor === "dos-apiladas" && imagenes.length < 2) imagenes.push({});
-  s.props = { ...(s.props ?? {}), variante: valor, imagenes };
   return s;
 }

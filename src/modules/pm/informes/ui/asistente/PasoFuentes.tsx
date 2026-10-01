@@ -13,9 +13,10 @@ import {
   accionGuardarNotas,
   accionIncluirFuente,
 } from "../../actions/informes";
+import { dirigirFuente, pendientesDirigidas, seleccionBase, slidesDeFuente } from "../../logic/dirigidas";
 import { fechaEs } from "../../logic/fuentes-actas";
 import { respuestaAuto } from "../../logic/fuentes-auto";
-import { normalizarEstructura } from "../../logic/informe";
+import { normalizarEstructura, tituloDe } from "../../logic/informe";
 import { rutaActasTrimestre, rutaPlanificacionProyecto, urlFoto } from "../../logic/paths";
 import { parseTrimestre, rangoTrimestre } from "../../logic/trimestre";
 import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto, type Fuente, type TipoFuenteAuto } from "../../types";
@@ -120,6 +121,26 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const respuesta = (tipo: TipoFuenteAuto) => respuestaAuto(fuentes, tipo) ?? respondido[tipo] ?? null;
   const sinResponder = !!idActivo && (respuesta("actas") === null || respuesta("planificacion") === null);
   const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo" && f.tipo !== "no_reportar");
+  // Con el informe ya generado se vuelve aquí desde la revisión: los documentos se pueden dirigir a slides concretas.
+  const slides = (informe.contenido?.slides ?? []).filter((s) => !s.oculto);
+  const yaGenerado = slides.length > 0;
+  const porAplicar = pendientesDirigidas(informe.seleccion, fuentes, informe.contenido?.slides ?? []).length;
+
+  function dirigir(fuenteId: number, slideId: string, marcada: boolean) {
+    const actuales = slidesDeFuente(informe.seleccion, fuenteId);
+    const nuevas = marcada ? [...actuales, slideId] : actuales.filter((s) => s !== slideId);
+    void h.guardar({ seleccion: dirigirFuente(seleccionBase(informe.seleccion, informe.analisis), fuenteId, nuevas) });
+  }
+
+  async function volverALaRevision() {
+    try {
+      await guardarNotasYa();
+      await guardarNoReportarYa();
+      h.ir("editor");
+    } catch (e) {
+      h.avisar(`No se ha podido guardar: ${e instanceof Error ? e.message : "error"}`, "error");
+    }
+  }
 
   async function cargarAuto(tipo: TipoFuenteAuto) {
     setOcupado(`Cargando ${ETIQUETA_AUTO[tipo]} del portal…`);
@@ -252,7 +273,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
       const analisis = a as unknown as Analisis;
       analisis.estructura = normalizarEstructura(a.estructura, h.previo);
       const ok = await h.guardar(
-        { analisis, seleccion: { estructura: analisis.estructura, anadir: [] }, estado: "analizado" },
+        { analisis, seleccion: { estructura: analisis.estructura, anadir: [], dirigidas: informe.seleccion?.dirigidas }, estado: "analizado" },
         "Información del trimestre analizada",
       );
       if (!ok) throw new Error("no se ha podido guardar el análisis");
@@ -328,7 +349,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
         {documentos.length ? (
           <ul className="space-y-1 text-sm">
             {documentos.map((d) => (
-              <li key={d.id} className={`flex flex-wrap items-center gap-2 ${d.incluida ? "" : "opacity-50"}`}>
+              <li key={d.id} className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${d.incluida ? "" : "opacity-50"}`}>
                 <span className={d.incluida ? "" : "line-through"}>{d.nombre}</span>
                 {d.auto ? <Chip tono="ok">del portal</Chip> : null}
                 {d.tipo === "correccion" ? <Chip>de una corrección</Chip> : null}
@@ -357,6 +378,31 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
                       Quitar
                     </Boton>
                   )
+                ) : null}
+                {yaGenerado && !d.auto ? (
+                  <details className="basis-full pl-1">
+                    <summary className="cursor-pointer text-sm text-icam-900">
+                      {slidesDeFuente(informe.seleccion, d.id).length
+                        ? `Dirigido a ${slides
+                            .map((s, i) => (slidesDeFuente(informe.seleccion, d.id).includes(s.id) ? `la slide ${i + 1}` : null))
+                            .filter(Boolean)
+                            .join(", ")}`
+                        : "Para todo el informe · dirigir a unas slides concretas"}
+                    </summary>
+                    <fieldset className="mt-1.5 grid gap-x-4 gap-y-1 sm:grid-cols-2" disabled={!puedeEditar}>
+                      <legend className="sr-only">Slides a las que va dirigido {d.nombre}</legend>
+                      {slides.map((s, i) => (
+                        <label key={s.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={slidesDeFuente(informe.seleccion, d.id).includes(s.id)}
+                            onChange={(e) => dirigir(d.id, s.id, e.target.checked)}
+                          />
+                          {i + 1} · {tituloDe(s)}
+                        </label>
+                      ))}
+                    </fieldset>
+                  </details>
                 ) : null}
               </li>
             ))}
@@ -464,14 +510,25 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
         <Boton onClick={() => h.ir("paso1")} disabled={!!analizando}>
           Atrás
         </Boton>
-        <Boton variante="primario" onClick={() => void analizar()} disabled={!puedeEditar || !!ocupado || !!analizando || sinResponder}>
-          Analizar la información
+        {yaGenerado ? (
+          <Boton variante="primario" onClick={() => void volverALaRevision()} disabled={!!ocupado || !!analizando}>
+            {porAplicar ? `Volver a la revisión (${porAplicar} slide${porAplicar > 1 ? "s" : ""} por montar)` : "Volver a la revisión"}
+          </Boton>
+        ) : null}
+        <Boton
+          variante={yaGenerado ? "secundario" : "primario"}
+          onClick={() => void analizar()}
+          disabled={!puedeEditar || !!ocupado || !!analizando || sinResponder}
+        >
+          {yaGenerado ? "Volver a analizar" : "Analizar la información"}
         </Boton>
         {analizando ? <Boton onClick={() => abortar.current?.abort()}>Parar</Boton> : null}
         <span className="text-sm text-text-muted">
           {sinResponder
             ? "Antes de analizar, indica si quieres incorporar las actas y la planificación."
-            : "Claude lee todo y propone la estructura (1–3 minutos)."}
+            : yaGenerado
+              ? "Para usar un documento en unas slides, dirígelo a ellas y vuelve a la revisión: allí Claude las monta. Volver a analizar y generar rehace todo el informe."
+              : "Claude lee todo y propone la estructura (1–3 minutos)."}
         </span>
       </div>
     </>

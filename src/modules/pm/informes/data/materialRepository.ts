@@ -1,5 +1,6 @@
 import type { UserContext } from "@/lib/auth/currentUser";
 
+import { mapaDirigidas } from "../logic/dirigidas";
 import type { MaterialInforme } from "../logic/prompts";
 import type { Informe } from "../types";
 import { listarFotos } from "./fotosRepository";
@@ -47,6 +48,7 @@ export async function cargarMaterial(
         referencias,
         biblioteca,
         fuentes: fuentes.data.filter((f) => f.incluida),
+        dirigidas: mapaDirigidas(informe.seleccion),
         previoTexto,
         previo: previo.data ?? null,
         fotos: fotos.data,
