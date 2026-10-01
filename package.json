@@ -55,6 +55,7 @@
     "pm:zoho-explore": "tsx scripts/pm/zoho-explore.ts",
     "pm:apply-migration-043": "tsx scripts/pm/apply-migration-043.ts",
     "pm:apply-migration-044": "tsx scripts/pm/apply-migration-044.ts",
+    "pm:apply-migration-045": "tsx scripts/pm/apply-migration-045.ts",
     "pm:importar-informes": "tsx scripts/pm/importar-informes.ts",
     "pm:informes-recorrido": "tsx scripts/pm/informes-recorrido.ts",
     "pm:informes-paridad": "tsx scripts/pm/informes-paridad.ts",

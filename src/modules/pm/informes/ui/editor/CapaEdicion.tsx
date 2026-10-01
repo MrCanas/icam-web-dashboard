@@ -26,15 +26,17 @@ import {
   reencuadrar,
   rejillaDe,
   sinFormato,
+  srcDeImagen,
   varianteTextoImagen,
   type CampoTexto,
+  type GrupoImagenes,
   type NodoArbol,
 } from "../../logic/edicion";
 import { tituloDe, type Ruta } from "../../logic/informe";
-import { urlFoto } from "../../logic/paths";
 import type { SlideJson } from "../../slides/tipos";
-import type { Foto } from "../../types";
+import { PARA_FINANZAS, type CategoriaFoto, type Foto } from "../../types";
 import { claseCampo } from "../componentes";
+import { DialogoImagen } from "./DialogoImagen";
 import {
   bloqueDeTexto,
   cajaDe,
@@ -55,7 +57,10 @@ interface Props {
   slide: SlideJson;
   lienzo: HTMLElement;
   modo: ModoEdicion;
-  fotos: Foto[];
+  /** Informe abierto: lo que se suba al elegir una imagen se guarda en él. */
+  informeId: string;
+  trimestre: string;
+  alSubirFoto: (f: Foto) => void;
   trabajando: boolean;
   aplicar: (nueva: SlideJson, cambio: string) => void;
   avisar: (texto: string) => void;
@@ -107,6 +112,21 @@ function distancia(c: Caja, x: number, y: number): number {
 
 function empiezaPor(ruta: Ruta, prefijo: Ruta): boolean {
   return prefijo.length <= ruta.length && prefijo.every((k, i) => k === ruta[i]);
+}
+
+function esPaginaDeFinanzas(idSlide: string): boolean {
+  return PARA_FINANZAS.some((p) => p.id === idSlide);
+}
+
+/**
+ * Categoría con la que se guarda una imagen subida para un hueco: la de
+ * portada y las páginas de Finanzas llevan la suya, que es la que busca la
+ * generación al rehacer esas slides.
+ */
+function categoriaDe(grupo: GrupoImagenes, idSlide: string): CategoriaFoto {
+  if (grupo.tipo === "Portada") return "Portada";
+  if (grupo.tipo === "SlideBloqueado") return esPaginaDeFinanzas(idSlide) ? "Página de Finanzas" : "Otra";
+  return grupo.tipo === "MapaLateral" ? "Otra" : "Obra";
 }
 
 const NOMBRE_BLOQUE: Record<string, string> = {
@@ -168,7 +188,7 @@ function destinosDe(geo: Geometria, origen: BloquePintado): Destino[] {
  * columnas e imágenes). No llama a Claude: cada cambio sale como un slide nuevo
  * por `aplicar`.
  */
-export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, avisar, abrirLista }: Props) {
+export function CapaEdicion({ slide, lienzo, modo, informeId, trimestre, alSubirFoto, trabajando, aplicar, avisar, abrirLista }: Props) {
   const capa = useRef<HTMLDivElement>(null);
   const titulo = tituloDe(slide);
   const arbol = useMemo(() => arbolBloques(slide), [slide]);
@@ -285,7 +305,8 @@ export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, a
   }
 
   function alPulsar(e: React.PointerEvent) {
-    if (!geo || trabajando || e.button > 0) return;
+    // Los eventos del diálogo de imagen suben hasta aquí por el árbol de React aunque se pinte fuera.
+    if (!geo || trabajando || fotosAbiertas || e.button > 0) return;
     const [x, y] = punto(e);
     const im = geo.imagenes.find((i) => dentro(i.caja, x, y));
     // El bloque más pequeño que contiene el punto.
@@ -390,7 +411,6 @@ export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, a
     return !!otra && (unidad?.b.padre === rejilla.rejilla || otra.contenedor?.orientacion !== "columnas");
   };
 
-  const fotosElegibles = fotos.filter((f) => f.categoria !== "Página de Finanzas");
   const boton = "rounded border border-subtle bg-card px-1.5 py-0.5 text-xs font-medium text-text-primary hover:bg-page disabled:opacity-40";
   const barra = "absolute z-20 flex flex-wrap items-center gap-1 rounded-md border border-subtle bg-card px-1.5 py-1 text-xs shadow-md";
 
@@ -408,6 +428,20 @@ export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, a
       onPointerMove={modo === "disposicion" ? alMover : undefined}
       onPointerUp={modo === "disposicion" ? alSoltar : undefined}
       onPointerCancel={modo === "disposicion" ? () => setPulso(null) : undefined}
+      onDoubleClick={
+        modo === "disposicion"
+          ? (e) => {
+              // Doble clic sobre una imagen o un hueco vacío: directamente a elegir imagen.
+              if (!geo || trabajando || fotosAbiertas) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              const im = geo.imagenes.find((i) => dentro(i.caja, e.clientX - r.left, e.clientY - r.top));
+              if (!im) return;
+              setSel({ tipo: "imagen", ruta: im.im.ruta });
+              setReencuadrando(false);
+              setFotosAbiertas(true);
+            }
+          : undefined
+      }
     >
       {modo === "textos" ? (
         <>
@@ -541,15 +575,19 @@ export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, a
 
           {imagen && !pulso?.arrastrando ? (
             <div className={barra} style={sobre(imagen.caja, 360)} onPointerDown={(e) => e.stopPropagation()}>
-              <button type="button" className={boton} aria-pressed={fotosAbiertas} disabled={trabajando} onClick={() => setFotosAbiertas(!fotosAbiertas)}>
-                Cambiar foto
+              <button type="button" className={boton} disabled={trabajando} onClick={() => setFotosAbiertas(true)}>
+                {srcDeImagen(slide, imagen.im.grupo, imagen.im.ruta) ? "Cambiar imagen" : "Elegir imagen"}
               </button>
               <button
                 type="button"
                 className={`${boton} ${reencuadrando ? "!border-amber-500 !bg-amber-100" : ""}`}
                 aria-pressed={reencuadrando}
-                disabled={trabajando || !(imagen.im.el instanceof HTMLImageElement)}
-                title="Pulsa sobre la foto lo que quieres que quede en el centro"
+                disabled={trabajando || !imagen.im.grupo.objetos || !(imagen.im.el instanceof HTMLImageElement)}
+                title={
+                  imagen.im.grupo.objetos
+                    ? "Pulsa sobre la foto lo que quieres que quede en el centro"
+                    : "La plantilla de este hueco no admite reencuadre: recorta la imagen antes de subirla"
+                }
                 onClick={() => setReencuadrando(!reencuadrando)}
               >
                 Reencuadrar
@@ -592,41 +630,25 @@ export function CapaEdicion({ slide, lienzo, modo, fotos, trabajando, aplicar, a
           ) : null}
 
           {imagen && fotosAbiertas ? (
-            <div
-              className="absolute inset-x-2 bottom-2 z-20 flex gap-2 overflow-x-auto rounded-md border border-subtle bg-card p-2 shadow-md"
-              onPointerDown={(e) => e.stopPropagation()}
-              role="listbox"
-              aria-label="Fotos del informe"
-            >
-              {fotosElegibles.length ? (
-                fotosElegibles.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    role="option"
-                    aria-selected={false}
-                    title={f.pie || f.nombre || f.categoria}
-                    disabled={trabajando}
-                    className="shrink-0 rounded border border-subtle hover:border-icam-900"
-                    onClick={() => {
-                      setFotosAbiertas(false);
-                      aplicar(cambiarFoto(slide, imagen.im.ruta, urlFoto(f.id)), `${titulo}: foto cambiada`);
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={urlFoto(f.id)} alt={f.pie || f.nombre || "Foto"} className="h-16 w-24 rounded object-cover" />
-                  </button>
-                ))
-              ) : (
-                <span className="text-xs text-text-muted">Este informe no tiene fotos. Añádelas en «Información del trimestre» o adjúntalas en una corrección.</span>
-              )}
-            </div>
+            <DialogoImagen
+              informeId={informeId}
+              trimestre={trimestre}
+              actual={srcDeImagen(slide, imagen.im.grupo, imagen.im.ruta)}
+              categoria={categoriaDe(imagen.im.grupo, slide.id)}
+              para={imagen.im.grupo.tipo === "SlideBloqueado" && esPaginaDeFinanzas(slide.id) ? slide.id : null}
+              onSubida={alSubirFoto}
+              onCerrar={() => setFotosAbiertas(false)}
+              onElegir={(src) => {
+                setFotosAbiertas(false);
+                aplicar(cambiarFoto(slide, imagen.im.grupo, imagen.im.ruta, src), `${titulo}: imagen cambiada`);
+              }}
+            />
           ) : null}
 
           {!arbol || geo.desajustes ? (
             <p className="pointer-events-none absolute right-2 top-2 max-w-[60%] rounded-md border border-subtle bg-card px-2 py-1 text-xs text-text-muted shadow-sm">
               {!arbol
-                ? "Esta slide tiene una plantilla fija: se cambian sus textos y sus fotos, pero los bloques no se mueven."
+                ? "Esta slide tiene una plantilla fija: se cambian sus textos y sus imágenes, pero los bloques no se mueven."
                 : "Parte de esta slide no se puede reordenar a mano: pide ese cambio con «Corregir»."}
             </p>
           ) : null}

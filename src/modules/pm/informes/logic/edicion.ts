@@ -371,14 +371,19 @@ export const DISPOSICIONES_GALERIA: { valor: string; nombre: string; huecos: num
 ];
 
 export interface GrupoImagenes {
-  /** Nodo que pinta las imágenes (o [] si es el propio slide, en TextoImagen). */
+  /** Nodo que pinta las imágenes (o [] si es el propio slide: TextoImagen, Portada, SlideBloqueado). */
   nodo: Ruta;
-  tipo: "Galeria" | "ImagenMarco" | "TextoImagen";
+  tipo: "Galeria" | "ImagenMarco" | "TextoImagen" | "Portada" | "MapaLateral" | "SlideBloqueado";
   /** Sitio de cada imagen en el JSON, por orden de aparición. */
   imagenes: Ruta[];
+  /**
+   * true: cada imagen es un objeto {src, pie, focalX…} y admite encuadre.
+   * false: la plantilla solo guarda la dirección de la imagen (portada, mapa, página de Finanzas).
+   */
+  objetos: boolean;
 }
 
-/** Imágenes de un slide que la PM puede cambiar, reencuadrar o reordenar. */
+/** Imágenes de un slide que la PM puede cambiar y, donde la plantilla lo admite, reencuadrar o reordenar. */
 export function gruposDeImagenes(slide: SlideJson): GrupoImagenes[] {
   const out: GrupoImagenes[] = [];
   if (slide.c === "TextoImagen") {
@@ -386,18 +391,31 @@ export function gruposDeImagenes(slide: SlideJson): GrupoImagenes[] {
     const props = esObjeto(slide.props) ? slide.props : {};
     const tope = props.variante === "dos-apiladas" ? 2 : 1;
     const n = Array.isArray(props.imagenes) ? Math.min(props.imagenes.length, tope) : 1;
-    out.push({ nodo: [], tipo: "TextoImagen", imagenes: Array.from({ length: n }, (_, i) => ["props", "imagenes", i]) });
+    out.push({ nodo: [], tipo: "TextoImagen", objetos: true, imagenes: Array.from({ length: n }, (_, i) => ["props", "imagenes", i]) });
   }
+  if (slide.c === "Portada") out.push({ nodo: [], tipo: "Portada", objetos: false, imagenes: [["props", "imagen"]] });
+  // Una slide bloqueada con contenido propio (hijos) no lleva página aportada.
+  if (slide.c === "SlideBloqueado" && !slide.hijos?.length) out.push({ nodo: [], tipo: "SlideBloqueado", objetos: false, imagenes: [["props", "vista"]] });
   recorrer(slide, (v, r) => {
     if (!esObjeto(v) || !r.length) return;
-    if (v.c === "ImagenMarco") out.push({ nodo: r, tipo: "ImagenMarco", imagenes: [[...r, "props"]] });
+    if (v.c === "ImagenMarco") out.push({ nodo: r, tipo: "ImagenMarco", objetos: true, imagenes: [[...r, "props"]] });
+    if (v.c === "MapaLateral") {
+      out.push({ nodo: r, tipo: "MapaLateral", objetos: false, imagenes: [[...r, "props", "mapa"], [...r, "props", "foto"]] });
+    }
     if (v.c === "Galeria") {
       const props = esObjeto(v.props) ? v.props : {};
       const d = DISPOSICIONES_GALERIA.find((x) => x.valor === props.disposicion) ?? DISPOSICIONES_GALERIA[3]!;
-      out.push({ nodo: r, tipo: "Galeria", imagenes: Array.from({ length: d.huecos }, (_, i) => [...r, "props", "imagenes", i]) });
+      out.push({ nodo: r, tipo: "Galeria", objetos: true, imagenes: Array.from({ length: d.huecos }, (_, i) => [...r, "props", "imagenes", i]) });
     }
   });
   return out;
+}
+
+/** Dirección de la imagen que hay en un hueco; null si está vacío. */
+export function srcDeImagen(slide: SlideJson, grupo: GrupoImagenes, imagen: Ruta): string | null {
+  const v = leerRuta(slide, imagen);
+  const src = grupo.objetos ? (esObjeto(v) ? v.src : null) : v;
+  return typeof src === "string" && src ? src : null;
 }
 
 /** Objeto de una imagen, creando lo que falte por el camino (props, la lista, los huecos anteriores). */
@@ -412,13 +430,25 @@ function imagenEn(s: SlideJson, ruta: Ruta): Objeto {
   return v as Objeto;
 }
 
-/** Cambia la foto de un hueco por otra del informe; el encuadre vuelve al centro. */
-export function cambiarFoto(slide: SlideJson, imagen: Ruta, src: string): SlideJson {
+/**
+ * Cambia la imagen de un hueco. En galerías e imágenes sueltas el encuadre
+ * vuelve al centro; en una página de Finanzas la slide pasa a «Aportado».
+ */
+export function cambiarFoto(slide: SlideJson, grupo: GrupoImagenes, imagen: Ruta, src: string): SlideJson {
   const s = clon(slide);
-  const im = imagenEn(s, imagen);
-  im.src = src;
-  delete im.focalX;
-  delete im.focalY;
+  if (grupo.objetos) {
+    const im = imagenEn(s, imagen);
+    im.src = src;
+    delete im.focalX;
+    delete im.focalY;
+    return s;
+  }
+  imagenEn(s, imagen.slice(0, -1))[String(imagen[imagen.length - 1])] = src;
+  if (grupo.tipo === "SlideBloqueado") {
+    const props = s.props as Objeto;
+    if (props.estado === "Pendiente de Finanzas") props.estado = "Aportado";
+    if (!s.fuentes) s.fuentes = "Página aportada a mano";
+  }
   return s;
 }
 

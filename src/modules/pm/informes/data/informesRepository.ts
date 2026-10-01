@@ -21,6 +21,7 @@ import type {
   VersionGuardada,
 } from "../types";
 import { getInformesSupabase, INFORMES_FOTOS_BUCKET } from "./client";
+import { fotosABorrarConInforme } from "./fotosRepository";
 
 type R<T> = { data: T; error: null } | { data: null; error: string };
 
@@ -238,21 +239,33 @@ export async function actualizarInforme(ctx: UserContext, id: string, cambios: C
   return { data: { actualizado: data.updated_at as string }, error: null };
 }
 
-/** Borra el informe con sus fuentes, fotos (y sus ficheros), versiones y cambios. */
+/**
+ * Borra el informe con sus fuentes, versiones y cambios. De sus fotos se van
+ * las que ningún otro informe del proyecto usa (con sus ficheros); las demás
+ * se quedan en la biblioteca del proyecto, ya sin informe (migración 045).
+ */
 export async function borrarInforme(ctx: UserContext, id: string): Promise<R<null>> {
   const sb = getInformesSupabase(ctx);
-  const { data: fotos, error: e1 } = await sb.from("informe_foto").select("storage_path").eq("informe_id", id);
-  if (e1) return { data: null, error: mensajeErrorBd(e1) };
+  const { data: informe, error: e0 } = await sb.from("informe").select("codigo").eq("id", id).maybeSingle();
+  if (e0) return { data: null, error: mensajeErrorBd(e0) };
+  if (!informe) return { data: null, error: null };
+  const fotos = await fotosABorrarConInforme(ctx, informe.codigo as string, id);
+  if (fotos.error !== null) return { data: null, error: fotos.error };
   const { error } = await withAudit(
     ctx,
     "pm.informe.delete",
-    { resourceType: "informe", resourceId: id, payload: { fotos: fotos?.length ?? 0 } },
-    async () => sb.from("informe").delete().eq("id", id),
+    { resourceType: "informe", resourceId: id, payload: { fotos: fotos.data.length } },
+    async () => {
+      if (fotos.data.length) {
+        const del = await sb.from("informe_foto").delete().in("id", fotos.data.map((f) => f.id));
+        if (del.error) return del;
+      }
+      return sb.from("informe").delete().eq("id", id);
+    },
   );
   if (error) return { data: null, error: mensajeErrorBd(error) };
-  const rutas = (fotos ?? []).map((f) => f.storage_path as string);
-  if (rutas.length) {
-    const { error: e2 } = await sb.storage.from(INFORMES_FOTOS_BUCKET).remove(rutas);
+  if (fotos.data.length) {
+    const { error: e2 } = await sb.storage.from(INFORMES_FOTOS_BUCKET).remove(fotos.data.map((f) => f.ruta));
     if (e2) console.error("[informes] borrar fotos", e2.message);
   }
   return { data: null, error: null };

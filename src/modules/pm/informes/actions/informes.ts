@@ -11,7 +11,7 @@ import {
   listarFuentes,
   reemplazarAutomaticas,
 } from "../data/fuentesRepository";
-import { actualizarFoto, borrarFoto, listarFotos } from "../data/fotosRepository";
+import { actualizarFoto, borrarFoto, listarBiblioteca, listarFotos } from "../data/fotosRepository";
 import {
   actualizarInforme,
   anotarCambio,
@@ -34,6 +34,7 @@ import {
   type CategoriaFoto,
   type Cambio,
   type Foto,
+  type FotoBiblioteca,
   type Fuente,
   type PrevioEstructurado,
   type Resultado,
@@ -308,6 +309,23 @@ export async function accionListarFotos(id: string): Promise<Resultado<Foto[]>> 
   if ("error" in acceso) return mal(acceso.error);
   const r = await listarFotos(acceso.user, id);
   return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
+}
+
+/** Biblioteca de imágenes del proyecto al que pertenece el informe. */
+export async function accionBibliotecaFotos(id: string): Promise<Resultado<FotoBiblioteca[]>> {
+  try {
+    if (!esIdInforme(id)) return mal("Informe no válido.");
+    const acceso = await usuarioLectura();
+    if ("error" in acceso) return mal(acceso.error);
+    const inf = await obtenerInforme(acceso.user, id);
+    if (inf.error !== null) return mal(inf.error);
+    if (!inf.data) return mal("El informe ya no existe.");
+    const r = await listarBiblioteca(acceso.user, inf.data.codigo);
+    return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
+  } catch (err) {
+    console.error("[informes] biblioteca de fotos", err);
+    return mal(err instanceof Error ? err.message : "No se ha podido leer la biblioteca de imágenes");
+  }
 }
 
 export async function accionActualizarFoto(

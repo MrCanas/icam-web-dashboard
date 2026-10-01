@@ -140,6 +140,14 @@ export interface Foto {
   alto: number | null;
 }
 
+/** Foto de la biblioteca del proyecto: cualquiera subida en alguno de sus informes. */
+export interface FotoBiblioteca extends Foto {
+  /** Informe en el que se subió; null si ese informe ya no existe. */
+  informeId: string | null;
+  trimestre: string | null;
+  creada: string;
+}
+
 export interface Cambio {
   id: number;
   texto: string;
