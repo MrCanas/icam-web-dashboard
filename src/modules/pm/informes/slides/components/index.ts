@@ -14,7 +14,7 @@ import {
 } from "./finanzas";
 import { AntecedentesNovedades, BloqueIcono, DosColumnas, MapaLateral, ResumenEjecutivo, TextoImagen } from "./narrativa";
 import { BarraConsolidacion, BarrasBreeam, BreeamRating } from "./sostenibilidad";
-import { Colaboradores, ConsejoAdministracion, VehiculoInversion } from "./vehiculo";
+import { Colaboradores, ConsejoAdministracion, FichasVehiculo, LogosColaboradores, VehiculoInversion } from "./vehiculo";
 
 /**
  * Componentes que el JSON del informe puede nombrar en «c». Es la lista que se
@@ -53,7 +53,9 @@ export const COMPONENTES = {
   BarrasBreeam,
   BarraConsolidacion,
   Colaboradores,
+  LogosColaboradores,
   VehiculoInversion,
+  FichasVehiculo,
   ConsejoAdministracion,
   SlideBloqueado,
   KpiIconosFinancieros,

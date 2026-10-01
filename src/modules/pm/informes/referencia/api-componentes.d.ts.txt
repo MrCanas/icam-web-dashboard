@@ -39,6 +39,8 @@ export declare function BarrasBreeam(p: { titulo?: string; categorias: { nombre:
 export declare function BarraConsolidacion(p: { segmentos: { etiqueta: string; valor: number; tono?: 0 | 1 | 2 | 3 }[] }): any;
 export declare function Colaboradores(p: SlideBase & { intro?: Rich; roles: { rol: string; parrafos?: Rich[]; vinetas?: Rich[] }[]; logos?: { src?: string; nombre?: string; pie?: string }[]; seccion?: number }): any;
 export declare function VehiculoInversion(p: SlideBase & { titulo?: string; detalles: Rich[]; fichas: { icono: string; etiqueta: string; valor: string }[]; nota?: Rich; seccion?: number }): any;
+export declare function LogosColaboradores(p: { logos?: { src?: string; nombre?: string; pie?: string }[] }): any;
+export declare function FichasVehiculo(p: { fichas: { icono: string; etiqueta: string; valor: string }[] }): any;
 export declare function ConsejoAdministracion(p: { titulo: string; intro?: string; puntos: Rich[] }): any;
 export declare function SlideBloqueado(p: SlideBase & { seccion?: number; titulo?: string; origen?: string; version?: number | string; estado?: string; vista?: string; children?: any }): any;
 export declare function KpiIconosFinancieros(p: { kpis: { icono: string; etiqueta: string; valor: string }[]; columnas?: number }): any;

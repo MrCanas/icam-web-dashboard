@@ -282,8 +282,46 @@ const textoImagen: SlideJson = {
   },
 };
 
+const colaboradores: SlideJson = {
+  id: "colaboradores",
+  c: "Colaboradores",
+  origen: "heredada",
+  props: {
+    intro: "Equipo que interviene en el **proyecto**.",
+    roles: [
+      { rol: "Arquitectura", parrafos: ["Estudio A, responsable del proyecto."] },
+      { rol: "Constructora", vinetas: ["Contrato llave en mano", "Fin de obra en agosto"] },
+      { rol: "Operador", parrafos: ["Operador B."], vinetas: ["Contrato firmado"] },
+    ],
+    logos: [{ src: "/api/informes/fotos/l1", nombre: "Estudio A", pie: "Arquitectura" }, { nombre: "Operador B" }],
+  },
+};
+
+const vehiculo: SlideJson = {
+  id: "vehiculo",
+  c: "VehiculoInversion",
+  props: {
+    detalles: ["Fondo de capital riesgo **cerrado**", "Plazo de 5 años"],
+    fichas: [
+      { icono: "kpi-tir", etiqueta: "TIR objetivo", valor: "12 %" },
+      { icono: "kpi-plazo", etiqueta: "Plazo", valor: "5 años" },
+    ],
+    nota: "**Nota:** datos del folleto.",
+  },
+};
+
 test("desplegar: una plantilla cerrada pasa a compuesto y se pinta exactamente igual", () => {
-  for (const slide of [resumen, kpis, textoImagen, { ...textoImagen, props: { titulo: "Sin imágenes", parrafos: ["p"] } } as SlideJson]) {
+  const variantes = [
+    resumen,
+    kpis,
+    textoImagen,
+    { ...textoImagen, props: { titulo: "Sin imágenes", parrafos: ["p"] } } as SlideJson,
+    colaboradores,
+    { id: "colaboradores-2", c: "Colaboradores", props: { roles: [{ rol: "Único" }] } } as SlideJson,
+    vehiculo,
+    { id: "vehiculo-2", c: "VehiculoInversion", props: { titulo: "Vehículo. Otro título", detalles: ["a"], fichas: [] } } as SlideJson,
+  ];
+  for (const slide of variantes) {
     assert.ok(esDesplegable(slide), slide.c);
     const abierta = desplegar(slide);
     assert.equal(abierta.c, undefined);
@@ -294,7 +332,12 @@ test("desplegar: una plantilla cerrada pasa a compuesto y se pinta exactamente i
   }
   // El original no cambia y lo que ya es compuesto o no se puede abrir se deja como está.
   assert.equal(resumen.c, "ResumenEjecutivo");
-  assert.equal(esDesplegable({ id: "colaboradores", c: "Colaboradores", props: {} }), false);
+  assert.equal(esDesplegable({ id: "portada", c: "Portada", props: {} }), false);
+  // Colaboradores: cada rol es un grupo que se mueve entero; los logos quedan fuera del área de bloques.
+  const col = arbolBloques(desplegar(colaboradores))!;
+  const rejilla = col.contenedor!.hijos[1]!;
+  assert.equal(rejilla.contenedor?.orientacion, "columnas");
+  assert.deepEqual(rejilla.contenedor?.hijos.map((c) => c.contenedor?.hijos.length), [2, 1]);
   assert.deepEqual(desplegar(obra), obra);
 });
 

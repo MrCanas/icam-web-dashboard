@@ -50,6 +50,12 @@ export interface Compuesto {
   estilo?: Record<string, unknown>;
   contenido?: NodoJson[];
   nota?: Rich;
+  /**
+   * Nodos que van fuera del área de contenido, colocados por su propio CSS (los
+   * logos de colaboradores). Lo usa el editor al abrir una plantilla cerrada
+   * para reorganizarla: se pinta igual que la plantilla original.
+   */
+  fuera?: NodoJson[];
 }
 
 export interface SlideJson {

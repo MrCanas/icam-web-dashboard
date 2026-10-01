@@ -37,22 +37,33 @@ export function Colaboradores(props: ColaboradoresProps) {
           <div>{col(roles.slice(mitad))}</div>
         </div>
       </Contenido>
-      <div className="iq-colab-logos">
-        {(props.logos || []).map((l, i) => (
-          <figure key={i} className="iq-colab-logo">
-            {l.src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={l.src} alt={l.nombre || ""} />
-            ) : (
-              <div className="iq-ph iq-ph-logo">
-                <span>{l.nombre || "Logo"}</span>
-              </div>
-            )}
-            {l.pie ? <figcaption>{l.pie}</figcaption> : null}
-          </figure>
-        ))}
-      </div>
+      <LogosColaboradores logos={props.logos} />
     </Slide>
+  );
+}
+
+export interface LogosColaboradoresProps {
+  logos?: { src?: string; nombre?: string; pie?: string }[];
+}
+
+/** Franja de logos de la slide de colaboradores (va fuera del área de contenido, al pie). */
+export function LogosColaboradores(props: LogosColaboradoresProps) {
+  return (
+    <div className="iq-colab-logos">
+      {(props.logos || []).map((l, i) => (
+        <figure key={i} className="iq-colab-logo">
+          {l.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={l.src} alt={l.nombre || ""} />
+          ) : (
+            <div className="iq-ph iq-ph-logo">
+              <span>{l.nombre || "Logo"}</span>
+            </div>
+          )}
+          {l.pie ? <figcaption>{l.pie}</figcaption> : null}
+        </figure>
+      ))}
+    </div>
   );
 }
 
@@ -71,19 +82,30 @@ export function VehiculoInversion(props: VehiculoInversionProps) {
       <Contenido>
         <Subtitulo>DETALLES DEL VEHÍCULO DE INVERSIÓN</Subtitulo>
         <Vinetas items={props.detalles} />
-        <div className="iq-fichas">
-          {(props.fichas || []).map((f, i) => (
-            <div key={i} className="iq-ficha">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={icono(f.icono)} alt="" />
-              <div className="iq-ficha-label">{f.etiqueta}</div>
-              <div className="iq-ficha-valor">{f.valor}</div>
-            </div>
-          ))}
-        </div>
+        <FichasVehiculo fichas={props.fichas} />
         {props.nota ? <div className="iq-nota-inline">{rt(props.nota)}</div> : null}
       </Contenido>
     </Slide>
+  );
+}
+
+export interface FichasVehiculoProps {
+  fichas: { icono: string; etiqueta: string; valor: string }[];
+}
+
+/** Fila de fichas con icono de la slide del vehículo de inversión. */
+export function FichasVehiculo(props: FichasVehiculoProps) {
+  return (
+    <div className="iq-fichas">
+      {(props.fichas || []).map((f, i) => (
+        <div key={i} className="iq-ficha">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={icono(f.icono)} alt="" />
+          <div className="iq-ficha-label">{f.etiqueta}</div>
+          <div className="iq-ficha-valor">{f.valor}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 

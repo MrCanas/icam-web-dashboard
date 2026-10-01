@@ -279,6 +279,44 @@ const DESPLIEGUES: Record<string, (p: Objeto) => NonNullable<SlideJson["compuest
       ],
     } as NonNullable<SlideJson["compuesto"]>;
   },
+  Colaboradores: (p) => {
+    const roles = (Array.isArray(p.roles) ? p.roles : []).filter(esObjeto);
+    const mitad = Math.ceil(roles.length / 2);
+    const columna = (rs: Objeto[]) => ({
+      c: "div",
+      hijos: rs.map((r) => {
+        const hijos: unknown[] = [{ c: "Subtitulo", hijos: [r.rol] }];
+        if (r.parrafos) hijos.push({ c: "Texto", props: { parrafos: r.parrafos } });
+        if (r.vinetas) hijos.push({ c: "Vinetas", props: { items: r.vinetas, compacta: true } });
+        return { c: "div", props: { className: "iq-colab-rol" }, hijos };
+      }),
+    });
+    const contenido: unknown[] = [];
+    if (p.intro) contenido.push({ c: "Texto", props: { parrafos: [p.intro] } });
+    contenido.push({ c: "div", props: { className: "iq-cols" }, hijos: [columna(roles.slice(0, mitad)), columna(roles.slice(mitad))] });
+    return {
+      layout: "colaboradores",
+      seccion: (p.seccion as number | undefined) || 5,
+      titulo: "Colaboradores",
+      contenido,
+      // Los logos van al pie de la slide, fuera del área de contenido.
+      fuera: [{ c: "LogosColaboradores", props: { logos: p.logos } }],
+    } as NonNullable<SlideJson["compuesto"]>;
+  },
+  VehiculoInversion: (p) => {
+    const contenido: unknown[] = [
+      { c: "Subtitulo", hijos: ["DETALLES DEL VEHÍCULO DE INVERSIÓN"] },
+      { c: "Vinetas", props: { items: p.detalles } },
+      { c: "FichasVehiculo", props: { fichas: p.fichas } },
+    ];
+    if (typeof p.nota === "string" && p.nota) contenido.push({ c: "div", props: { className: "iq-nota-inline" }, hijos: nodosDeTexto(p.nota) });
+    return {
+      layout: "vehiculo",
+      seccion: (p.seccion as number | undefined) || 6,
+      titulo: String(p.titulo || "Vehículo de inversión. Detalles"),
+      contenido,
+    } as NonNullable<SlideJson["compuesto"]>;
+  },
 };
 
 /** ¿Es una plantilla cerrada que `desplegar` puede abrir? */

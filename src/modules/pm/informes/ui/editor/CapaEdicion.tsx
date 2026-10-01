@@ -82,7 +82,10 @@ interface Props {
 interface Geometria {
   ancho: number;
   alto: number;
+  /** Bloques que se ven con contorno y se eligen pulsando: las hojas del árbol. */
   unidades: { b: BloquePintado; caja: Caja }[];
+  /** Todos los bloques, también los grupos: se llega a ellos desde uno de sus bloques. */
+  bloques: { b: BloquePintado; caja: Caja }[];
   imagenes: { im: ImagenPintada; caja: Caja }[];
   contenedores: { nodo: NodoArbol; caja: Caja; hijos: Caja[] }[];
   desajustes: number;
@@ -102,8 +105,10 @@ interface Destino {
 type Seleccion = { tipo: "bloque" | "imagen"; ruta: Ruta };
 
 interface Pulso extends Seleccion {
-  /** Imagen pulsada cuando lo que se arrastra es su bloque (una imagen suelta). */
-  imagen?: Ruta;
+  /** Bloque que se mueve si se arrastra: el pulsado o el que contiene a la imagen pulsada. */
+  bloque: Ruta | null;
+  /** Imagen pulsada: en una galería, al soltarla sobre otra foto se intercambian. */
+  imagen: Ruta | null;
   x0: number;
   y0: number;
   x: number;
@@ -288,7 +293,7 @@ export function CapaEdicion({
     // El observador avisa al empezar a observar y en cada cambio de tamaño: ahí se mide.
     const medir = () => {
       if (modo !== "disposicion") {
-        setGeo({ ancho: c.clientWidth, alto: c.clientHeight, unidades: [], imagenes: [], contenedores: [], desajustes: 0 });
+        setGeo({ ancho: c.clientWidth, alto: c.clientHeight, unidades: [], bloques: [], imagenes: [], contenedores: [], desajustes: 0 });
         return;
       }
       const mapa = mapaSlide(lienzo, trabajo, arbol);
@@ -296,6 +301,7 @@ export function CapaEdicion({
         ancho: c.clientWidth,
         alto: c.clientHeight,
         unidades: seleccionables(mapa, arbol).map((b) => ({ b, caja: cajaDe(b.el, c) })),
+        bloques: mapa.bloques.map((b) => ({ b, caja: cajaDe(b.el, c) })),
         imagenes: mapa.imagenes.map((im) => ({ im, caja: cajaDe(im.el, c) })),
         contenedores: mapa.contenedores.map((x) => ({
           nodo: x.nodo,
@@ -311,23 +317,30 @@ export function CapaEdicion({
   }, [lienzo, trabajo, arbol, modo]);
 
   const imagen = sel?.tipo === "imagen" ? (geo?.imagenes.find((x) => mismaRuta(x.im.ruta, sel.ruta)) ?? null) : null;
-  /** Bloque de una imagen suelta (ImagenMarco): se mueve, se redimensiona y se quita como bloque. */
-  const bloqueDe = (im: ImagenPintada) =>
-    im.grupo.tipo === "ImagenMarco" ? (geo?.unidades.find((u) => empiezaPor(im.grupo.nodo, u.b.nodo.ruta)) ?? null) : null;
-  const unidad =
-    sel?.tipo === "bloque" ? (geo?.unidades.find((u) => mismaRuta(u.b.nodo.ruta, sel.ruta)) ?? null) : imagen ? bloqueDe(imagen.im) : null;
-  const origenArrastre = pulso?.arrastrando && pulso.tipo === "bloque" ? (geo?.unidades.find((u) => mismaRuta(u.b.nodo.ruta, pulso.ruta)) ?? null) : null;
+  /** Bloque que contiene una imagen (la imagen suelta, su galería, el mapa): es lo que se mueve con ella. */
+  const bloqueDe = (im: ImagenPintada) => (im.grupo.nodo.length ? (geo?.unidades.find((u) => empiezaPor(im.grupo.nodo, u.b.nodo.ruta)) ?? null) : null);
+  const unidad = sel?.tipo === "bloque" ? (geo?.bloques.find((u) => mismaRuta(u.b.nodo.ruta, sel.ruta)) ?? null) : imagen ? bloqueDe(imagen.im) : null;
+  /** Grupo que contiene a la unidad seleccionada, si es a su vez un bloque que se puede mover. */
+  const grupo = unidad ? (geo?.bloques.find((u) => u.b.nodo === unidad.b.padre) ?? null) : null;
+  const origenArrastre = pulso?.arrastrando && pulso.bloque ? (geo?.bloques.find((u) => mismaRuta(u.b.nodo.ruta, pulso.bloque!)) ?? null) : null;
   const destinos = useMemo(() => (geo && origenArrastre ? destinosDe(geo, origenArrastre.b) : []), [geo, origenArrastre]);
+  // Una foto de galería soltada sobre otra de la misma galería: se intercambian. En cualquier otro sitio, se mueve su bloque.
+  const imagenDestino =
+    pulso?.arrastrando && pulso.imagen && geo
+      ? (() => {
+          const origen = geo.imagenes.find((x) => mismaRuta(x.im.ruta, pulso.imagen!));
+          if (origen?.im.grupo.tipo !== "Galeria") return null;
+          return (
+            geo.imagenes.find((x) => x !== origen && mismaRuta(x.im.grupo.nodo, origen.im.grupo.nodo) && dentro(x.caja, pulso.x, pulso.y)) ?? null
+          );
+        })()
+      : null;
   const destino =
-    pulso?.arrastrando && destinos.length
+    pulso?.arrastrando && !imagenDestino && destinos.length
       ? destinos.reduce<{ d: Destino; dist: number } | null>((mejor, d) => {
           const dist = distancia(d.zona ?? d.linea, pulso.x, pulso.y);
           return dist < 90 && (!mejor || dist < mejor.dist) ? { d, dist } : mejor;
         }, null)?.d ?? null
-      : null;
-  const imagenDestino =
-    pulso?.arrastrando && pulso.tipo === "imagen" && geo
-      ? (geo.imagenes.find((x) => !mismaRuta(x.im.ruta, pulso.ruta) && dentro(x.caja, pulso.x, pulso.y)) ?? null)
       : null;
 
   function punto(e: React.PointerEvent): [number, number] {
@@ -352,10 +365,8 @@ export function CapaEdicion({
     e.preventDefault();
     capa.current!.setPointerCapture(e.pointerId);
     setSel(nuevo);
-    // Una imagen suelta se arrastra como bloque; las de una galería se intercambian entre sí.
-    const suelta = im ? bloqueDe(im.im) : null;
-    const arrastre: Seleccion = suelta ? { tipo: "bloque", ruta: suelta.b.nodo.ruta } : nuevo;
-    setPulso({ ...arrastre, imagen: im?.im.ruta, x0: x, y0: y, x, y, arrastrando: false });
+    const bloque = im ? (bloqueDe(im.im)?.b.nodo.ruta ?? null) : (u?.b.nodo.ruta ?? null);
+    setPulso({ ...nuevo, bloque, imagen: im?.im.ruta ?? null, x0: x, y0: y, x, y, arrastrando: false });
   }
 
   function alMover(e: React.PointerEvent) {
@@ -369,14 +380,11 @@ export function CapaEdicion({
     setPulso(null);
     if (!p || !geo) return;
     if (p.arrastrando) {
-      if (p.tipo === "bloque" && destino) soltar(p.ruta, destino);
-      if (p.tipo === "imagen" && imagenDestino) {
-        const origen = geo.imagenes.find((x) => mismaRuta(x.im.ruta, p.ruta));
-        if (origen && origen.im.grupo.tipo === "Galeria" && mismaRuta(origen.im.grupo.nodo, imagenDestino.im.grupo.nodo)) {
-          setSel({ tipo: "imagen", ruta: imagenDestino.im.ruta });
-          aplicar(intercambiarFotos(trabajo, p.ruta, imagenDestino.im.ruta), `${titulo}: fotos reordenadas`);
-        } else avisar("Las fotos solo se intercambian dentro de la misma galería. Para poner esa imagen en otro hueco, usa «Cambiar imagen».");
-      }
+      if (p.imagen && imagenDestino) {
+        setSel({ tipo: "imagen", ruta: imagenDestino.im.ruta });
+        aplicar(intercambiarFotos(trabajo, p.imagen, imagenDestino.im.ruta), `${titulo}: fotos reordenadas`);
+      } else if (p.bloque && destino) soltar(p.bloque, destino);
+      else if (p.imagen && !p.bloque) avisar("La plantilla fija el sitio de esa imagen: se puede cambiar por otra, pero no moverla.");
       return;
     }
     if (p.imagen && reencuadrando) {
@@ -607,6 +615,12 @@ export function CapaEdicion({
               />
             );
           })}
+          {unidad && !geo.unidades.some((u) => u.b === unidad.b) ? (
+            <div
+              className={`absolute rounded-sm outline outline-2 outline-icam-900 ${pulso?.arrastrando ? "bg-icam-900/10" : ""}`}
+              style={{ left: unidad.caja.x - 4, top: unidad.caja.y - 4, width: unidad.caja.w + 8, height: unidad.caja.h + 8 }}
+            />
+          ) : null}
           {geo.imagenes.map(({ im, caja }) => {
             const elegida = imagen?.im === im;
             const vacia = !srcDeImagen(trabajo, im.grupo, im.ruta);
@@ -642,13 +656,7 @@ export function CapaEdicion({
               className="pointer-events-none absolute z-30 whitespace-nowrap rounded bg-icam-900 px-2 py-0.5 text-xs font-medium text-white shadow"
               style={{ left: pulso.x + 14, top: pulso.y + 14 }}
             >
-              {pulso.tipo === "imagen"
-                ? imagenDestino
-                  ? "Intercambiar con esta foto"
-                  : "Suelta sobre otra foto de la galería"
-                : destino
-                  ? "Soltar aquí"
-                  : "Lleva el bloque a un hueco"}
+              {imagenDestino ? "Intercambiar con esta foto" : destino ? "Soltar aquí" : pulso.bloque ? "Lleva el bloque a un hueco" : "Esta imagen no se mueve"}
             </div>
           ) : null}
 
@@ -656,6 +664,17 @@ export function CapaEdicion({
             <div className={barra} style={sobre(unidad.caja, 330)} onPointerDown={(e) => e.stopPropagation()}>
               <span className="px-1 font-medium text-text-muted">{NOMBRE_BLOQUE[unidad.b.nodo.c ?? ""] ?? unidad.b.nodo.c}</span>
               {flechas}
+              {grupo ? (
+                <button
+                  type="button"
+                  className={boton}
+                  title="Selecciona el grupo que contiene a este bloque, para moverlo entero"
+                  disabled={trabajando}
+                  onClick={() => setSel({ tipo: "bloque", ruta: grupo.b.nodo.ruta })}
+                >
+                  Seleccionar grupo
+                </button>
+              ) : null}
               {rejilla ? (
                 <>
                   <button

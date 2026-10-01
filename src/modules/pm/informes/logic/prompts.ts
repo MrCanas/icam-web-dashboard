@@ -1,6 +1,7 @@
 import type { SlideJson } from "../slides/tipos";
 import type { Analisis, Foto, Fuente, PrevioEstructurado } from "../types";
 import { entradaDeId, type EntradaBiblioteca } from "./biblioteca";
+import { fuentesParaSlide } from "./dirigidas";
 import { textos, tituloDe } from "./informe";
 import { urlFoto } from "./paths";
 import { qCierre } from "./trimestre";
@@ -53,6 +54,8 @@ export interface MaterialInforme {
   biblioteca: EntradaBiblioteca[];
   /** Fuentes incluidas, en su orden (sin el texto del informe anterior). */
   fuentes: Fuente[];
+  /** Fuentes dirigidas a slides concretas (fuente → slides): solo las ven las peticiones de esas slides. */
+  dirigidas?: Record<string, string[]>;
   /** Texto extraído del informe anterior (PDF/PPTX), si no hay estructurado. */
   previoTexto: string | null;
   previo: PrevioEstructurado | null;
@@ -64,6 +67,7 @@ export interface MaterialInforme {
 export const MAX_BYTES_FUENTES = 60_000;
 const MAX_BYTES_ESQUEMA_PREVIO = 22_000;
 const MAX_BYTES_NO_REPORTAR = 6_000;
+const MAX_BYTES_DIRIGIDA = 45_000;
 const MAX_BYTES_PREVIO_NUEVA = 14_000;
 
 const codificador = new TextEncoder();
@@ -126,6 +130,32 @@ export function bloqueNoReportar(fuentes: Fuente[]): string | null {
     'No pongas "[pendiente: …]" en su lugar ni digas que se ha omitido algo: redacta con el resto de la información.'
   );
 }
+
+/** Fuentes generales del trimestre: todas menos las dirigidas a slides concretas. */
+export function fuentesGenerales(m: Pick<MaterialInforme, "fuentes" | "dirigidas">): Fuente[] {
+  const d = m.dirigidas ?? {};
+  return m.fuentes.filter((f) => !d[String(f.id)]?.length);
+}
+
+/** Información que el equipo ha dirigido a un slide; null si no hay ninguna. */
+export function bloqueDirigido(m: Pick<MaterialInforme, "fuentes" | "dirigidas">, slideId: string): string | null {
+  const d = m.dirigidas ?? {};
+  const suyas = fuentesParaSlide(d, m.fuentes, slideId);
+  if (!suyas.length) return null;
+  const docs = suyas
+    .map((f) => {
+      const otros = (d[String(f.id)] ?? []).filter((s) => s !== slideId);
+      return `### DOCUMENTO: ${f.nombre}${otros.length ? ` (va también a los slides: ${otros.join(", ")})` : ""}\n${f.texto}`;
+    })
+    .join("\n\n");
+  return "== INFORMACIÓN DIRIGIDA A ESTE SLIDE ==\nEl equipo la ha aportado expresamente para este slide.\n" + recortar(docs, MAX_BYTES_DIRIGIDA);
+}
+
+const REGLAS_DIRIGIDA =
+  "- Las cifras del documento son exactas: cópialas tal cual, con sus unidades, signos y decimales. No calcules, no redondees, no estimes ni completes ninguna; lo que no esté en el documento no se pone. " +
+  "Para este slide no aplica la regla de no redactar cifras financieras: vienen del documento.\n" +
+  "- Tu criterio se limita a la disposición y, si hace falta, a un texto breve que acompañe a los datos.\n" +
+  "- Si el documento va también a otros slides, toma para este solo lo que corresponde a su tema, sin repetir lo de los demás.";
 
 export function fotosTexto(fotos: Foto[]): string {
   const f = fotos.filter((x) => x.categoria !== "Página de Finanzas");
@@ -197,7 +227,7 @@ function baseSlide(m: MaterialInforme): BloquePrompt[] {
       texto: [
         "== HECHOS DEL TRIMESTRE ==\n" + hechosTexto(m.analisis, d.trimestreAnterior),
         "== FOTOS DISPONIBLES ==\n" + fotosTexto(m.fotos),
-        "== FUENTES DEL TRIMESTRE ==\n" + recortar(fuentesTexto(m.fuentes), MAX_BYTES_FUENTES),
+        "== FUENTES DEL TRIMESTRE ==\n" + recortar(fuentesTexto(fuentesGenerales(m)), MAX_BYTES_FUENTES),
       ].join("\n\n"),
     },
   ];
@@ -229,6 +259,22 @@ export function promptActualizar(m: MaterialInforme, prev: SlideJson): BloquePro
       "SLIDE ANTERIOR:\n" +
       JSON.stringify(prev),
   );
+}
+
+/**
+ * Monta por completo un slide con la información que el equipo ha dirigido a
+ * él (un informe financiero para las slides de finanzas). Claude elige layout
+ * y componentes; las cifras se copian del documento, sin calcular nada.
+ */
+export function promptDirigida(m: MaterialInforme, slide: SlideJson, informacion: string): BloquePrompt[] {
+  const t =
+    `Rehaz por completo el slide "${slide.id}" («${tituloDe(slide)}») con la INFORMACIÓN DIRIGIDA A ESTE SLIDE. ` +
+    'Monta el slide entero: elige en el catálogo el layout y los componentes que mejor presenten esa información (tablas, KPIs, gráficos o texto) y devuélvelo completo, con su mismo "id".\n' +
+    REGLAS_DIRIGIDA +
+    "\n- Si el slide actual es una página bloqueada (SlideBloqueado) o un hueco pendiente, sustitúyelo por un slide real hecho con los componentes del API." +
+    "\n- Conserva del slide actual el título y lo que siga siendo válido y no contradiga al documento.\nSLIDE ACTUAL:\n" +
+    JSON.stringify(slide);
+  return conTarea(m, t, [informacion]);
 }
 
 export function promptNueva(m: MaterialInforme, id: string): BloquePrompt[] {
@@ -280,7 +326,13 @@ export function promptCorreccion(
     "Si la instrucción incluye una tabla pegada (columnas separadas por tabuladores o |), úsala como datos. " +
     'Devuelve {"slide": <slide completo>, "avisos": ["otros slides que también deberían cambiar por coherencia, con su id", …]}.\nSLIDE ACTUAL:\n' +
     JSON.stringify(slide);
-  return conTarea(m, t, [extra.marcas, recortar(extra.adjuntos ?? "", 24_000)].filter((x): x is string => !!x));
+  // El documento dirigido a este slide no está entre las fuentes generales: sin él no se podría corregir contra sus datos.
+  const dirigida = bloqueDirigido(m, slide.id);
+  return conTarea(
+    m,
+    t,
+    [extra.marcas, recortar(extra.adjuntos ?? "", 24_000), dirigida ? dirigida + "\n" + REGLAS_DIRIGIDA : null].filter((x): x is string => !!x),
+  );
 }
 
 export function promptAnalisis(m: MaterialInforme): BloquePrompt[] {
@@ -312,7 +364,7 @@ export function promptAnalisis(m: MaterialInforme): BloquePrompt[] {
             ? '\n- Lo indicado en NO REPORTAR no entra en "resumen", "hechos" ni en la evidencia de los objetivos, no justifica slides nuevas y no se pide en "faltan".' +
               '\n- "omitidos": lo que has dejado fuera por NO REPORTAR, una frase por cada cosa: qué era y en qué fuente o slide del informe anterior aparecía. Solo lo ve el equipo, para comprobar que has entendido cada indicación. [] si nada de lo aportado estaba afectado.'
             : ""),
-        "== FUENTES DEL TRIMESTRE ==\n" + recortar(fuentesTexto(m.fuentes), MAX_BYTES_FUENTES),
+        "== FUENTES DEL TRIMESTRE ==\n" + recortar(fuentesTexto(fuentesGenerales(m)), MAX_BYTES_FUENTES),
         noReportar,
       ]
         .filter((x): x is string => !!x)

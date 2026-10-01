@@ -43,10 +43,14 @@ interface Props {
   cambiar: (nueva: SlideJson, cambio: string) => Promise<MedidaSlide>;
   /** Vuelve a la slide anterior al último cambio; null si no hay nada que deshacer. */
   deshacer: (() => Promise<MedidaSlide>) | null;
+  /** Documentos dirigidos a esta slide que todavía no se han usado para montarla. */
+  dirigida: string[] | null;
+  /** Monta esta slide con su información dirigida; null mientras ya se está montando alguna. */
+  montarDirigida: (() => void) | null;
 }
 
 /** Una slide del editor: vista, chips de relleno/pendientes/origen, edición a mano, marcas y corrección con Claude. */
-export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer }: Props) {
+export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer, dirigida, montarDirigida }: Props) {
   const { informe, puedeEditar } = h;
   const [marcando, setMarcando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
@@ -201,6 +205,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   else if (medida?.medida) chips.push(<Chip key="r" tono={medida.medida.relleno < 80 ? "aviso" : "ok"}>Relleno {medida.medida.relleno} %</Chip>);
   if (medida?.pendientes) chips.push(<Chip key="p" tono="aviso">{medida.pendientes} pendiente{medida.pendientes > 1 ? "s" : ""}</Chip>);
   if (slide.origen) chips.push(<Chip key="o">{slide.origen}</Chip>);
+  if (dirigida?.length) chips.push(<Chip key="i" tono="marca">información nueva</Chip>);
 
   return (
     <section className="flex scroll-mt-4 flex-col gap-2" id={`ed-${slide.id}`}>
@@ -210,6 +215,17 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         <span className="flex flex-wrap gap-1">{chips}</span>
         {puedeEditar ? (
           <span className="ml-auto flex flex-wrap gap-1.5">
+            {dirigida?.length ? (
+              <Boton
+                pequeno
+                variante="primario"
+                disabled={!montarDirigida || trabajando}
+                title={`Claude rehace esta slide por completo con: ${dirigida.join(", ")}`}
+                onClick={() => montarDirigida?.()}
+              >
+                Montar con la información
+              </Boton>
+            ) : null}
             <Boton
               pequeno
               aria-pressed={marcando}

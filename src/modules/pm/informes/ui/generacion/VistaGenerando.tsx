@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { marcarAplicadas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
 import { clon } from "../../logic/informe";
 import { Boton, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
@@ -32,13 +33,26 @@ export function VistaGenerando({ h }: { h: HerramientaInforme }) {
     void (async () => {
       try {
         await fuentesListas();
+        const dirigidas = slidesConDirigidas(informe.current.seleccion, h.fuentes);
         const r = await generarInforme({
           informe: informe.current,
           previo: h.previo,
           fotos: h.fotos,
           biblioteca: h.biblioteca,
+          dirigidas,
           signal: ctrl.signal,
-          guardar: (contenido, extra, cambio) => h.guardar({ contenido: clon(contenido), ...extra }, cambio),
+          guardar: (contenido, extra, cambio) =>
+            h.guardar(
+              {
+                contenido: clon(contenido),
+                ...extra,
+                // Al terminar, la información dirigida ya está usada en sus slides.
+                ...(extra?.estado === "borrador" && dirigidas.size
+                  ? { seleccion: marcarAplicadas(seleccionBase(informe.current.seleccion, informe.current.analisis), [...dirigidas]) }
+                  : {}),
+              },
+              cambio,
+            ),
           onFilas: setFilas,
           onFase: setFase,
         });

@@ -68,6 +68,7 @@ export function elemento(s: SlideJson, pagina: number, meta: MetaInforme | null 
           {(c.contenido || []).map((x, i) => nodo(x, i))}
         </Contenido>
         {c.nota ? <div className="iq-nota">{rt(c.nota)}</div> : null}
+        {c.fuera?.length ? c.fuera.map((x, i) => nodo(x, i)) : null}
       </Slide>
     );
   }
