@@ -12,7 +12,7 @@ export function clon<T>(o: T): T {
   return JSON.parse(JSON.stringify(o)) as T;
 }
 
-type Ruta = (string | number)[];
+export type Ruta = (string | number)[];
 
 export function recorrer(v: unknown, fn: (v: unknown, ruta: Ruta) => void, ruta: Ruta = []): void {
   fn(v, ruta);
@@ -20,7 +20,7 @@ export function recorrer(v: unknown, fn: (v: unknown, ruta: Ruta) => void, ruta:
   else if (v && typeof v === "object") Object.keys(v).forEach((k) => recorrer((v as Record<string, unknown>)[k], fn, ruta.concat(k)));
 }
 
-const NO_TEXTO = new Set([
+export const NO_TEXTO = new Set([
   "src", "imagen", "vista", "foto", "mapa", "c", "icono", "variante", "disposicion", "layout", "clase", "id", "origen", "fuentes", "className",
 ]);
 

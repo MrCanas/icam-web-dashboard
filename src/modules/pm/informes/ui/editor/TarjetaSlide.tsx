@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { accionAnadirFuente } from "../../actions/informes";
-import { actualizarPeriodo, clon, renumerar, tituloDe, validarSlide } from "../../logic/informe";
+import { normalizar } from "../../logic/edicion";
+import { actualizarPeriodo, tituloDe, validarSlide } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
-import { medirFuera } from "../../slides/motor";
-import type { InformeJson, SlideJson } from "../../slides/tipos";
+import type { MedidaSlide } from "../../slides/motor";
+import type { MetaInforme, SlideJson } from "../../slides/tipos";
 import { Boton, Chip, claseCampo } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
 import { subirFotoInforme } from "../asistente/PasoFuentes";
@@ -15,7 +16,9 @@ import { ZonaSoltar } from "../asistente/ZonaSoltar";
 import { mensajeErrorClaude, pedirClaude, type ImagenClaude } from "../lib/claude";
 import { aBase64, ACEPTA_DOCUMENTOS, extraerTexto, redimensionar } from "../lib/ficheros";
 import { VisorSlide, type ResultadoVisor } from "../slides/VisorSlide";
+import { CapaEdicion, type ModoEdicion } from "./CapaEdicion";
 import { CapaMarcas } from "./CapaMarcas";
+import { ListaTextos } from "./ListaTextos";
 import { capturaMarcada, HERRAMIENTAS, marcasTexto, NOMBRE_MARCA, type Herramienta, type Marca } from "./marcas";
 
 interface Adjunto {
@@ -31,14 +34,19 @@ interface Props {
   slide: SlideJson;
   pagina: number;
   total: number;
+  meta: MetaInforme;
   medida: (ResultadoVisor & { pendientes: number }) | undefined;
   onPintado: (r: ResultadoVisor) => void;
   mover: (delta: number) => void;
   ocultar: () => void;
+  /** Sustituye esta slide por otra: comprueba que pinta, la guarda y deja la anterior para «Deshacer». */
+  cambiar: (nueva: SlideJson, cambio: string) => Promise<MedidaSlide>;
+  /** Vuelve a la slide anterior al último cambio; null si no hay nada que deshacer. */
+  deshacer: (() => Promise<MedidaSlide>) | null;
 }
 
-/** Una slide del editor: vista, chips de relleno/pendientes/origen, marcas y corrección con Claude. */
-export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover, ocultar }: Props) {
+/** Una slide del editor: vista, chips de relleno/pendientes/origen, edición a mano, marcas y corrección con Claude. */
+export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer }: Props) {
   const { informe, puedeEditar } = h;
   const [marcando, setMarcando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
@@ -49,7 +57,42 @@ export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover
   const [estado, setEstado] = useState("");
   const [trabajando, setTrabajando] = useState(false);
   const lienzo = useRef<HTMLElement | null>(null);
-  const meta = informe.contenido!.meta;
+  const [editando, setEditando] = useState<ModoEdicion | null>(null);
+  const [listaAbierta, setListaAbierta] = useState(false);
+  // Lienzo junto al slide que tiene pintado. La capa de edición trabaja siempre sobre esa pareja y se
+  // bloquea mientras no sea la vigente (entre un cambio y su repintado), sin perder la selección.
+  const [pintada, setPintada] = useState<{ lienzo: HTMLElement; slide: SlideJson } | null>(null);
+  const normalizado = useMemo(() => normalizar(slide), [slide]);
+  const pintado = useMemo(() => (pintada ? normalizar(pintada.slide) : null), [pintada]);
+  const abrirLista = useCallback(() => setListaAbierta(true), []);
+
+  /** Cambio hecho a mano (texto, bloque o foto): sin Claude. */
+  async function aplicarManual(nueva: SlideJson, cambio: string) {
+    setTrabajando(true);
+    setEstado("");
+    try {
+      if (nueva.origen === "heredada") nueva.origen = "actualizada";
+      const m = await cambiar(nueva, cambio);
+      setEstado(m.desborde ? "Cambio aplicado, pero ahora la slide desborda: acorta el texto o deshaz el cambio." : "");
+    } catch (e) {
+      setEstado(`No se pudo aplicar el cambio: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  async function deshacerCambio() {
+    if (!deshacer) return;
+    setTrabajando(true);
+    try {
+      await deshacer();
+      setEstado("Cambio deshecho.");
+    } catch (e) {
+      setEstado(`No se pudo deshacer: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setTrabajando(false);
+    }
+  }
 
   async function adjuntar(files: File[]) {
     for (const file of files) {
@@ -135,12 +178,7 @@ export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover
       const avisos = json && typeof json === "object" && Array.isArray((json as { avisos?: unknown }).avisos) ? ((json as { avisos: string[] }).avisos) : [];
       const s = actualizarPeriodo(validarSlide(json, slide.id, componentesPermitidos()), informe);
       s.origen = slide.origen === "nueva" ? "nueva" : "actualizada";
-      const m = medirFuera(s, pagina, meta);
-      if (m.error) throw new Error(m.error);
-      const contenido: InformeJson = clon(informe.contenido!);
-      contenido.slides = contenido.slides.map((x) => (x.id === slide.id ? s : x));
-      renumerar(contenido.slides);
-      await h.guardar({ contenido }, `${tituloDe(s)}: ${instr}${marcas.length ? ` (${marcas.length} marca${marcas.length > 1 ? "s" : ""})` : ""}`);
+      const m = await cambiar(s, `${tituloDe(s)}: ${instr}${marcas.length ? ` (${marcas.length} marca${marcas.length > 1 ? "s" : ""})` : ""}`);
       setEstado((m.desborde ? "Aplicada, pero ahora desborda: pide acortarla. " : "Aplicada. ") + (avisos.length ? "Revisa también: " + avisos.join(" · ") : ""));
       setInstruccion("");
       adjuntos.forEach((a) => a.url && URL.revokeObjectURL(a.url));
@@ -175,11 +213,29 @@ export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover
               title="Pinta, subraya o recuadra sobre la slide lo que quieres cambiar"
               onClick={() => {
                 setMarcando(!marcando);
+                setEditando(null);
                 if (!marcando) setCorrigiendo(true);
               }}
             >
               Marcar
             </Boton>
+            <Boton
+              pequeno
+              aria-pressed={!!editando}
+              className={editando ? "!border-icam-900 !bg-icam-900 !text-white" : ""}
+              title="Cambia a mano un texto, el sitio de un bloque o una foto, sin pasar por Claude"
+              onClick={() => {
+                setEditando(editando ? null : "textos");
+                setMarcando(false);
+              }}
+            >
+              Editar
+            </Boton>
+            {deshacer ? (
+              <Boton pequeno disabled={trabajando} title="Vuelve a la slide anterior al último cambio" onClick={() => void deshacerCambio()}>
+                Deshacer
+              </Boton>
+            ) : null}
             <Boton pequeno onClick={() => setCorrigiendo(!corrigiendo)}>
               Corregir
             </Boton>
@@ -227,14 +283,64 @@ export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover
         </div>
       ) : null}
 
-      <div className={marcando ? "rounded-md outline outline-2 outline-offset-2 outline-red-600" : ""}>
+      {editando ? (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-subtle bg-card px-2.5 py-2 text-sm shadow-sm" role="toolbar" aria-label="Edición a mano">
+          {(
+            [
+              ["textos", "Textos"],
+              ["disposicion", "Disposición"],
+            ] as const
+          ).map(([modo, nombre]) => (
+            <Boton
+              key={modo}
+              pequeno
+              aria-pressed={editando === modo}
+              className={editando === modo ? "!border-icam-900 !bg-icam-900 !text-white" : ""}
+              onClick={() => setEditando(modo)}
+            >
+              {nombre}
+            </Boton>
+          ))}
+          <span className="text-text-muted">
+            {editando === "textos"
+              ? "Pulsa sobre un texto de la slide para cambiarlo."
+              : "Pulsa un bloque o una foto para moverlo con los botones, o arrástralo a su nuevo sitio."}
+          </span>
+          <span className="ml-auto flex gap-1.5">
+            <Boton pequeno aria-pressed={listaAbierta} onClick={() => setListaAbierta(!listaAbierta)}>
+              Todos los textos
+            </Boton>
+            <Boton
+              pequeno
+              variante="primario"
+              onClick={() => {
+                setEditando(null);
+                setListaAbierta(false);
+              }}
+            >
+              Listo
+            </Boton>
+          </span>
+        </div>
+      ) : null}
+
+      <div
+        className={
+          marcando
+            ? "rounded-md outline outline-2 outline-offset-2 outline-red-600"
+            : editando
+              ? "rounded-md outline outline-2 outline-offset-2 outline-icam-900"
+              : ""
+        }
+      >
         <VisorSlide
           slide={slide}
           pagina={pagina}
           meta={meta}
           className="rounded-md border border-subtle shadow-sm"
-          onPintado={(r, l) => {
+          onPintado={(r, l, s) => {
             lienzo.current = l;
+            setPintada({ lienzo: l, slide: s });
             onPintado(r);
           }}
         >
@@ -246,8 +352,24 @@ export function TarjetaSlide({ h, slide, pagina, total, medida, onPintado, mover
             onMarca={(m) => setMarcas((ms) => [...ms, m])}
             etiqueta={`Capa de marcas de la slide ${pagina}`}
           />
+          {editando && pintada && pintado ? (
+            <CapaEdicion
+              slide={pintado}
+              lienzo={pintada.lienzo}
+              modo={editando}
+              fotos={h.fotos}
+              trabajando={trabajando || pintada.slide !== slide}
+              aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)}
+              avisar={setEstado}
+              abrirLista={abrirLista}
+            />
+          ) : null}
         </VisorSlide>
       </div>
+
+      {editando && listaAbierta ? (
+        <ListaTextos slide={normalizado} trabajando={trabajando} aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)} />
+      ) : null}
 
       {corrigiendo && puedeEditar ? (
         <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-card p-3 shadow-sm">
