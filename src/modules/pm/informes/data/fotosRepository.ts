@@ -2,7 +2,8 @@ import type { UserContext } from "@/lib/auth/currentUser";
 import { withAudit } from "@/lib/audit/withAudit";
 
 import { mensajeErrorBd } from "../logic/errores";
-import { CATEGORIAS_FOTO, type CategoriaFoto, type Foto } from "../types";
+import { compararTrimestres } from "../logic/trimestre";
+import { CATEGORIAS_FOTO, type CategoriaFoto, type Foto, type FotoBiblioteca } from "../types";
 import { getInformesSupabase, INFORMES_FOTOS_BUCKET } from "./client";
 
 type R<T> = { data: T; error: null } | { data: null; error: string };
@@ -32,6 +33,57 @@ export async function listarFotos(ctx: UserContext, informeId: string): Promise<
     .order("created_at", { ascending: true });
   if (error) return { data: null, error: mensajeErrorBd(error) };
   return { data: (data ?? []).map(aFoto), error: null };
+}
+
+/**
+ * Biblioteca de imágenes del proyecto: las fotos subidas en cualquiera de sus
+ * informes (migración 045: cada foto es de su proyecto), de la más reciente a
+ * la más antigua.
+ */
+export async function listarBiblioteca(ctx: UserContext, codigo: string): Promise<R<FotoBiblioteca[]>> {
+  const sb = getInformesSupabase(ctx);
+  const [fotos, informes] = await Promise.all([
+    sb.from("informe_foto").select(`${COLUMNAS}, informe_id, created_at`).eq("codigo", codigo).order("created_at", { ascending: false }),
+    sb.from("informe").select("id, trimestre").eq("codigo", codigo),
+  ]);
+  if (fotos.error) return { data: null, error: mensajeErrorBd(fotos.error) };
+  if (informes.error) return { data: null, error: mensajeErrorBd(informes.error) };
+  const trimestres = new Map((informes.data ?? []).map((i) => [i.id as string, i.trimestre as string]));
+  return {
+    data: ((fotos.data ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
+      ...aFoto(f),
+      informeId: (f.informe_id as string | null) ?? null,
+      trimestre: trimestres.get(f.informe_id as string) ?? null,
+      creada: f.created_at as string,
+    })),
+    error: null,
+  };
+}
+
+/**
+ * Informes del proyecto cuyas slides usan alguna de estas fotos (las slides las
+ * referencian por id). Devuelve, por foto, los trimestres que la usan, del más
+ * reciente al más antiguo.
+ */
+export async function usoDeFotos(
+  ctx: UserContext,
+  codigo: string,
+  ids: string[],
+  excluirInforme?: string,
+): Promise<R<Map<string, string[]>>> {
+  const uso = new Map<string, string[]>();
+  if (!ids.length) return { data: uso, error: null };
+  const { data, error } = await getInformesSupabase(ctx).from("informe").select("id, trimestre, contenido").eq("codigo", codigo);
+  if (error) return { data: null, error: mensajeErrorBd(error) };
+  const informes = (data ?? [])
+    .filter((i) => i.id !== excluirInforme && i.contenido)
+    .map((i) => ({ trimestre: i.trimestre as string, texto: JSON.stringify(i.contenido) }))
+    .sort((a, b) => compararTrimestres(b.trimestre, a.trimestre));
+  for (const id of ids) {
+    const donde = informes.filter((i) => i.texto.includes(id)).map((i) => i.trimestre);
+    if (donde.length) uso.set(id, donde);
+  }
+  return { data: uso, error: null };
 }
 
 export async function subirFoto(
@@ -100,6 +152,15 @@ export async function borrarFoto(ctx: UserContext, informeId: string, id: string
   const { data, error: e0 } = await sb.from("informe_foto").select("storage_path").eq("id", id).eq("informe_id", informeId).maybeSingle();
   if (e0) return { data: null, error: mensajeErrorBd(e0) };
   if (!data) return { data: null, error: null };
+  // Una foto colocada en una slide no se borra: la slide se quedaría sin imagen.
+  const { data: informe, error: e1 } = await sb.from("informe").select("codigo").eq("id", informeId).maybeSingle();
+  if (e1) return { data: null, error: mensajeErrorBd(e1) };
+  if (informe) {
+    const uso = await usoDeFotos(ctx, informe.codigo as string, [id]);
+    if (uso.error !== null) return { data: null, error: uso.error };
+    const donde = uso.data.get(id);
+    if (donde) return { data: null, error: `Esa foto está colocada en el informe ${donde.join(", ")}: quítala antes de la slide.` };
+  }
   const { error } = await withAudit(
     ctx,
     "pm.informe.foto.delete",
@@ -109,6 +170,23 @@ export async function borrarFoto(ctx: UserContext, informeId: string, id: string
   if (error) return { data: null, error: mensajeErrorBd(error) };
   await sb.storage.from(INFORMES_FOTOS_BUCKET).remove([data.storage_path as string]);
   return { data: null, error: null };
+}
+
+/**
+ * Fotos subidas en un informe que se van a borrar con él: las que ningún otro
+ * informe del proyecto usa. Las demás se quedan en la biblioteca del proyecto.
+ */
+export async function fotosABorrarConInforme(
+  ctx: UserContext,
+  codigo: string,
+  informeId: string,
+): Promise<R<{ id: string; ruta: string }[]>> {
+  const { data, error } = await getInformesSupabase(ctx).from("informe_foto").select("id, storage_path").eq("informe_id", informeId);
+  if (error) return { data: null, error: mensajeErrorBd(error) };
+  const fotos = (data ?? []).map((f) => ({ id: f.id as string, ruta: f.storage_path as string }));
+  const uso = await usoDeFotos(ctx, codigo, fotos.map((f) => f.id), informeId);
+  if (uso.error !== null) return { data: null, error: uso.error };
+  return { data: fotos.filter((f) => !uso.data.has(f.id)), error: null };
 }
 
 /** Binario de una foto para servirla desde /api/informes/fotos/[id]. */

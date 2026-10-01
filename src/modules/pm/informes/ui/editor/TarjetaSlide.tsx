@@ -357,7 +357,9 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               slide={pintado}
               lienzo={pintada.lienzo}
               modo={editando}
-              fotos={h.fotos}
+              informeId={informe.id}
+              trimestre={informe.trimestre}
+              alSubirFoto={(f) => h.setFotos((fs) => [...fs, f])}
               trabajando={trabajando || pintada.slide !== slide}
               aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)}
               avisar={setEstado}

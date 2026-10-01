@@ -216,7 +216,8 @@ export function slideDeterminista(
   let s = clon(actual);
   const props = (s.props ?? {}) as Record<string, unknown>;
   if (t.id === "portada") {
-    const fp = fotos.find((f) => f.categoria === "Portada");
+    // Si hay varias, la última subida: es la que la PM acaba de elegir.
+    const fp = fotos.findLast((f) => f.categoria === "Portada");
     return {
       id: "portada",
       c: "Portada",
@@ -228,7 +229,7 @@ export function slideDeterminista(
   if (t.id === "disclaimer") return { id: "disclaimer", c: "Disclaimer", origen: "heredada" };
   if (t.id === "cierre") return { id: "cierre", c: "Cierre", origen: "heredada" };
   if (s.c === "SlideBloqueado" || SLIDES_FINANZAS.includes(t.id)) {
-    const pag = fotos.find((f) => f.categoria === "Página de Finanzas" && (f.para || "resumen-financiero") === t.id);
+    const pag = fotos.findLast((f) => f.categoria === "Página de Finanzas" && (f.para || "resumen-financiero") === t.id);
     const base =
       (props.titulo as string | undefined) ||
       (t.id === "varianzas"

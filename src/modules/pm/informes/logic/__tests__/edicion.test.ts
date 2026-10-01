@@ -21,6 +21,7 @@ import {
   proporcionColumnas,
   reencuadrar,
   rejillaDe,
+  srcDeImagen,
   varianteTextoImagen,
 } from "@/modules/pm/informes/logic/edicion";
 import type { SlideJson } from "@/modules/pm/informes/slides/tipos";
@@ -168,14 +169,14 @@ test("imágenes: grupos, cambio de foto, reencuadre, orden y disposición de la 
   const reencuadrada = reencuadrar(obra, im0, 0.253, 1.4);
   assert.deepEqual(leerRuta(reencuadrada, im0), { src: "/api/informes/fotos/a", pie: "Fachada", focalX: 0.25, focalY: 1 });
   // Cambiar la foto conserva el pie y devuelve el encuadre al centro.
-  assert.deepEqual(leerRuta(cambiarFoto(reencuadrada, im0, "/api/informes/fotos/c"), im0), { src: "/api/informes/fotos/c", pie: "Fachada" });
+  assert.deepEqual(leerRuta(cambiarFoto(reencuadrada, grupos[0]!, im0, "/api/informes/fotos/c"), im0), { src: "/api/informes/fotos/c", pie: "Fachada" });
   const cambiadas = intercambiarFotos(obra, im0, [...galeria, "props", "imagenes", 1]);
   assert.deepEqual((leerRuta(cambiadas, [...galeria, "props", "imagenes"]) as { src: string }[]).map((x) => x.src), ["/api/informes/fotos/b", "/api/informes/fotos/a"]);
 
   // Al pasar a 4 fotos aparecen dos huecos más, que se pueden rellenar aunque la lista fuera más corta.
   const cuatro = disposicionGaleria(obra, galeria, "4");
   assert.equal(gruposDeImagenes(cuatro)[0]!.imagenes.length, 4);
-  const rellena = cambiarFoto(cuatro, [...galeria, "props", "imagenes", 3], "/api/informes/fotos/d");
+  const rellena = cambiarFoto(cuatro, gruposDeImagenes(cuatro)[0]!, [...galeria, "props", "imagenes", 3], "/api/informes/fotos/d");
   assert.deepEqual((leerRuta(rellena, [...galeria, "props", "imagenes"]) as { src?: string }[]).map((x) => x.src ?? null), [
     "/api/informes/fotos/a",
     "/api/informes/fotos/b",
@@ -195,5 +196,41 @@ test("imágenes: grupos, cambio de foto, reencuadre, orden y disposición de la 
 
   const marco: SlideJson = { id: "x", compuesto: { contenido: [{ c: "ImagenMarco", props: { ancho: 300, alto: 200 } }] } };
   assert.deepEqual(gruposDeImagenes(marco)[0]!.imagenes, [["compuesto", "contenido", 0, "props"]]);
-  assert.equal((leerRuta(cambiarFoto(marco, ["compuesto", "contenido", 0, "props"], "/api/informes/fotos/z"), ["compuesto", "contenido", 0, "props"]) as { src: string }).src, "/api/informes/fotos/z");
+  assert.equal(
+    (leerRuta(cambiarFoto(marco, gruposDeImagenes(marco)[0]!, ["compuesto", "contenido", 0, "props"], "/api/informes/fotos/z"), ["compuesto", "contenido", 0, "props"]) as { src: string }).src,
+    "/api/informes/fotos/z",
+  );
+});
+
+test("imágenes que la plantilla guarda solo como dirección: portada, ubicación y página de Finanzas", () => {
+  const portada: SlideJson = { id: "portada", c: "Portada", props: { trimestre: "Q3 2026", proyecto: "Santa Engracia 84" } };
+  const gp = gruposDeImagenes(portada)[0]!;
+  assert.deepEqual([gp.tipo, gp.objetos, gp.imagenes], ["Portada", false, [["props", "imagen"]]]);
+  assert.equal(srcDeImagen(portada, gp, gp.imagenes[0]!), null);
+  const conFoto = cambiarFoto(portada, gp, gp.imagenes[0]!, "/api/informes/fotos/p");
+  assert.equal(conFoto.props?.imagen, "/api/informes/fotos/p");
+  assert.equal(srcDeImagen(conFoto, gp, gp.imagenes[0]!), "/api/informes/fotos/p");
+
+  const estrategia: SlideJson = {
+    id: "estrategia",
+    compuesto: { clase: "iq-cols", contenido: [{ c: "Texto", props: { parrafos: ["p"] } }, { c: "MapaLateral", props: { rotulo: "Chamberí", mapa: "/api/informes/fotos/m" } }] },
+  };
+  const gm = gruposDeImagenes(estrategia)[0]!;
+  const nodo = ["compuesto", "contenido", 1];
+  assert.deepEqual(gm.imagenes, [[...nodo, "props", "mapa"], [...nodo, "props", "foto"]]);
+  assert.deepEqual(leerRuta(cambiarFoto(estrategia, gm, gm.imagenes[1]!, "/api/informes/fotos/f"), [...nodo, "props"]), {
+    rotulo: "Chamberí",
+    mapa: "/api/informes/fotos/m",
+    foto: "/api/informes/fotos/f",
+  });
+
+  // Página de Finanzas: al aportarla a mano, la slide deja de estar pendiente.
+  const bloqueada: SlideJson = { id: "varianzas", c: "SlideBloqueado", origen: "bloqueada", fuentes: "", props: { titulo: "Varianzas", estado: "Pendiente de Finanzas" } };
+  const gb = gruposDeImagenes(bloqueada)[0]!;
+  const aportada = cambiarFoto(bloqueada, gb, gb.imagenes[0]!, "/api/informes/fotos/v");
+  assert.deepEqual(aportada.props, { titulo: "Varianzas", estado: "Aportado", vista: "/api/informes/fotos/v" });
+  assert.equal(aportada.fuentes, "Página aportada a mano");
+  assert.equal(bloqueada.props?.vista, undefined);
+  // Con contenido propio no lleva página.
+  assert.equal(gruposDeImagenes({ id: "x", c: "SlideBloqueado", hijos: [{ c: "Texto" }] }).length, 0);
 });

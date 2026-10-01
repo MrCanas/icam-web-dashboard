@@ -115,18 +115,25 @@ export function mapaSlide(lienzo: HTMLElement, slide: SlideJson, arbol: NodoArbo
   if (arbol && area) emparejar(arbol, area);
 
   for (const grupo of gruposDeImagenes(slide)) {
-    const el =
-      grupo.tipo === "TextoImagen"
-        ? lienzo.querySelector<HTMLElement>(".iq-imagenes-col")
-        : (mapa.bloques.find((b) => mismaRuta(b.nodo.ruta, grupo.nodo))?.el ?? null);
-    if (!el) continue;
-    const figuras = el.matches("figure.iq-figura") ? [el] : (Array.from(el.querySelectorAll(":scope > figure.iq-figura")) as HTMLElement[]);
-    if (figuras.length !== grupo.imagenes.length) continue;
-    figuras.forEach((f, i) => {
+    let huecos: HTMLElement[];
+    if (grupo.tipo === "SlideBloqueado") {
+      // La página aportada ocupa todo el cuerpo; sin página, el hueco es el cuerpo vacío.
+      const cuerpo = lienzo.querySelector<HTMLElement>(".iq-bloqueado-cuerpo");
+      huecos = cuerpo ? [cuerpo.querySelector<HTMLElement>(":scope > img") ?? cuerpo] : [];
+    } else {
+      const el =
+        grupo.tipo === "TextoImagen"
+          ? lienzo.querySelector<HTMLElement>(".iq-imagenes-col")
+          : grupo.tipo === "Portada"
+            ? lienzo.querySelector<HTMLElement>(".iq-portada-foto")
+            : (mapa.bloques.find((b) => mismaRuta(b.nodo.ruta, grupo.nodo))?.el ?? null);
+      if (!el) continue;
+      const figuras = el.matches("figure.iq-figura") ? [el] : (Array.from(el.querySelectorAll(":scope > figure.iq-figura")) as HTMLElement[]);
       // El hueco de la foto, sin el pie: la imagen o su marcador de «falta foto».
-      const hueco = f.querySelector<HTMLElement>("img.iq-img, .iq-ph") ?? f;
-      mapa.imagenes.push({ ruta: grupo.imagenes[i]!, grupo, indice: i, el: hueco });
-    });
+      huecos = figuras.map((f) => f.querySelector<HTMLElement>("img.iq-img, .iq-ph") ?? f);
+    }
+    if (huecos.length !== grupo.imagenes.length) continue;
+    huecos.forEach((el, i) => mapa.imagenes.push({ ruta: grupo.imagenes[i]!, grupo, indice: i, el }));
   }
   return mapa;
 }
