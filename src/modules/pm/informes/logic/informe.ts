@@ -1,6 +1,7 @@
 import type { NodoJson, SlideJson } from "../slides/tipos";
 import type { EntradaEstructura, Foto, PrevioEstructurado } from "../types";
 import type { EntradaBiblioteca } from "./biblioteca";
+import { conFlotantesDe, flotantesValidos } from "./flotantes";
 
 /**
  * Lógica pura sobre el informe (slides en formato informe.json), portada de
@@ -149,6 +150,8 @@ export function validarSlide(o: unknown, id: string, permitidos: string[]): Slid
   if (!x || typeof x !== "object" || Array.isArray(x)) throw new Error("la respuesta no es un slide");
   if (!x.c && !x.compuesto) throw new Error("el slide no indica componente");
   x.id = id;
+  // Las imágenes flotantes las pone el equipo a mano y no viajan a Claude: lo que venga aquí no es suyo.
+  delete x.flotantes;
   const malos: string[] = [];
   recorrer(x, (v) => {
     if (v && typeof v === "object" && !Array.isArray(v) && typeof (v as { c?: unknown }).c === "string") {
@@ -207,6 +210,18 @@ export const SLIDES_FINANZAS = ["resumen-financiero", "varianzas", "seguimiento-
  * «Pendiente de Finanzas») y las que se mantienen. null = la redacta Claude.
  */
 export function slideDeterminista(
+  t: { id: string; accion: string },
+  actual: SlideJson,
+  d: PeriodoInforme & { proyecto: string },
+  fotos: Foto[],
+  urlFoto: (id: string) => string,
+): SlideJson | null {
+  const s = plantillaDeterminista(t, actual, d, fotos, urlFoto);
+  // Lo que el equipo colocó a mano encima de la slide sigue ahí aunque la slide se rehaga.
+  return s && conFlotantesDe(actual, s);
+}
+
+function plantillaDeterminista(
   t: { id: string; accion: string },
   actual: SlideJson,
   d: PeriodoInforme & { proyecto: string },
@@ -286,6 +301,14 @@ export function qaMecanico(slides: SlideJson[], medidas: Record<string, MedidaQa
       out.push({ nivel: "aviso", slide: s.id, texto: `Relleno ${m.relleno} %: queda hueco.` });
     }
     if (m.error) out.push({ nivel: "error", slide: s.id, texto: m.error });
+    const heredadas = flotantesValidos(s.flotantes).filter((f) => f.heredada).length;
+    if (heredadas) {
+      out.push({
+        nivel: "aviso",
+        slide: s.id,
+        texto: `${heredadas} imagen(es) colocada(s) a mano en el informe anterior: comprueba que siguen en su sitio (Editar › Imágenes libres).`,
+      });
+    }
     recorrer(s, (v, r) => {
       if (typeof v !== "string" || r.includes("anterior")) return;
       const k = r[r.length - 1];
