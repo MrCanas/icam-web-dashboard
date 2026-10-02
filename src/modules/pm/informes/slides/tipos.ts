@@ -58,6 +58,24 @@ export interface Compuesto {
   fuera?: NodoJson[];
 }
 
+/**
+ * Imagen colocada a mano en un área de la slide, por encima de su contenido:
+ * no forma parte de la plantilla ni del flujo. Unidades de slide (960 × 540).
+ */
+export interface Flotante {
+  id: string;
+  src: string;
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+  /** Punto de la foto que queda a la vista (0–1), como en ImagenMarco. */
+  focalX?: number;
+  focalY?: number;
+  /** Viene del informe anterior y nadie la ha tocado todavía en este. */
+  heredada?: boolean;
+}
+
 export interface SlideJson {
   id: string;
   c?: string;
@@ -68,6 +86,8 @@ export interface SlideJson {
   /** heredada · actualizada · nueva · bloqueada */
   origen?: string;
   fuentes?: string;
+  /** Imágenes puestas a mano en un área; las pinta `elemento()` encima de la slide. */
+  flotantes?: Flotante[];
 }
 
 export interface InformeJson {

@@ -123,6 +123,9 @@
 .iq-ph span { background: var(--paper); padding: 3px 7px; }
 .iq-pie-foto { font-size: 7.5px; font-style: italic; margin-top: 3px; text-align: right; }
 .iq-imagenes-col { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+/* Imágenes colocadas a mano en un área: capa encima del slide, fuera de su flujo y de su plantilla. */
+.iq-flotantes { position: absolute; left: 0; top: 0; width: 960px; height: 540px; overflow: hidden; pointer-events: none; z-index: 1; }
+.iq-flotante { position: absolute; max-width: none; }
 
 /* ---------- Cover ---------- */
 .iq-portada-fecha { position: absolute; left: 32px; top: 22px; font-size: 20px; line-height: 1; color: var(--paper); }

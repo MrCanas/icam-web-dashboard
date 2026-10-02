@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { accionBorrarInforme, accionGuardarVersion, accionHistorial } from "../../actions/informes";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
 import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
+import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, qaMecanico, renumerar, tituloDe, validarSlide, type MedidaQa } from "../../logic/informe";
 import { rutaImprimir, rutaListaInformes } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
@@ -191,6 +192,8 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
             if (esCancelado(e)) throw e;
           }
         }
+        // Lo que el equipo colocó a mano encima de la slide no lo rehace Claude: se queda.
+        s = conFlotantesDe(actual, s);
         const c: InformeJson = clon(base);
         c.slides = c.slides.map((x) => (x.id === actual.id ? s : x));
         renumerar(c.slides);

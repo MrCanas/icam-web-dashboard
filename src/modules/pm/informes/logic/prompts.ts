@@ -2,6 +2,7 @@ import type { SlideJson } from "../slides/tipos";
 import type { Analisis, Foto, Fuente, PrevioEstructurado } from "../types";
 import { entradaDeId, type EntradaBiblioteca } from "./biblioteca";
 import { fuentesParaSlide } from "./dirigidas";
+import { flotantesValidos, sinFlotantes } from "./flotantes";
 import { textos, tituloDe } from "./informe";
 import { urlFoto } from "./paths";
 import { qCierre } from "./trimestre";
@@ -233,6 +234,21 @@ function baseSlide(m: MaterialInforme): BloquePrompt[] {
   ];
 }
 
+/**
+ * El slide tal como lo ve Claude: sin las imágenes que el equipo ha colocado a
+ * mano encima (`flotantes`), que no son suyas y se conservan aparte.
+ */
+function jsonDeSlide(slide: SlideJson): string {
+  const n = flotantesValidos(slide.flotantes).length;
+  return (
+    JSON.stringify(sinFlotantes(slide)) +
+    (n
+      ? `
+(Sobre este slide el equipo ha colocado a mano ${n} imagen(es) superpuesta(s) que no están en el JSON y se conservan solas: no las añadas ni intentes cambiarlas.)`
+      : "")
+  );
+}
+
 function conTarea(m: MaterialInforme, tarea: string, extra: string[] = []): BloquePrompt[] {
   return [
     ...baseSlide(m),
@@ -257,7 +273,7 @@ export function promptActualizar(m: MaterialInforme, prev: SlideJson): BloquePro
     `Actualiza al ${d.trimestre} el slide "${prev.id}" del informe ${d.trimestreAnterior}. Conserva su layout salvo que el contenido pida otro. ` +
       "Mantén lo persistente que siga vigente (sin resumirlo de más) y sustituye lo propio del trimestre por lo nuevo.\n" +
       "SLIDE ANTERIOR:\n" +
-      JSON.stringify(prev),
+      jsonDeSlide(prev),
   );
 }
 
@@ -273,7 +289,7 @@ export function promptDirigida(m: MaterialInforme, slide: SlideJson, informacion
     REGLAS_DIRIGIDA +
     "\n- Si el slide actual es una página bloqueada (SlideBloqueado) o un hueco pendiente, sustitúyelo por un slide real hecho con los componentes del API." +
     "\n- Conserva del slide actual el título y lo que siga siendo válido y no contradiga al documento.\nSLIDE ACTUAL:\n" +
-    JSON.stringify(slide);
+    jsonDeSlide(slide);
   return conTarea(m, t, [informacion]);
 }
 
@@ -296,7 +312,7 @@ export function promptResumen(m: MaterialInforme, slides: SlideJson[], prev: Sli
     `Redacta el slide "resumen-ejecutivo" (componente ResumenEjecutivo, trimestre "${d.trimestre}") a partir del informe ya redactado. ` +
     "Jerarquía: fase actual; logros más materiales; retrasos e incidencias con su mitigación; avance hacia el siguiente hito; operador, comercialización o desinversión; próximas fechas. " +
     `Situación actual 650–900 caracteres. Logros: 6 (máximo 9), hechos concretos y fechados del ${d.trimestre}. Coherente al dígito con los demás slides.` +
-    (prev ? "\nRESUMEN EJECUTIVO ANTERIOR (estructura y datos persistentes):\n" + JSON.stringify(prev) : "") +
+    (prev ? "\nRESUMEN EJECUTIVO ANTERIOR (estructura y datos persistentes):\n" + jsonDeSlide(prev) : "") +
     "\nRESTO DEL INFORME YA REDACTADO:\n" +
     recortar(otros, 22_000);
   return conTarea(m, t);
@@ -312,7 +328,7 @@ export function promptAjuste(m: MaterialInforme, slide: SlideJson, med: MedidaAj
   const t = med.desborde
     ? `El slide "${slide.id}" DESBORDA: su contenido ocupa el ${med.ocupacion} % del área útil medida en el navegador. Acórtalo hasta ~90 % quitando lo menos relevante, sin cambiar estilos ni tamaños (o cambia a un layout más compacto).`
     : `El slide "${slide.id}" queda al ${med.relleno} % del área tras repartir huecos (objetivo ≥ 85 %). Amplíalo con información REAL de las fuentes o del texto vigente del informe anterior, o agranda las fotos (disposición mayor). Si no hay más información real, devuélvelo sin cambios.`;
-  return conTarea(m, t + "\nSLIDE ACTUAL:\n" + JSON.stringify(slide));
+  return conTarea(m, t + "\nSLIDE ACTUAL:\n" + jsonDeSlide(slide));
 }
 
 export function promptCorreccion(
@@ -325,7 +341,7 @@ export function promptCorreccion(
     `Aplica esta corrección del equipo al slide "${slide.id}": «${instruccion}». Cambia solo lo pedido; mantén el resto igual. ` +
     "Si la instrucción incluye una tabla pegada (columnas separadas por tabuladores o |), úsala como datos. " +
     'Devuelve {"slide": <slide completo>, "avisos": ["otros slides que también deberían cambiar por coherencia, con su id", …]}.\nSLIDE ACTUAL:\n' +
-    JSON.stringify(slide);
+    jsonDeSlide(slide);
   // El documento dirigido a este slide no está entre las fuentes generales: sin él no se podría corregir contra sus datos.
   const dirigida = bloqueDirigido(m, slide.id);
   return conTarea(
