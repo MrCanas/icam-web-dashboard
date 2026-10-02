@@ -32,6 +32,8 @@ export interface HerramientaInforme {
   setFotos: (f: Foto[] | ((x: Foto[]) => Foto[])) => void;
   /** Aplica los cambios en local y los guarda (en cola: una escritura cada vez). */
   guardar: (cambios: CambiosInforme, cambio?: string) => Promise<boolean>;
+  /** Se resuelve cuando no queda nada por guardar (el PDF se hace con lo guardado). */
+  guardadoAlDia: () => Promise<unknown>;
   ir: (v: Vista) => void;
   avisar: (texto: string | null, tipo?: "aviso" | "error" | "ok") => void;
 }
@@ -104,6 +106,8 @@ export function InformeApp(props: Props) {
     [props.informe.id],
   );
 
+  const guardadoAlDia = useCallback(() => cola.current, []);
+
   const avisar = useCallback((texto: string | null, tipo: "aviso" | "error" | "ok" = "aviso") => {
     setMensaje(texto ? { texto, tipo } : null);
     if (texto && tipo === "error") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -128,10 +132,11 @@ export function InformeApp(props: Props) {
       setFuentes,
       setFotos,
       guardar,
+      guardadoAlDia,
       ir,
       avisar,
     }),
-    [informe, fuentes, fotos, previo, props.candidatos, props.biblioteca, props.puedeEditar, guardar, ir, avisar],
+    [informe, fuentes, fotos, previo, props.candidatos, props.biblioteca, props.puedeEditar, guardar, guardadoAlDia, ir, avisar],
   );
 
   const paso = vista === "paso1" ? 1 : vista === "paso2" ? 2 : vista === "paso3" ? 3 : null;

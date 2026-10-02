@@ -86,6 +86,8 @@ async function main() {
     await foto.click();
     const capa = tarjeta.getByLabel(/^Imágenes libres de /);
     await tarjeta.getByText("Arrastra sobre la slide para marcar el área").waitFor();
+    // Entera a la vista: el ratón no llega a lo que queda fuera de la ventana.
+    await capa.scrollIntoViewIfNeeded();
     const b = (await capa.boundingBox())!;
     // Unidades de slide → píxeles de pantalla.
     const px = (x: number, y: number): [number, number] => [b.x + (x * b.width) / 960, b.y + (y * b.height) / 540];
