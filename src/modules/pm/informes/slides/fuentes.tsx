@@ -11,6 +11,15 @@ export function FuentesInforme() {
   return <link rel="stylesheet" href={URL_FUENTES} precedence="default" />;
 }
 
+/** Caras que usan las slides: las que hay que tener cargadas antes de pintar y medir. */
+export const CARAS: { familia: string; peso: number; estilo: "normal" | "italic" }[] = [
+  { familia: "Lato", peso: 300, estilo: "normal" },
+  { familia: "Lato", peso: 400, estilo: "normal" },
+  { familia: "Lato", peso: 700, estilo: "normal" },
+  { familia: "Lato", peso: 400, estilo: "italic" },
+  { familia: "Baskervville", peso: 400, estilo: "normal" },
+];
+
 let listas: Promise<void> | null = null;
 
 /**
@@ -26,13 +35,35 @@ export function fuentesListas(): Promise<void> {
     // fonts.load() resuelve vacío. Se espera a que la hoja cargue.
     for (let i = 0; i < 50 && !hojaCargada(); i++) await new Promise((r) => setTimeout(r, 100));
     await Promise.all(
-      ["300 10px Lato", "400 10px Lato", "700 10px Lato", "italic 400 10px Lato", "400 10px Baskervville"].map((f) =>
-        document.fonts.load(f).catch(() => []),
-      ),
+      CARAS.map((c) => document.fonts.load(`${c.estilo === "italic" ? "italic " : ""}${c.peso} 10px ${c.familia}`).catch(() => [])),
     );
     await document.fonts.ready;
   })();
   return listas;
+}
+
+/**
+ * Caras de las slides que no están cargadas ahora mismo (vacío = todas listas).
+ * `document.fonts.check()` no sirve de prueba: da por buena una familia que no
+ * existe. Aquí se exige una FontFace realmente cargada por cada cara. Si falta
+ * alguna, lo pintado ha salido con la fuente de reserva: el PDF no debe hacerse.
+ */
+export function carasQueFaltan(): string[] {
+  if (typeof document === "undefined" || !document.fonts) return [];
+  const cargadas = Array.from(document.fonts).filter((f) => f.status === "loaded");
+  return CARAS.filter(
+    (c) =>
+      !cargadas.some((f) => {
+        // El peso de una FontFace puede ser un valor («400») o un rango («100 900»).
+        const pesos = f.weight.split(" ").map((p) => (p === "normal" ? 400 : p === "bold" ? 700 : Number(p)));
+        return (
+          f.family.replace(/["']/g, "") === c.familia &&
+          f.style === c.estilo &&
+          c.peso >= Math.min(...pesos) &&
+          c.peso <= Math.max(...pesos)
+        );
+      }),
+  ).map((c) => `${c.familia} ${c.peso}${c.estilo === "italic" ? " cursiva" : ""}`);
 }
 
 function hojaCargada(): boolean {

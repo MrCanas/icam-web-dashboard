@@ -12,6 +12,7 @@
  *   npm run pm:informes-recorrido -- --email x@imparcapital.com --con-claude
  *   npm run pm:informes-recorrido -- --email-lector y@imparcapital.com   (comprueba el 403)
  */
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Page } from "playwright-core";
@@ -173,15 +174,12 @@ async function main() {
 
     await corregirConMarca(page);
 
-    // PDF.
-
+    // PDF: el que genera el servidor, como el botón «PDF» del editor.
     const id = decodeURIComponent(page.url().split("/informes/")[1]!.split(/[?#]/)[0]!);
-    await page.goto(`${URL_BASE}/dashboard/pm/informes/${encodeURIComponent(id)}/imprimir`, { waitUntil: "networkidle" });
-    await page.waitForSelector(".iq-paginas[data-listo]", { timeout: 180_000 });
-    await page.waitForFunction("Array.from(document.images).every((i) => i.complete)");
-    await page.emulateMedia({ media: "print" });
-    const pdf = join(SALIDA, `${await page.title()}.pdf`);
-    await page.pdf({ path: pdf, preferCSSPageSize: true, printBackground: true });
+    const r = await ctx.request.get(`${URL_BASE}/api/informes/pdf/${encodeURIComponent(id)}`, { timeout: 240_000 });
+    if (!r.ok()) throw new Error(`El servidor no ha generado el PDF (${r.status()}): ${(await r.text()).slice(0, 300)}`);
+    const pdf = join(SALIDA, `${id}.pdf`);
+    writeFileSync(pdf, await r.body());
     log(`PDF: ${pdf}`);
     log(`Errores de consola: ${errores.length ? errores.join(" | ") : "ninguno"}`);
   } finally {

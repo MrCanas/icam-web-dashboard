@@ -50,9 +50,11 @@ Se sigue `ARCHITECTURE.md`: `data/ · logic/ · ui/ · actions/`, `ctx: UserCont
 - **Orquestación en el navegador.** La medición de relleno (`motor.airear`) necesita layout real, así que el cliente pinta cada slide en un lienzo oculto de 960×540 y decide si pide un ajuste.
   - Cada slide terminada se guarda al momento: si se cierra la pestaña, la generación se reanuda donde se quedó.
   - 2 slides en paralelo.
-- **PDF vectorial:** en la ruta `/imprimir`, `@page { size: 960pt 540pt; margin: 0 }`, una slide por página y botón «Descargar PDF» con `window.print()` (guardar como PDF). Es igual que `visor.html` del skill.
+- **PDF vectorial, hecho en el servidor:** el botón «PDF» del editor llama a `GET /api/informes/pdf/[id]`. Un Chromium sin ventana (`playwright-core`; en Vercel, `@sparticuz/chromium`; en local, el Edge o el Chrome instalados) abre la ruta `/imprimir?pdf=1` con la sesión de quien lo pide y la guarda como PDF: `@page { size: 960pt 540pt; margin: 0 }`, una slide por página, texto seleccionable y fuentes incrustadas. Sale igual para todos, sin diálogo de impresión.
+  - La vista `/imprimir` solo se declara lista (`data-listo`) con todas las slides pintadas con sus fuentes de verdad y todas las imágenes cargadas; si algo falla pone `data-error` y no hay PDF. Los fondos salen siempre (`print-color-adjust: exact`).
+  - Respaldo: la misma vista con `window.print()` (enlace «Vista de impresión»).
+  - `npm run pm:informes-pdf-fidelidad` compara el PDF con las slides página a página (tamaño, texto, fuentes incrustadas e imagen por zonas); con `--pdf` comprueba uno descargado de un despliegue.
   - Sustituye a html2canvas + jsPDF, que daban PDF rasterizado.
-  - Queda para más adelante: PDF en servidor con Chromium (`@sparticuz/chromium`) si se quiere un botón sin diálogo.
 - **Fotos:** bucket privado `informes-fotos`, más `GET /api/informes/fotos/[id]`, que las sirve **desde el mismo origen** para que la vista de impresión y las capturas de corrección no tengan problemas de CORS.
 - **Estética:** la herramienta usa los componentes y tokens del dashboard (`tailwind.config.js`: navy `#1E2A56`, dorado `#B89660`, fondo `#F5F5F5`, Inter, tarjetas `rounded-lg border-subtle/50`). Las slides, solo `slides.css`.
   - Ojo: los `h2`/`h3` de las slides heredaban un tracking (`.02em` / `.08em`) de la herramienta antigua. Hay que fijarlo en `slides.css` (`.iq-slide h2/h3`) para que salgan igual que los informes aprobados.

@@ -9,7 +9,7 @@ import { ESTRUCTURALES } from "../../logic/biblioteca";
 import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
 import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, qaMecanico, renumerar, tituloDe, validarSlide, type MedidaQa } from "../../logic/informe";
-import { rutaImprimir, rutaListaInformes } from "../../logic/paths";
+import { rutaImprimir, rutaListaInformes, rutaPdf } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
 import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
@@ -37,6 +37,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const [confirmar, setConfirmar] = useState(false);
   const [historial, setHistorial] = useState<Cambio[] | null>(null);
   const [uso, setUso] = useState<ResumenUso | null>(usoInicial);
+  const [pdf, setPdf] = useState<{ generando: boolean; error: string | null }>({ generando: false, error: null });
 
   // Cada slide conserva su objeto mientras no cambie su contenido: así no se repintan todas tras cada guardado.
   const [cache] = useState(() => new Map<string, { json: string; slide: SlideJson }>());
@@ -315,6 +316,29 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     router.push(rutaListaInformes());
   }
 
+  /** Descarga el PDF hecho en el servidor, con todo lo editado ya guardado. */
+  async function descargarPdf() {
+    setPdf({ generando: true, error: null });
+    try {
+      await h.guardadoAlDia();
+      const r = await fetch(rutaPdf(informe.id));
+      if (!r.ok) {
+        const cuerpo = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(cuerpo?.error ?? `el servidor ha respondido ${r.status}.`);
+      }
+      const nombre = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") ?? "")?.[1];
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre ? decodeURIComponent(nombre) : `${informe.id}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPdf({ generando: false, error: null });
+    } catch (e) {
+      setPdf({ generando: false, error: e instanceof Error ? e.message : "error desconocido." });
+    }
+  }
+
   const irA = (id: string) => document.getElementById(`ed-${id}`)?.scrollIntoView({ behavior: "smooth" });
   const coh = informe.qa?.coherencia ?? [];
 
@@ -357,13 +381,22 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
                   Eliminar informe
                 </Boton>
               ) : null}
-              <Link href={rutaImprimir(informe.id)} className="rounded-md bg-icam-900 px-4 py-2 text-sm font-medium text-white hover:bg-icam-800">
-                PDF
+              <Link href={rutaImprimir(informe.id)} className="text-sm font-medium text-icam-900 hover:underline">
+                Vista de impresión
               </Link>
+              <Boton variante="primario" disabled={pdf.generando} title="Descarga el informe en PDF, tal como se ve aquí" onClick={() => void descargarPdf()}>
+                {pdf.generando ? "Generando PDF…" : "PDF"}
+              </Boton>
             </>
           )}
         </div>
       </div>
+
+      {pdf.error ? (
+        <Aviso tipo="error">
+          No se ha podido generar el PDF: {pdf.error} Mientras tanto puedes sacarlo desde la «Vista de impresión».
+        </Aviso>
+      ) : null}
 
       <Tarjeta>
         <h2 className="text-sm font-semibold text-text-primary">Revisión</h2>

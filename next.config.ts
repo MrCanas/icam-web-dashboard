@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/informes/claude": ["./src/modules/pm/informes/referencia/**"],
     "/dashboard/pm/informes/[id]": ["./src/modules/pm/informes/referencia/**"],
+    // El PDF del informe lo pinta un Chromium en el servidor: ni su binario comprimido ni lo que
+    // playwright-core carga en marcha se detectan solos.
+    "/api/informes/pdf/*": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/playwright-core/**"],
   },
   turbopack: {
     root: path.resolve(__dirname),

@@ -18,6 +18,16 @@ export function rutaImprimir(id: string): string {
   return `/dashboard/pm/informes/${encodeURIComponent(id)}/imprimir`;
 }
 
+/** Vista de impresión tal como la abre el servidor para hacer el PDF (slides a escala 1). */
+export function rutaImprimirPdf(id: string): string {
+  return `${rutaImprimir(id)}?pdf=1`;
+}
+
+/** Descarga del PDF del informe, hecho en el servidor. */
+export function rutaPdf(id: string): string {
+  return `/api/informes/pdf/${encodeURIComponent(id)}`;
+}
+
 export function rutaInformesProyecto(idActivo: string): string {
   return `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}/informe`;
 }
