@@ -145,7 +145,12 @@ export function Timeline(props: TimelineProps) {
   const punto = props.puntoSituacion != null ? (props.puntoSituacion as number) : hechos - 0.5;
   const xPunto = x0 + punto * paso;
   return (
-    <div className={cx("iq-timeline", "iq-timeline-" + (props.variante || "slate"))} style={{ width: ancho, height: 170 }}>
+    // Con nota, el calendario ocupa sus 170 px y la nota va debajo, en el flujo (como en TextoImagen o
+    // VehiculoInversion). Antes iba con la clase .iq-nota, cuyo `top: 488px` la sacaba de la slide: no se veía.
+    <div
+      className={cx("iq-timeline", "iq-timeline-" + (props.variante || "slate"))}
+      style={props.nota ? { width: ancho, paddingTop: 170 } : { width: ancho, height: 170 }}
+    >
       <div className="iq-tl-linea iq-tl-pend" style={{ left: x0, width: ancho - 80, top: y - 1.5 }} />
       {hechos ? (
         <div className="iq-tl-linea iq-tl-hecha" style={{ left: x0, width: Math.max(0, xPunto - x0), top: y - 1.5 }} />
@@ -182,11 +187,7 @@ export function Timeline(props: TimelineProps) {
           </div>
         </>
       ) : null}
-      {props.nota ? (
-        <div className="iq-nota" style={{ position: "absolute", right: 0, bottom: 0 }}>
-          {rt(props.nota)}
-        </div>
-      ) : null}
+      {props.nota ? <div className="iq-nota-inline">{rt(props.nota)}</div> : null}
     </div>
   );
 }
