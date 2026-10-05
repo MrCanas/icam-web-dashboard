@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { accionRegistrarImpresion } from "../../actions/informes";
+import { incidenciasExportacion } from "../../logic/exportacion";
+import type { MedidaQa, PeriodoInforme } from "../../logic/informe";
 import { nombrePdf, rutaInforme } from "../../logic/paths";
 import { carasQueFaltan } from "../../slides/fuentes";
 import type { InformeJson } from "../../slides/tipos";
-import type { EstadoInforme } from "../../types";
+import type { EstadoInforme, IncidenciaCoherencia } from "../../types";
 import { Aviso, Boton } from "../componentes";
+import { DialogoExportar } from "../exportacion/DialogoExportar";
 import { VisorSlide } from "../slides/VisorSlide";
 import "./impresion.css";
 
@@ -18,6 +22,9 @@ interface Props {
   estado: EstadoInforme;
   version: number;
   contenido: InformeJson;
+  periodo: PeriodoInforme;
+  /** Incoherencias que señaló Claude en la última revisión. */
+  coherencia: IncidenciaCoherencia[];
   /** La abre el servidor para generar el PDF: slides a su tamaño real y sin nada alrededor. */
   modoPdf?: boolean;
 }
@@ -34,18 +41,37 @@ interface Props {
  * falla se pone `data-error`, a la vista, en vez de dejar salir un PDF distinto
  * de lo que se ve en el editor.
  */
-export function VistaImpresion({ id, codigo, trimestre, estado, version, contenido, modoPdf }: Props) {
+export function VistaImpresion({ id, codigo, trimestre, estado, version, contenido, periodo, coherencia, modoPdf }: Props) {
   const raiz = useRef<HTMLDivElement>(null);
   const visibles = useMemo(() => contenido.slides.filter((s) => !s.oculto), [contenido]);
-  // Slides ya pintadas, por id (una slide puede pintarse más de una vez).
+  // Slides ya pintadas, por id (una slide puede pintarse más de una vez), con lo medido al pintarlas.
   const [pintadas, setPintadas] = useState<Record<string, string | null>>({});
+  const [medidas, setMedidas] = useState<Record<string, MedidaQa>>({});
   const todasPintadas = visibles.every((s) => s.id in pintadas);
+  // Validador de exportación, con lo medido en esta misma vista: lo lee el servidor (data-incidencias) y el botón de imprimir.
+  const incidencias = useMemo(
+    () => (todasPintadas ? incidenciasExportacion(contenido.slides, medidas, periodo, coherencia) : []),
+    [todasPintadas, contenido, medidas, periodo, coherencia],
+  );
+  const [exportando, setExportando] = useState<{ ocupado: boolean; error: string | null } | null>(null);
   // Alguna slide se pintó (y se midió) sin sus fuentes: ya no vale aunque lleguen después.
   const sinFuentes = useRef<string[]>([]);
   const [comprobado, setComprobado] = useState<{ error: string | null } | null>(null);
   const listo = todasPintadas && comprobado?.error === null;
   const error = todasPintadas ? (comprobado?.error ?? null) : null;
   const nombre = nombrePdf({ codigo, trimestre, estado, version });
+
+  /** Anota la impresión (con lo que dijo el validador) y abre el diálogo de impresión del navegador. */
+  async function imprimir(confirmado: boolean) {
+    setExportando({ ocupado: true, error: null });
+    const r = await accionRegistrarImpresion(id, { incidencias, confirmado: incidencias.length > 0 && confirmado });
+    if (!r.ok) {
+      setExportando({ ocupado: false, error: `No se ha podido anotar la exportación: ${r.error}` });
+      return;
+    }
+    setExportando(null);
+    window.print();
+  }
 
   // Tamaño de página del PDF, solo mientras esta vista está abierta.
   useEffect(() => {
@@ -114,7 +140,7 @@ export function VistaImpresion({ id, codigo, trimestre, estado, version, conteni
           <Link href={rutaInforme(id)} className="text-sm font-medium text-icam-900 hover:underline">
             Volver al informe
           </Link>
-          <Boton variante="primario" disabled={!listo} onClick={() => window.print()}>
+          <Boton variante="primario" disabled={!listo} onClick={() => setExportando({ ocupado: false, error: null })}>
             {listo ? "Imprimir o guardar como PDF" : error ? "No se puede imprimir" : "Preparando…"}
           </Boton>
         </div>
@@ -129,7 +155,22 @@ export function VistaImpresion({ id, codigo, trimestre, estado, version, conteni
           </Aviso>
         )}
       </div>
-      <div className={`iq-paginas${modoPdf ? " iq-modo-pdf" : ""}`} data-listo={listo ? "1" : undefined} data-error={error ?? undefined}>
+      {exportando ? (
+        <DialogoExportar
+          medio="impresion"
+          incidencias={incidencias}
+          ocupado={exportando.ocupado}
+          error={exportando.error}
+          onCerrar={() => setExportando(null)}
+          onExportar={(confirmado) => void imprimir(confirmado)}
+        />
+      ) : null}
+      <div
+        className={`iq-paginas${modoPdf ? " iq-modo-pdf" : ""}`}
+        data-listo={listo ? "1" : undefined}
+        data-error={error ?? undefined}
+        data-incidencias={listo ? JSON.stringify(incidencias) : undefined}
+      >
         {visibles.map((s, i) => (
           <div key={s.id} className="iq-pagina-pdf">
             <VisorSlide
@@ -140,6 +181,7 @@ export function VistaImpresion({ id, codigo, trimestre, estado, version, conteni
               onPintado={(r) => {
                 sinFuentes.current.push(...carasQueFaltan());
                 setPintadas((p) => ({ ...p, [s.id]: r.error ?? null }));
+                setMedidas((m) => ({ ...m, [s.id]: { pendientes: r.pendientes, relleno: r.medida?.relleno ?? null, desborde: r.medida?.desborde, error: r.error } }));
               }}
             />
           </div>
