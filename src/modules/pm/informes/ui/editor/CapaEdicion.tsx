@@ -39,6 +39,7 @@ import {
   type NodoArbol,
 } from "../../logic/edicion";
 import { tituloDe, type Ruta } from "../../logic/informe";
+import { alinear, AREA, colocarLibre, libreDe, limitarLibre, RATIOS, volverAlFlujo, type CajaBloque, type EjeAlineacion, type Libre } from "../../logic/libre";
 import type { SlideJson } from "../../slides/tipos";
 import { PARA_FINANZAS, type CategoriaFoto, type Foto } from "../../types";
 import { claseCampo } from "../componentes";
@@ -89,6 +90,9 @@ interface Geometria {
   imagenes: { im: ImagenPintada; caja: Caja }[];
   contenedores: { nodo: NodoArbol; caja: Caja; hijos: Caja[] }[];
   desajustes: number;
+  /** Esquina del área de contenido (.iq-contenido) en la capa, para situar bloques libres mientras se arrastran. */
+  contenidoX?: number;
+  contenidoY?: number;
 }
 
 interface Destino {
@@ -114,6 +118,8 @@ interface Pulso extends Seleccion {
   x: number;
   y: number;
   arrastrando: boolean;
+  /** El bloque está en disposición libre: se arrastra a donde se suelte (o se estira por un lado), no a un hueco. */
+  libre?: { el: HTMLElement; caja0: Libre; caja: Libre; lado?: "e" | "o" };
 }
 
 function dentro(c: Caja, x: number, y: number): boolean {
@@ -286,6 +292,21 @@ export function CapaEdicion({
   const [pulso, setPulso] = useState<Pulso | null>(null);
   const [fotosAbiertas, setFotosAbiertas] = useState(false);
   const [reencuadrando, setReencuadrando] = useState(false);
+  // «Alinear con…»: bloque de partida esperando a que se pulse el otro, y después las opciones (eje y ratio).
+  const [alineando, setAlineando] = useState<Ruta | null>(null);
+  const [alineacion, setAlineacion] = useState<{ a: Ruta; b: Ruta; eje: EjeAlineacion; ratio: string } | null>(null);
+
+  // Esc deja «Alinear con…» a medias.
+  useEffect(() => {
+    if (!alineando && !alineacion) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAlineando(null);
+      setAlineacion(null);
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [alineando, alineacion]);
 
   useEffect(() => {
     const c = capa.current;
@@ -309,6 +330,14 @@ export function CapaEdicion({
           hijos: (Array.from(x.el.children) as HTMLElement[]).map((h) => cajaDe(h, c)),
         })),
         desajustes: mapa.desajustes,
+        contenidoX: (() => {
+          const ca = lienzo.querySelector(".iq-contenido");
+          return ca ? cajaDe(ca, c).x : 0;
+        })(),
+        contenidoY: (() => {
+          const ca = lienzo.querySelector(".iq-contenido");
+          return ca ? cajaDe(ca, c).y : 0;
+        })(),
       });
     };
     const ro = new ResizeObserver(medir);
@@ -322,7 +351,7 @@ export function CapaEdicion({
   const unidad = sel?.tipo === "bloque" ? (geo?.bloques.find((u) => mismaRuta(u.b.nodo.ruta, sel.ruta)) ?? null) : imagen ? bloqueDe(imagen.im) : null;
   /** Grupo que contiene a la unidad seleccionada, si es a su vez un bloque que se puede mover. */
   const grupo = unidad ? (geo?.bloques.find((u) => u.b.nodo === unidad.b.padre) ?? null) : null;
-  const origenArrastre = pulso?.arrastrando && pulso.bloque ? (geo?.bloques.find((u) => mismaRuta(u.b.nodo.ruta, pulso.bloque!)) ?? null) : null;
+  const origenArrastre = pulso?.arrastrando && pulso.bloque && !pulso.libre ? (geo?.bloques.find((u) => mismaRuta(u.b.nodo.ruta, pulso.bloque!)) ?? null) : null;
   const destinos = useMemo(() => (geo && origenArrastre ? destinosDe(geo, origenArrastre.b) : []), [geo, origenArrastre]);
   // Una foto de galería soltada sobre otra de la misma galería: se intercambian. En cualquier otro sitio, se mueve su bloque.
   const imagenDestino =
@@ -348,6 +377,20 @@ export function CapaEdicion({
     return [e.clientX - r.left, e.clientY - r.top];
   }
 
+  /** Caja de la capa (px de pantalla) en unidades de slide. */
+  const aSlide = (c: Caja): CajaBloque => {
+    const k = (geo?.ancho ?? 960) / 960;
+    return { x: c.x / k, y: c.y / k, ancho: c.w / k, alto: c.h / k };
+  };
+  const libreDeUnidad = (u: { b: BloquePintado } | null) => (u ? libreDe(leerRuta(trabajo, u.b.nodo.ruta)) : null);
+
+  /** Mientras se arrastra o se estira un bloque libre, el bloque pintado sigue al puntero; al soltar, el slide manda. */
+  function moverPintado(el: HTMLElement, l: Libre) {
+    el.style.left = `${l.x - AREA.izquierda}px`;
+    el.style.top = `${l.y - AREA.arriba}px`;
+    el.style.width = `${l.ancho}px`;
+  }
+
   function alPulsar(e: React.PointerEvent) {
     // Los eventos del diálogo de imagen suben hasta aquí por el árbol de React aunque se pinte fuera.
     if (!geo || trabajando || fotosAbiertas || anadiendo || e.button > 0) return;
@@ -364,21 +407,81 @@ export function CapaEdicion({
     if (!(reencuadrando && sel && nuevo.tipo === "imagen" && mismaRuta(nuevo.ruta, sel.ruta))) setReencuadrando(false);
     e.preventDefault();
     capa.current!.setPointerCapture(e.pointerId);
+    // Segundo clic de «Alinear con…»: el otro bloque es la referencia.
+    const unidadPulsada = im ? bloqueDe(im.im) : (u ?? null);
+    if (alineando && unidadPulsada && !mismaRuta(unidadPulsada.b.nodo.ruta, alineando)) {
+      setAlineacion({ a: alineando, b: unidadPulsada.b.nodo.ruta, eje: "horizontal", ratio: "1:1" });
+      setAlineando(null);
+      setPulso(null);
+      return;
+    }
     setSel(nuevo);
     const bloque = im ? (bloqueDe(im.im)?.b.nodo.ruta ?? null) : (u?.b.nodo.ruta ?? null);
-    setPulso({ ...nuevo, bloque, imagen: im?.im.ruta ?? null, x0: x, y0: y, x, y, arrastrando: false });
+    const libre = unidadPulsada ? libreDeUnidad(unidadPulsada) : null;
+    setPulso({
+      ...nuevo,
+      bloque,
+      imagen: im?.im.ruta ?? null,
+      x0: x,
+      y0: y,
+      x,
+      y,
+      arrastrando: false,
+      libre: libre && unidadPulsada ? { el: unidadPulsada.b.el, caja0: libre, caja: libre } : undefined,
+    });
+  }
+
+  /** Tirador de un lado de un bloque libre: cambia su ancho (por la izquierda, también su x). */
+  function alPulsarTirador(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    const lado = e.currentTarget.dataset.lado as "e" | "o";
+    if (!unidad || trabajando || e.button > 0) return;
+    const libre = libreDeUnidad(unidad);
+    if (!libre) return;
+    e.preventDefault();
+    capa.current!.setPointerCapture(e.pointerId);
+    const [x, y] = punto(e);
+    setPulso({ tipo: "bloque", ruta: unidad.b.nodo.ruta, bloque: unidad.b.nodo.ruta, imagen: null, x0: x, y0: y, x, y, arrastrando: true, libre: { el: unidad.b.el, caja0: libre, caja: libre, lado } });
   }
 
   function alMover(e: React.PointerEvent) {
     if (!pulso) return;
     const [x, y] = punto(e);
-    setPulso({ ...pulso, x, y, arrastrando: pulso.arrastrando || (!reencuadrando && Math.hypot(x - pulso.x0, y - pulso.y0) > 6) });
+    const arrastrando = pulso.arrastrando || (!reencuadrando && Math.hypot(x - pulso.x0, y - pulso.y0) > 6);
+    if (pulso.libre && arrastrando && !(pulso.imagen && reencuadrando)) {
+      const k = (geo?.ancho ?? 960) / 960;
+      const dx = (x - pulso.x0) / k;
+      const dy = (y - pulso.y0) / k;
+      const c0 = pulso.libre.caja0;
+      const caja = limitarLibre(
+        pulso.libre.lado === "e"
+          ? { ...c0, ancho: c0.ancho + dx }
+          : pulso.libre.lado === "o"
+            ? { x: Math.min(c0.x + dx, c0.x + c0.ancho - 40), y: c0.y, ancho: c0.ancho - Math.min(dx, c0.ancho - 40) }
+            : { ...c0, x: c0.x + dx, y: c0.y + dy },
+      );
+      moverPintado(pulso.libre.el, caja);
+      setPulso({ ...pulso, x, y, arrastrando, libre: { ...pulso.libre, caja } });
+      return;
+    }
+    setPulso({ ...pulso, x, y, arrastrando });
   }
 
   function alSoltar() {
     const p = pulso;
     setPulso(null);
     if (!p || !geo) return;
+    if (p.arrastrando && p.libre) {
+      // Bloque libre: se queda donde se ha soltado (si no ha cambiado, vuelve a su sitio).
+      const { caja0, caja } = p.libre;
+      if (caja.x === caja0.x && caja.y === caja0.y && caja.ancho === caja0.ancho) {
+        moverPintado(p.libre.el, caja0);
+        return;
+      }
+      setSel({ tipo: "bloque", ruta: p.bloque! });
+      aplicar(colocarLibre(trabajo, p.bloque!, caja), `${titulo}: bloque ${p.libre.lado ? "redimensionado" : "movido"} en disposición libre`);
+      return;
+    }
     if (p.arrastrando) {
       if (p.imagen && imagenDestino) {
         setSel({ tipo: "imagen", ruta: imagenDestino.im.ruta });
@@ -530,8 +633,31 @@ export function CapaEdicion({
     return { left: Math.max(4, Math.min(c.x, W - ancho - 4)), top: c.y >= 34 ? c.y - 32 : c.y + 4, maxWidth: W - 8 };
   }
 
+  const libreSel = libreDeUnidad(unidad);
+  /** Desplaza un bloque libre (1 unidad; con Mayús, 10). */
+  const desplazar = (dx: number, dy: number, e: React.MouseEvent) => {
+    if (!unidad || !libreSel) return;
+    const paso = e.shiftKey ? 10 : 1;
+    aplicar(colocarLibre(trabajo, unidad.b.nodo.ruta, { ...libreSel, x: libreSel.x + dx * paso, y: libreSel.y + dy * paso }), `${titulo}: bloque movido en disposición libre`);
+  };
+
   /** Flechas para mover la unidad seleccionada (un bloque o una imagen suelta). */
-  const flechas = unidad ? (
+  const flechas = unidad && libreSel ? (
+    <>
+      {(
+        [
+          ["←", -1, 0, "Un poco a la izquierda (Mayús: 10)"],
+          ["↑", 0, -1, "Un poco arriba (Mayús: 10)"],
+          ["↓", 0, 1, "Un poco abajo (Mayús: 10)"],
+          ["→", 1, 0, "Un poco a la derecha (Mayús: 10)"],
+        ] as const
+      ).map(([t, dx, dy, ayuda]) => (
+        <button key={t} type="button" className={boton} aria-label={ayuda} title={ayuda} disabled={trabajando} onClick={(e) => desplazar(dx, dy, e)}>
+          {t}
+        </button>
+      ))}
+    </>
+  ) : unidad ? (
     <>
       {enPila ? (
         <>
@@ -556,6 +682,60 @@ export function CapaEdicion({
     </>
   ) : null;
 
+  /** Botones de disposición libre y alineación de la unidad seleccionada (bloque o el bloque de la imagen). */
+  const disposicionLibre = unidad ? (
+    <>
+      {libreSel ? (
+        <button
+          type="button"
+          className={boton}
+          disabled={trabajando}
+          title="Devuelve el bloque al flujo de su columna"
+          onClick={() => aplicar(volverAlFlujo(trabajo, unidad.b.nodo.ruta), `${titulo}: bloque devuelto al flujo`)}
+        >
+          Volver al flujo
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={boton}
+          disabled={trabajando}
+          title="Saca el bloque del flujo: después se arrastra a cualquier sitio del área de contenido y se estira por los lados"
+          onClick={() => {
+            const c = aSlide(unidad.caja);
+            aplicar(colocarLibre(trabajo, unidad.b.nodo.ruta, { x: c.x, y: c.y, ancho: c.ancho }), `${titulo}: bloque en disposición libre`);
+          }}
+        >
+          Posición libre
+        </button>
+      )}
+      <button
+        type="button"
+        className={`${boton} ${alineando ? "!border-icam-900 !bg-icam-100" : ""}`}
+        aria-pressed={!!alineando}
+        disabled={trabajando || (geo?.unidades.length ?? 0) < 2}
+        title="Elige el bloque con el que alinear este: después se pregunta si en fila o en columna y cómo repartir el espacio"
+        onClick={() => setAlineando(alineando ? null : unidad.b.nodo.ruta)}
+      >
+        {alineando ? "Elige el otro bloque…" : "Alinear con…"}
+      </button>
+    </>
+  ) : null;
+
+  const tiradores =
+    unidad && libreSel && !pulso?.arrastrando && !trabajando
+      ? (["o", "e"] as const).map((lado) => (
+          <div
+            key={lado}
+            className="absolute z-10 h-5 w-2.5 rounded-sm border border-icam-900 bg-white shadow"
+            style={{ left: (lado === "o" ? unidad.caja.x : unidad.caja.x + unidad.caja.w) - 5, top: unidad.caja.y + unidad.caja.h / 2 - 10, cursor: "ew-resize" }}
+            title="Arrastra para cambiar el ancho"
+            data-lado={lado}
+            onPointerDown={alPulsarTirador}
+          />
+        ))
+      : null;
+
   return (
     <div
       ref={capa}
@@ -563,7 +743,14 @@ export function CapaEdicion({
       onPointerDown={modo === "disposicion" ? alPulsar : undefined}
       onPointerMove={modo === "disposicion" ? alMover : undefined}
       onPointerUp={modo === "disposicion" ? alSoltar : undefined}
-      onPointerCancel={modo === "disposicion" ? () => setPulso(null) : undefined}
+      onPointerCancel={
+        modo === "disposicion"
+          ? () => {
+              if (pulso?.libre) moverPintado(pulso.libre.el, pulso.libre.caja0);
+              setPulso(null);
+            }
+          : undefined
+      }
       onDoubleClick={
         modo === "disposicion"
           ? (e) => {
@@ -605,13 +792,16 @@ export function CapaEdicion({
         <>
           {geo.unidades.map(({ b, caja }) => {
             const elegida = unidad?.b === b;
+            // Un bloque libre que se arrastra o se estira: el contorno sigue al bloque pintado.
+            const k = geo.ancho / 960;
+            const c = elegida && pulso?.libre && pulso.arrastrando ? { x: (pulso.libre.caja.x - AREA.izquierda) * k + (geo.contenidoX ?? 0), y: (pulso.libre.caja.y - AREA.arriba) * k + (geo.contenidoY ?? 0), w: pulso.libre.caja.ancho * k, h: caja.h } : caja;
             return (
               <div
                 key={b.nodo.ruta.join("/")}
                 className={`absolute rounded-sm ${elegida ? "outline outline-2 outline-icam-900" : "outline-dashed outline-1 outline-icam-900/35"} ${
-                  pulso?.arrastrando && elegida ? "bg-icam-900/10" : ""
-                } cursor-grab`}
-                style={{ left: caja.x - 2, top: caja.y - 2, width: caja.w + 4, height: caja.h + 4 }}
+                  pulso?.arrastrando && elegida && !pulso.libre ? "bg-icam-900/10" : ""
+                } ${libreDe(leerRuta(trabajo, b.nodo.ruta)) ? "cursor-move" : "cursor-grab"}`}
+                style={{ left: c.x - 2, top: c.y - 2, width: c.w + 4, height: c.h + 4 }}
               />
             );
           })}
@@ -620,6 +810,78 @@ export function CapaEdicion({
               className={`absolute rounded-sm outline outline-2 outline-icam-900 ${pulso?.arrastrando ? "bg-icam-900/10" : ""}`}
               style={{ left: unidad.caja.x - 4, top: unidad.caja.y - 4, width: unidad.caja.w + 8, height: unidad.caja.h + 8 }}
             />
+          ) : null}
+          {tiradores}
+          {alineando ? (
+            <p className="pointer-events-none absolute left-2 top-2 z-20 rounded-md border border-icam-900 bg-card px-2 py-1 text-xs text-text-primary shadow-sm">
+              Pulsa el bloque con el que quieres alinear el seleccionado. Esc o el mismo botón para dejarlo.
+            </p>
+          ) : null}
+          {alineacion ? (
+            <div
+              className="absolute left-1/2 top-1/2 z-30 flex w-[340px] -translate-x-1/2 -translate-y-1/2 flex-col gap-2 rounded-md border border-subtle bg-card p-3 text-sm shadow-lg"
+              role="dialog"
+              aria-label="Alinear bloques"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <b className="text-text-primary">¿Cómo quieres alinearlos?</b>
+              <div className="flex gap-3">
+                {(
+                  [
+                    ["horizontal", "Horizontal: en la misma fila"],
+                    ["vertical", "Vertical: uno encima del otro"],
+                  ] as const
+                ).map(([eje, nombre]) => (
+                  <label key={eje} className="flex items-center gap-1.5">
+                    <input type="radio" name="eje" checked={alineacion.eje === eje} onChange={() => setAlineacion({ ...alineacion, eje })} />
+                    {nombre}
+                  </label>
+                ))}
+              </div>
+              <label className="flex items-center gap-2">
+                <span className="text-text-muted">Reparto</span>
+                <select
+                  className="rounded border border-subtle bg-card px-1 py-0.5 text-xs"
+                  value={alineacion.ratio}
+                  onChange={(e) => setAlineacion({ ...alineacion, ratio: e.target.value })}
+                >
+                  {RATIOS.map((r) => (
+                    <option key={r.valor} value={r.valor}>
+                      {r.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-xs text-text-muted">
+                {alineacion.eje === "horizontal"
+                  ? "El de la izquierda se queda a la izquierda; el reparto es del ancho que ocupan entre los dos."
+                  : "El de arriba se queda arriba, con el ancho del bloque de referencia; el reparto del alto solo se aplica entre dos imágenes sueltas."}{" "}
+                Los dos pasan a disposición libre.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-md bg-icam-900 px-3 py-1 text-xs font-medium text-white hover:bg-icam-800"
+                  onClick={() => {
+                    const ua = geo.bloques.find((u) => mismaRuta(u.b.nodo.ruta, alineacion.a));
+                    const ub = geo.bloques.find((u) => mismaRuta(u.b.nodo.ruta, alineacion.b));
+                    setAlineacion(null);
+                    if (!ua || !ub) return;
+                    const ratio = RATIOS.find((r) => r.valor === alineacion.ratio)?.partes ?? null;
+                    setSel({ tipo: "bloque", ruta: alineacion.a });
+                    aplicar(
+                      alinear(trabajo, { ruta: alineacion.a, caja: aSlide(ua.caja) }, { ruta: alineacion.b, caja: aSlide(ub.caja) }, { eje: alineacion.eje, ratio }),
+                      `${titulo}: bloques alineados en ${alineacion.eje === "horizontal" ? "fila" : "columna"}`,
+                    );
+                  }}
+                >
+                  Alinear
+                </button>
+                <button type="button" className="rounded-md border border-subtle px-3 py-1 text-xs font-medium hover:bg-page" onClick={() => setAlineacion(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
           ) : null}
           {geo.imagenes.map(({ im, caja }) => {
             const elegida = imagen?.im === im;
@@ -656,14 +918,28 @@ export function CapaEdicion({
               className="pointer-events-none absolute z-30 whitespace-nowrap rounded bg-icam-900 px-2 py-0.5 text-xs font-medium text-white shadow"
               style={{ left: pulso.x + 14, top: pulso.y + 14 }}
             >
-              {imagenDestino ? "Intercambiar con esta foto" : destino ? "Soltar aquí" : pulso.bloque ? "Lleva el bloque a un hueco" : "Esta imagen no se mueve"}
+              {pulso.libre
+                ? pulso.libre.lado
+                  ? `Ancho ${pulso.libre.caja.ancho}`
+                  : `x ${pulso.libre.caja.x} · y ${pulso.libre.caja.y}`
+                : imagenDestino
+                  ? "Intercambiar con esta foto"
+                  : destino
+                    ? "Soltar aquí"
+                    : pulso.bloque
+                      ? "Lleva el bloque a un hueco"
+                      : "Esta imagen no se mueve"}
             </div>
           ) : null}
 
           {unidad && !imagen && !pulso?.arrastrando ? (
             <div className={barra} style={sobre(unidad.caja, 330)} onPointerDown={(e) => e.stopPropagation()}>
-              <span className="px-1 font-medium text-text-muted">{NOMBRE_BLOQUE[unidad.b.nodo.c ?? ""] ?? unidad.b.nodo.c}</span>
+              <span className="px-1 font-medium text-text-muted">
+                {NOMBRE_BLOQUE[unidad.b.nodo.c ?? ""] ?? unidad.b.nodo.c}
+                {libreSel ? " · libre" : ""}
+              </span>
               {flechas}
+              {disposicionLibre}
               {grupo ? (
                 <button
                   type="button"
@@ -771,6 +1047,7 @@ export function CapaEdicion({
                 </>
               ) : null}
               {flechas}
+              {disposicionLibre}
               {imagen.im.grupo.tipo === "ImagenMarco" || imagen.im.grupo.tipo === "Galeria" ? (
                 <button
                   type="button"

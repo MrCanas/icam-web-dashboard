@@ -1,6 +1,7 @@
 import { createElement, type ReactNode } from "react";
 
 import { flotantesValidos } from "../logic/flotantes";
+import { AREA, libreDe } from "../logic/libre";
 import { componente, ETIQUETAS_HTML } from "./components";
 import { Contenido, Slide, SlideHeader } from "./components/base";
 import { rt } from "./texto";
@@ -40,8 +41,17 @@ function nodo(n: unknown, key?: number): ReactNode {
   const comp = HTML.has(o.c) ? o.c : componente(o.c);
   if (!comp) throw new Error("Componente desconocido: " + o.c);
   const props = valor(o.props || {}) as Record<string, unknown>;
-  props.key = key;
   const hijos = (o.hijos || []).map((x, i) => nodo(x, i));
+  // Disposición libre: el bloque se coloca donde diga `libre` (unidades de slide), dentro del área de contenido.
+  const libre = libreDe(o);
+  if (libre) {
+    return createElement(
+      "div",
+      { key, className: "iq-libre", style: { left: libre.x - AREA.izquierda, top: libre.y - AREA.arriba, width: libre.ancho } },
+      createElement(comp, props, ...hijos),
+    );
+  }
+  props.key = key;
   return createElement(comp, props, ...hijos);
 }
 

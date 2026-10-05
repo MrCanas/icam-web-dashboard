@@ -63,7 +63,8 @@ async function main() {
       log(`PDF leído de ${PDF} (${Math.round(pdf.length / 1024)} KB)`);
     } else {
       const t = Date.now();
-      const r = await sesion.request.get(`${URL_BASE}/api/informes/pdf/${encodeURIComponent(INFORME)}`, { timeout: 240_000 });
+      // Como el botón «PDF» con «Estoy seguro» marcado: la comprobación no depende de lo que falte en el informe.
+      const r = await sesion.request.post(`${URL_BASE}/api/informes/pdf/${encodeURIComponent(INFORME)}`, { data: { confirmado: true }, timeout: 240_000 });
       if (!r.ok()) throw new Error(`El servidor no ha generado el PDF (${r.status()}): ${(await r.text()).slice(0, 300)}`);
       pdf = await r.body();
       const destino = join(SALIDA, `${INFORME}.pdf`);

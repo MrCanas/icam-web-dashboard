@@ -132,7 +132,9 @@ export function airear(esc: HTMLElement): Medida | null {
   const fondo = (ps: Element[]) => ps.reduce((m, p) => Math.max(m, y(p, "bottom")), arriba);
   const todas = partes(cont);
   if (!todas.length) return { ocupacion: 0, relleno: 0, desborde: false };
-  const ultimo = Math.max(fondo(todas), fondo(Array.from(cont.querySelectorAll(".iq-cols > div > *"))));
+  // Los bloques en disposición libre no cuentan: la pila se mide como si no estuvieran.
+  const enFlujo = (sel: string) => Array.from(cont.querySelectorAll(sel)).filter((el) => !el.classList.contains("iq-libre"));
+  const ultimo = Math.max(fondo(todas), fondo(enFlujo(".iq-cols > div > *")));
   const ocupacion = Math.round((100 * (ultimo - arriba)) / (limite - arriba));
   if (ultimo > limite + 1) return { ocupacion, relleno: ocupacion, desborde: true };
 
@@ -147,14 +149,14 @@ export function airear(esc: HTMLElement): Medida | null {
       libre -= g * (gs.length - 1);
     }
     const sep = Array.from(contenedor.querySelectorAll<HTMLElement>(".iq-texto p, .iq-vinetas li")).filter(
-      (el) => el.previousElementSibling,
+      (el) => el.previousElementSibling && !el.closest(".iq-libre"),
     );
     if (libre > 4 && sep.length) {
       const d = Math.min(TOPE_PARRAFO, libre / sep.length);
       sep.forEach((el) => sumarMargen(el, d));
       libre -= d * sep.length;
     }
-    const filas = contenedor.querySelectorAll(".iq-tabla-rayada tbody tr");
+    const filas = Array.from(contenedor.querySelectorAll(".iq-tabla-rayada tbody tr")).filter((tr) => !tr.closest(".iq-libre"));
     if (libre > 4 && filas.length) {
       const c = Math.min(TOPE_CELDA, libre / (2 * filas.length));
       filas.forEach((tr) => {
@@ -178,7 +180,7 @@ export function airear(esc: HTMLElement): Medida | null {
       const tope = y(grid, "bottom") + sobrante;
       Array.prototype.forEach.call(grid.children, (col: Element) => airearCont(col, tope));
     });
-  const despues = Math.max(fondo(partes(cont)), fondo(Array.from(cont.querySelectorAll(".iq-cols > div > *"))));
+  const despues = Math.max(fondo(partes(cont)), fondo(enFlujo(".iq-cols > div > *")));
   return { ocupacion, relleno: Math.round((100 * (despues - arriba)) / (limite - arriba)), desborde: false };
 }
 

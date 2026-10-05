@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
 import { canAccessRouteKey } from "@/lib/auth/permissions";
+import { registrarExportacion } from "@/modules/pm/informes/data/exportacionesRepository";
 import { obtenerInforme } from "@/modules/pm/informes/data/informesRepository";
 import { abrirNavegadorPdf, contextoPdf, ErrorPdf, imprimirInforme } from "@/modules/pm/informes/data/pdfInforme";
 import { nombrePdf, rutaImprimirPdf } from "@/modules/pm/informes/logic/paths";
@@ -37,8 +38,12 @@ function origenPortal(request: NextRequest): string | null {
  * mismo que se ve en el editor, una slide por página de 960 × 540 pt. El
  * navegador del servidor entra con la sesión de quien lo pide (ve lo que esa
  * persona puede ver) y se cierra al terminar.
+ *
+ * Cuerpo: `{ confirmado }`. El validador se pasa aquí, con lo que calcula la
+ * propia vista: si hay incidencias y no se ha confirmado, no hay PDF (409 con
+ * la lista). Cada PDF que sale queda anotado en el registro de exportaciones.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await getCurrentUser();
   if (!ctx) return NextResponse.json({ error: "Tu sesión ha caducado: vuelve a entrar." }, { status: 401 });
   if (!canAccessRouteKey(ctx, "pm.informes")) return NextResponse.json({ error: "Sin acceso a los informes." }, { status: 403 });
@@ -50,6 +55,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!r.data.contenido?.slides?.some((s) => !s.oculto)) {
     return NextResponse.json({ error: "Este informe todavía no tiene slides." }, { status: 409 });
   }
+  const cuerpo = (await request.json().catch(() => ({}))) as { confirmado?: unknown };
+  const confirmado = cuerpo.confirmado === true;
   const origen = origenPortal(request);
   const sesion = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!origen || !sesion) {
@@ -70,7 +77,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       { name: SESSION_COOKIE_NAME, value: sesion, url: origen, httpOnly: true, secure: seguras },
       ...(vercel ? [{ name: COOKIE_VERCEL, value: vercel, url: origen, httpOnly: true, secure: seguras }] : []),
     ]);
-    const pdf = await imprimirInforme(contexto, origen + rutaImprimirPdf(id));
+    const { pdf, incidencias } = await imprimirInforme(contexto, origen + rutaImprimirPdf(id));
+    if (incidencias.length && !confirmado) {
+      return NextResponse.json(
+        { error: "El validador ha encontrado incidencias: hay que marcar «Estoy seguro» para exportar así.", incidencias },
+        { status: 409 },
+      );
+    }
+    const registro = await registrarExportacion(ctx, r.data, { medio: "pdf", incidencias, confirmado: incidencias.length > 0 && confirmado });
+    if (registro.error !== null) return NextResponse.json({ error: `No se ha podido anotar la exportación: ${registro.error}` }, { status: 500 });
     const nombre = `${nombrePdf(r.data)}.pdf`;
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
