@@ -176,7 +176,7 @@ async function main() {
 
     // PDF: el que genera el servidor, como el botón «PDF» del editor.
     const id = decodeURIComponent(page.url().split("/informes/")[1]!.split(/[?#]/)[0]!);
-    const r = await ctx.request.get(`${URL_BASE}/api/informes/pdf/${encodeURIComponent(id)}`, { timeout: 240_000 });
+    const r = await ctx.request.post(`${URL_BASE}/api/informes/pdf/${encodeURIComponent(id)}`, { data: { confirmado: true }, timeout: 240_000 });
     if (!r.ok()) throw new Error(`El servidor no ha generado el PDF (${r.status()}): ${(await r.text()).slice(0, 300)}`);
     const pdf = join(SALIDA, `${id}.pdf`);
     writeFileSync(pdf, await r.body());

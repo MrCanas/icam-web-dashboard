@@ -1,5 +1,7 @@
 import { chromium, type Browser, type BrowserContext } from "playwright-core";
 
+import type { IncidenciaExportacion } from "../types";
+
 /**
  * PDF del informe hecho en el servidor: un Chromium sin ventana abre la vista
  * de impresión (la misma que ve el equipo, con las mismas slides) y la guarda
@@ -60,12 +62,13 @@ export async function contextoPdf(navegador: Browser, origen: string, cabeceras:
 }
 
 /**
- * Abre la vista de impresión (`url`, con ?pdf=1) y devuelve el PDF. Espera a
- * que la vista se declare lista —slides pintadas con sus fuentes e imágenes
- * cargadas— y falla con su mensaje si declara un error: nunca devuelve un PDF
- * que no sea fiel.
+ * Abre la vista de impresión (`url`, con ?pdf=1) y devuelve el PDF junto con
+ * lo que el validador de exportación ha encontrado en esa misma vista
+ * (`data-incidencias`). Espera a que la vista se declare lista —slides
+ * pintadas con sus fuentes e imágenes cargadas— y falla con su mensaje si
+ * declara un error: nunca devuelve un PDF que no sea fiel.
  */
-export async function imprimirInforme(contexto: BrowserContext, url: string): Promise<Buffer> {
+export async function imprimirInforme(contexto: BrowserContext, url: string): Promise<{ pdf: Buffer; incidencias: IncidenciaExportacion[] }> {
   const page = await contexto.newPage();
   const errores: string[] = [];
   page.on("pageerror", (e) => errores.push(e.message));
@@ -80,6 +83,13 @@ export async function imprimirInforme(contexto: BrowserContext, url: string): Pr
   }
   const error = await marca.getAttribute("data-error");
   if (error) throw new ErrorPdf(`El PDF no saldría igual que el informe: ${error}.`);
+  let incidencias: IncidenciaExportacion[] = [];
+  try {
+    incidencias = JSON.parse((await marca.getAttribute("data-incidencias")) || "[]") as IncidenciaExportacion[];
+  } catch {
+    // Sin lista no se puede validar: mejor no dejar pasar nada en silencio.
+    throw new ErrorPdf("La vista de impresión no ha devuelto el resultado del validador.");
+  }
   await page.emulateMedia({ media: "print" });
-  return page.pdf({ preferCSSPageSize: true, printBackground: true });
+  return { pdf: await page.pdf({ preferCSSPageSize: true, printBackground: true }), incidencias };
 }

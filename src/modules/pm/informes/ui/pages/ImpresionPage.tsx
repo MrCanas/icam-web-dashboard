@@ -18,6 +18,8 @@ export default async function ImpresionPage({ ctx, id, modoPdf }: { ctx: UserCon
       estado={r.data.estado}
       version={r.data.version}
       contenido={r.data.contenido}
+      periodo={{ trimestre: r.data.trimestre, trimestreAnterior: r.data.trimestreAnterior, siguiente: r.data.siguiente }}
+      coherencia={r.data.qa?.coherencia ?? []}
       modoPdf={modoPdf}
     />
   );

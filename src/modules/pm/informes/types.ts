@@ -154,6 +154,29 @@ export interface FotoBiblioteca extends Foto {
   creada: string;
 }
 
+/** Lo que el validador señala antes de exportar: lo mismo que la revisión del editor, con una explicación. */
+export interface IncidenciaExportacion {
+  nivel: "error" | "aviso";
+  slide: string;
+  texto: string;
+}
+
+/** 'pdf': descarga hecha en el servidor · 'impresion': diálogo de impresión del navegador. */
+export type MedioExportacion = "pdf" | "impresion";
+
+/** Una exportación del informe: quién, cuándo, cómo y si tuvo que marcar «Estoy seguro». */
+export interface Exportacion {
+  id: number;
+  fecha: string;
+  usuario: string;
+  email: string;
+  medio: MedioExportacion;
+  version: number;
+  estado: string;
+  incidencias: IncidenciaExportacion[];
+  confirmado: boolean;
+}
+
 export interface Cambio {
   id: number;
   texto: string;

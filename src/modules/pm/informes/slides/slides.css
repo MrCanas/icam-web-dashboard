@@ -126,6 +126,8 @@
 /* Imágenes colocadas a mano en un área: capa encima del slide, fuera de su flujo y de su plantilla. */
 .iq-flotantes { position: absolute; left: 0; top: 0; width: 960px; height: 540px; overflow: hidden; pointer-events: none; z-index: 1; }
 .iq-flotante { position: absolute; max-width: none; }
+/* Bloque en disposición libre: fuera del flujo de su columna, colocado dentro del área de contenido. */
+.iq-libre { position: absolute; }
 
 /* ---------- Cover ---------- */
 .iq-portada-fecha { position: absolute; left: 32px; top: 22px; font-size: 20px; line-height: 1; color: var(--paper); }

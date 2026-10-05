@@ -2,20 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { accionBorrarInforme, accionGuardarVersion, accionHistorial } from "../../actions/informes";
+import { accionBorrarInforme, accionExportaciones, accionGuardarVersion, accionHistorial } from "../../actions/informes";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
 import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
+import { incidenciasExportacion, resumenIncidencias } from "../../logic/exportacion";
 import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, qaMecanico, renumerar, tituloDe, validarSlide, type MedidaQa } from "../../logic/informe";
 import { rutaImprimir, rutaListaInformes, rutaPdf } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
 import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
-import type { Cambio, IncidenciaCoherencia, ResumenUso, Seleccion } from "../../types";
+import type { Cambio, Exportacion, IncidenciaCoherencia, ResumenUso, Seleccion } from "../../types";
 import { Aviso, Boton, ChipEstado, claseCampo, fechaCorta, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
+import { DialogoExportar } from "../exportacion/DialogoExportar";
 import { esCancelado, mensajeErrorClaude, pedirClaude } from "../lib/claude";
 import type { ResultadoVisor } from "../slides/VisorSlide";
 import { TarjetaSlide } from "./TarjetaSlide";
@@ -38,6 +40,9 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const [historial, setHistorial] = useState<Cambio[] | null>(null);
   const [uso, setUso] = useState<ResumenUso | null>(usoInicial);
   const [pdf, setPdf] = useState<{ generando: boolean; error: string | null }>({ generando: false, error: null });
+  // Validador de exportación abierto, y registro de exportaciones (null: sin cargar; string: no se ha podido leer).
+  const [exportando, setExportando] = useState(false);
+  const [exportaciones, setExportaciones] = useState<Exportacion[] | string | null>(null);
 
   // Cada slide conserva su objeto mientras no cambie su contenido: así no se repintan todas tras cada guardado.
   const [cache] = useState(() => new Map<string, { json: string; slide: SlideJson }>());
@@ -94,6 +99,16 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const qa = useMemo(() => (contenido ? qaMecanico(contenido.slides, medidasQa, informe) : []), [contenido, medidasQa, informe]);
   const medidasCompletas = visibles.every((s) => medidas[s.id]);
   const bloqueantes = qa.filter((x) => x.nivel === "error");
+  // Lo que verá el validador antes de exportar: la revisión más las incoherencias, Finanzas y huecos de imagen.
+  const incidencias = useMemo(
+    () => (contenido ? incidenciasExportacion(contenido.slides, medidasQa, informe, informe.qa?.coherencia ?? []) : []),
+    [contenido, medidasQa, informe],
+  );
+
+  const cargarExportaciones = useCallback(() => {
+    void accionExportaciones(informe.id).then((r) => setExportaciones(r.ok ? r.data : r.error));
+  }, [informe.id]);
+  useEffect(() => cargarExportaciones(), [cargarExportaciones]);
 
   if (!contenido) {
     return (
@@ -316,12 +331,19 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     router.push(rutaListaInformes());
   }
 
-  /** Descarga el PDF hecho en el servidor, con todo lo editado ya guardado. */
-  async function descargarPdf() {
+  /**
+   * Descarga el PDF hecho en el servidor, con todo lo editado ya guardado. El
+   * servidor vuelve a pasar el validador y anota la exportación.
+   */
+  async function descargarPdf(confirmado: boolean) {
     setPdf({ generando: true, error: null });
     try {
       await h.guardadoAlDia();
-      const r = await fetch(rutaPdf(informe.id));
+      const r = await fetch(rutaPdf(informe.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmado }),
+      });
       if (!r.ok) {
         const cuerpo = (await r.json().catch(() => null)) as { error?: string } | null;
         throw new Error(cuerpo?.error ?? `el servidor ha respondido ${r.status}.`);
@@ -334,6 +356,8 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       setPdf({ generando: false, error: null });
+      setExportando(false);
+      cargarExportaciones();
     } catch (e) {
       setPdf({ generando: false, error: e instanceof Error ? e.message : "error desconocido." });
     }
@@ -384,7 +408,15 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
               <Link href={rutaImprimir(informe.id)} className="text-sm font-medium text-icam-900 hover:underline">
                 Vista de impresión
               </Link>
-              <Boton variante="primario" disabled={pdf.generando} title="Descarga el informe en PDF, tal como se ve aquí" onClick={() => void descargarPdf()}>
+              <Boton
+                variante="primario"
+                disabled={pdf.generando || !medidasCompletas}
+                title={medidasCompletas ? "Descarga el informe en PDF, tal como se ve aquí, tras pasar el validador" : "Espera a que termine la revisión de las slides"}
+                onClick={() => {
+                  setPdf({ generando: false, error: null });
+                  setExportando(true);
+                }}
+              >
                 {pdf.generando ? "Generando PDF…" : "PDF"}
               </Boton>
             </>
@@ -392,10 +424,20 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
         </div>
       </div>
 
-      {pdf.error ? (
+      {pdf.error && !exportando ? (
         <Aviso tipo="error">
           No se ha podido generar el PDF: {pdf.error} Mientras tanto puedes sacarlo desde la «Vista de impresión».
         </Aviso>
+      ) : null}
+      {exportando ? (
+        <DialogoExportar
+          medio="pdf"
+          incidencias={incidencias}
+          ocupado={pdf.generando}
+          error={pdf.error ? `No se ha podido generar el PDF: ${pdf.error}` : null}
+          onCerrar={() => setExportando(false)}
+          onExportar={(confirmado) => void descargarPdf(confirmado)}
+        />
       ) : null}
 
       <Tarjeta>
@@ -548,6 +590,47 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
           </ul>
         </Tarjeta>
       ) : null}
+
+      <Tarjeta>
+        <h2 className="text-sm font-semibold text-text-primary">Exportaciones</h2>
+        {exportaciones === null ? (
+          <p className="text-sm text-text-muted">Cargando…</p>
+        ) : typeof exportaciones === "string" ? (
+          <p className="text-sm text-red-700">No se ha podido leer el registro: {exportaciones}</p>
+        ) : !exportaciones.length ? (
+          <p className="text-sm text-text-muted">Nadie ha exportado todavía este informe.</p>
+        ) : (
+          <ul className="space-y-1.5 text-sm">
+            {exportaciones.map((e) => (
+              <li key={e.id} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span className="text-text-muted">{fechaCorta(e.fecha)}</span>
+                <b className="text-text-primary">{e.usuario}</b>
+                <span className="text-text-muted">
+                  · {e.medio === "pdf" ? "PDF descargado" : "impreso desde la vista de impresión"} · v{e.version} · {e.estado}
+                </span>
+                {e.incidencias.length ? (
+                  <details className="basis-full">
+                    <summary className={`cursor-pointer ${e.confirmado ? "text-amber-800" : "text-text-muted"}`}>
+                      {e.confirmado ? "Marcó «Estoy seguro» con " : "Con "}
+                      {resumenIncidencias(e.incidencias)}
+                    </summary>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-text-muted">
+                      {e.incidencias.map((x, i) => (
+                        <li key={i}>
+                          {x.nivel === "error" ? "Bloqueante" : "Aviso"}
+                          {x.slide ? ` · ${x.slide}` : ""} · {x.texto}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : (
+                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800">sin incidencias</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Tarjeta>
 
       {historial?.length ? (
         <details className="rounded-lg border border-subtle/50 bg-card p-4 shadow-sm">

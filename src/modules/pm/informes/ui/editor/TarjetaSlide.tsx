@@ -76,6 +76,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   const terminarAnadir = useCallback(() => setAnadiendo(false), []);
   const [anadiendoLibre, setAnadiendoLibre] = useState(false);
   const terminarAnadirLibre = useCallback(() => setAnadiendoLibre(false), []);
+  // La slide tal como estaba al pulsar «Editar»: «Cancelar» vuelve a ella.
+  const inicioEdicion = useRef<SlideJson | null>(null);
   // Plantillas sin área de bloques (portada, índice, financieras…): ahí no cabe una imagen nueva.
   const admiteImagenNueva = useMemo(() => !!arbolBloques(desplegar(slide)), [slide]);
 
@@ -89,6 +91,25 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
       setEstado(m.desborde ? "Cambio aplicado, pero ahora la slide desborda: acorta el texto o deshaz el cambio." : "");
     } catch (e) {
       setEstado(`No se pudo aplicar el cambio: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  /** Cierra la edición a mano dejando la slide como estaba al pulsar «Editar» (un solo cambio, con su «Deshacer»). */
+  async function cancelarEdicion() {
+    const base = inicioEdicion.current;
+    setEditando(null);
+    setListaAbierta(false);
+    setAnadiendo(false);
+    setAnadiendoLibre(false);
+    if (!base || JSON.stringify(base) === JSON.stringify(slide)) return;
+    setTrabajando(true);
+    try {
+      await cambiar(JSON.parse(JSON.stringify(base)) as SlideJson, `${tituloDe(slide)}: cambios de edición descartados`);
+      setEstado("Cambios descartados: la slide vuelve a estar como antes de editar.");
+    } catch (e) {
+      setEstado(`No se han podido descartar los cambios: ${e instanceof Error ? e.message : "error"}`);
     } finally {
       setTrabajando(false);
     }
@@ -251,6 +272,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               className={editando ? "!border-icam-900 !bg-icam-900 !text-white" : ""}
               title="Cambia a mano un texto, el sitio de un bloque o una foto, sin pasar por Claude"
               onClick={() => {
+                if (!editando) inicioEdicion.current = slide;
                 setEditando(editando ? null : "textos");
                 setMarcando(false);
               }}
@@ -366,6 +388,9 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
           <span className="ml-auto flex gap-1.5">
             <Boton pequeno aria-pressed={listaAbierta} onClick={() => setListaAbierta(!listaAbierta)}>
               Todos los textos
+            </Boton>
+            <Boton pequeno disabled={trabajando} title="Cierra la edición y deja la slide como estaba al pulsar «Editar»" onClick={() => void cancelarEdicion()}>
+              Cancelar
             </Boton>
             <Boton
               pequeno

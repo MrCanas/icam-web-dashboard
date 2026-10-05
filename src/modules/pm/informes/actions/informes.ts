@@ -25,6 +25,7 @@ import {
   obtenerProyecto,
   type CambiosInforme,
 } from "../data/informesRepository";
+import { listarExportaciones, registrarExportacion } from "../data/exportacionesRepository";
 import { resumenUsoInforme } from "../data/usoRepository";
 import { esIdInforme, limpiarCodigo, parseTrimestre, qSig } from "../logic/trimestre";
 import type { Pie } from "../slides/tipos";
@@ -33,9 +34,11 @@ import {
   type Arquetipo,
   type CategoriaFoto,
   type Cambio,
+  type Exportacion,
   type Foto,
   type FotoBiblioteca,
   type Fuente,
+  type IncidenciaExportacion,
   type PrevioEstructurado,
   type Resultado,
   type ResumenUso,
@@ -177,6 +180,35 @@ export async function accionGuardarVersion(id: string): Promise<Resultado<{ vers
   const r = await guardarVersion(acceso.user, inf.data);
   if (r.error !== null) return mal(r.error);
   await anotarCambio(acceso.user, id, `Versión ${inf.data.version} guardada; se trabaja sobre la ${r.data.version}`);
+  return { ok: true, data: r.data };
+}
+
+/** Exportaciones del informe (quién, cuándo, cómo), para el registro del final del editor. */
+export async function accionExportaciones(id: string): Promise<Resultado<Exportacion[]>> {
+  const acceso = await usuarioLectura();
+  if ("error" in acceso) return mal(acceso.error);
+  const r = await listarExportaciones(acceso.user, id);
+  if (r.error !== null) return mal(r.error);
+  return { ok: true, data: r.data };
+}
+
+/**
+ * Anota una exportación hecha con el diálogo de impresión del navegador (la
+ * descarga del PDF la anota la propia ruta api/informes/pdf). Basta con poder
+ * ver el informe: exportar no lo modifica.
+ */
+export async function accionRegistrarImpresion(
+  id: string,
+  datos: { incidencias: IncidenciaExportacion[]; confirmado: boolean },
+): Promise<Resultado<Exportacion>> {
+  if (!esIdInforme(id)) return mal("Informe no válido.");
+  const acceso = await usuarioLectura();
+  if ("error" in acceso) return mal(acceso.error);
+  const inf = await obtenerInforme(acceso.user, id);
+  if (inf.error !== null) return mal(inf.error);
+  if (!inf.data) return mal("El informe ya no existe.");
+  const r = await registrarExportacion(acceso.user, inf.data, { medio: "impresion", incidencias: datos.incidencias.slice(0, 200), confirmado: !!datos.confirmado });
+  if (r.error !== null) return mal(r.error);
   return { ok: true, data: r.data };
 }
 
