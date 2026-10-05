@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { accionAnadirFuente } from "../../actions/informes";
-import { normalizar } from "../../logic/edicion";
+import { arbolBloques, desplegar, normalizar } from "../../logic/edicion";
+import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, tituloDe, validarSlide } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
@@ -17,6 +18,7 @@ import { mensajeErrorClaude, pedirClaude, type ImagenClaude } from "../lib/claud
 import { aBase64, ACEPTA_DOCUMENTOS, extraerTexto, redimensionar } from "../lib/ficheros";
 import { VisorSlide, type ResultadoVisor } from "../slides/VisorSlide";
 import { CapaEdicion, type ModoEdicion } from "./CapaEdicion";
+import { CapaFlotantes } from "./CapaFlotantes";
 import { CapaMarcas } from "./CapaMarcas";
 import { ListaTextos } from "./ListaTextos";
 import { capturaMarcada, HERRAMIENTAS, marcasTexto, NOMBRE_MARCA, type Herramienta, type Marca } from "./marcas";
@@ -43,10 +45,14 @@ interface Props {
   cambiar: (nueva: SlideJson, cambio: string) => Promise<MedidaSlide>;
   /** Vuelve a la slide anterior al último cambio; null si no hay nada que deshacer. */
   deshacer: (() => Promise<MedidaSlide>) | null;
+  /** Documentos dirigidos a esta slide que todavía no se han usado para montarla. */
+  dirigida: string[] | null;
+  /** Monta esta slide con su información dirigida; null mientras ya se está montando alguna. */
+  montarDirigida: (() => void) | null;
 }
 
 /** Una slide del editor: vista, chips de relleno/pendientes/origen, edición a mano, marcas y corrección con Claude. */
-export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer }: Props) {
+export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer, dirigida, montarDirigida }: Props) {
   const { informe, puedeEditar } = h;
   const [marcando, setMarcando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
@@ -57,7 +63,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   const [estado, setEstado] = useState("");
   const [trabajando, setTrabajando] = useState(false);
   const lienzo = useRef<HTMLElement | null>(null);
-  const [editando, setEditando] = useState<ModoEdicion | null>(null);
+  // «flotantes»: las imágenes libres, que van por encima de la slide y tienen su propia capa.
+  const [editando, setEditando] = useState<ModoEdicion | "flotantes" | null>(null);
   const [listaAbierta, setListaAbierta] = useState(false);
   // Lienzo junto al slide que tiene pintado. La capa de edición trabaja siempre sobre esa pareja y se
   // bloquea mientras no sea la vigente (entre un cambio y su repintado), sin perder la selección.
@@ -65,6 +72,12 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   const normalizado = useMemo(() => normalizar(slide), [slide]);
   const pintado = useMemo(() => (pintada ? normalizar(pintada.slide) : null), [pintada]);
   const abrirLista = useCallback(() => setListaAbierta(true), []);
+  const [anadiendo, setAnadiendo] = useState(false);
+  const terminarAnadir = useCallback(() => setAnadiendo(false), []);
+  const [anadiendoLibre, setAnadiendoLibre] = useState(false);
+  const terminarAnadirLibre = useCallback(() => setAnadiendoLibre(false), []);
+  // Plantillas sin área de bloques (portada, índice, financieras…): ahí no cabe una imagen nueva.
+  const admiteImagenNueva = useMemo(() => !!arbolBloques(desplegar(slide)), [slide]);
 
   /** Cambio hecho a mano (texto, bloque o foto): sin Claude. */
   async function aplicarManual(nueva: SlideJson, cambio: string) {
@@ -176,7 +189,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         { imagenes: [...(captura ? [captura] : []), ...imagenes].slice(0, 4) },
       );
       const avisos = json && typeof json === "object" && Array.isArray((json as { avisos?: unknown }).avisos) ? ((json as { avisos: string[] }).avisos) : [];
-      const s = actualizarPeriodo(validarSlide(json, slide.id, componentesPermitidos()), informe);
+      // Claude rehace el contenido; las imágenes colocadas a mano encima se quedan como estaban.
+      const s = conFlotantesDe(slide, actualizarPeriodo(validarSlide(json, slide.id, componentesPermitidos()), informe));
       s.origen = slide.origen === "nueva" ? "nueva" : "actualizada";
       const m = await cambiar(s, `${tituloDe(s)}: ${instr}${marcas.length ? ` (${marcas.length} marca${marcas.length > 1 ? "s" : ""})` : ""}`);
       setEstado((m.desborde ? "Aplicada, pero ahora desborda: pide acortarla. " : "Aplicada. ") + (avisos.length ? "Revisa también: " + avisos.join(" · ") : ""));
@@ -197,6 +211,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   else if (medida?.medida) chips.push(<Chip key="r" tono={medida.medida.relleno < 80 ? "aviso" : "ok"}>Relleno {medida.medida.relleno} %</Chip>);
   if (medida?.pendientes) chips.push(<Chip key="p" tono="aviso">{medida.pendientes} pendiente{medida.pendientes > 1 ? "s" : ""}</Chip>);
   if (slide.origen) chips.push(<Chip key="o">{slide.origen}</Chip>);
+  if (dirigida?.length) chips.push(<Chip key="i" tono="marca">información nueva</Chip>);
 
   return (
     <section className="flex scroll-mt-4 flex-col gap-2" id={`ed-${slide.id}`}>
@@ -206,6 +221,17 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         <span className="flex flex-wrap gap-1">{chips}</span>
         {puedeEditar ? (
           <span className="ml-auto flex flex-wrap gap-1.5">
+            {dirigida?.length ? (
+              <Boton
+                pequeno
+                variante="primario"
+                disabled={!montarDirigida || trabajando}
+                title={`Claude rehace esta slide por completo con: ${dirigida.join(", ")}`}
+                onClick={() => montarDirigida?.()}
+              >
+                Montar con la información
+              </Boton>
+            ) : null}
             <Boton
               pequeno
               aria-pressed={marcando}
@@ -289,6 +315,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
             [
               ["textos", "Textos"],
               ["disposicion", "Disposición"],
+              ["flotantes", "Imágenes libres"],
             ] as const
           ).map(([modo, nombre]) => (
             <Boton
@@ -301,10 +328,40 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               {nombre}
             </Boton>
           ))}
+          <Boton
+            pequeno
+            disabled={trabajando || !admiteImagenNueva || pintada?.slide !== slide}
+            title={
+              admiteImagenNueva
+                ? "Sube una imagen de tu ordenador o elígela de la biblioteca del proyecto: entra como un bloque más de la slide y el resto se recoloca"
+                : "La plantilla de esta slide no admite imágenes como bloque: usa «＋ Imagen en un área»; las que ya tiene se cambian pulsando sobre ellas"
+            }
+            onClick={() => {
+              setEditando("disposicion");
+              setAnadiendoLibre(false);
+              setAnadiendo(true);
+            }}
+          >
+            ＋ Imagen como bloque
+          </Boton>
+          <Boton
+            pequeno
+            disabled={trabajando || pintada?.slide !== slide}
+            title="Sube una imagen o elígela de la biblioteca y dibuja sobre la slide el área que debe ocupar: queda ahí, por encima del contenido. Vale en cualquier slide"
+            onClick={() => {
+              setEditando("flotantes");
+              setAnadiendo(false);
+              setAnadiendoLibre(true);
+            }}
+          >
+            ＋ Imagen en un área
+          </Boton>
           <span className="text-text-muted">
             {editando === "textos"
               ? "Pulsa sobre un texto de la slide para cambiarlo."
-              : "Pulsa un bloque o una foto para moverlo con los botones, o arrástralo a su nuevo sitio."}
+              : editando === "disposicion"
+                ? "Pulsa un bloque para moverlo con los botones o arrástralo. Cada imagen tiene su botón para cambiarla."
+                : "Arrastra una imagen libre para moverla, o sus tiradores para cambiarle el tamaño. Flechas: ajuste fino; Supr: quitarla."}
           </span>
           <span className="ml-auto flex gap-1.5">
             <Boton pequeno aria-pressed={listaAbierta} onClick={() => setListaAbierta(!listaAbierta)}>
@@ -316,6 +373,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               onClick={() => {
                 setEditando(null);
                 setListaAbierta(false);
+                setAnadiendo(false);
+                setAnadiendoLibre(false);
               }}
             >
               Listo
@@ -352,7 +411,20 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
             onMarca={(m) => setMarcas((ms) => [...ms, m])}
             etiqueta={`Capa de marcas de la slide ${pagina}`}
           />
-          {editando && pintada && pintado ? (
+          {editando === "flotantes" && pintada ? (
+            <CapaFlotantes
+              slide={pintada.slide}
+              lienzo={pintada.lienzo}
+              informeId={informe.id}
+              trimestre={informe.trimestre}
+              alSubirFoto={(f) => h.setFotos((fs) => [...fs, f])}
+              anadiendo={anadiendoLibre}
+              alTerminarAnadir={terminarAnadirLibre}
+              trabajando={trabajando || pintada.slide !== slide}
+              aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)}
+              avisar={setEstado}
+            />
+          ) : editando && editando !== "flotantes" && pintada && pintado ? (
             <CapaEdicion
               slide={pintado}
               lienzo={pintada.lienzo}
@@ -360,6 +432,8 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               informeId={informe.id}
               trimestre={informe.trimestre}
               alSubirFoto={(f) => h.setFotos((fs) => [...fs, f])}
+              anadiendo={anadiendo}
+              alTerminarAnadir={terminarAnadir}
               trabajando={trabajando || pintada.slide !== slide}
               aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)}
               avisar={setEstado}

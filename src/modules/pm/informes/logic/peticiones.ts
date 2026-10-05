@@ -1,11 +1,13 @@
 import type { SlideJson } from "../slides/tipos";
 import type { TipoPeticionClaude } from "../types";
 import {
+  bloqueDirigido,
   promptActualizar,
   promptAjuste,
   promptAnalisis,
   promptCoherencia,
   promptCorreccion,
+  promptDirigida,
   promptNueva,
   promptResumen,
   type BloquePrompt,
@@ -22,6 +24,8 @@ import {
 export type PeticionClaude =
   | { tipo: "analisis"; informeId: string }
   | { tipo: "slide"; informeId: string; slideId: string; modo: "actualizar" | "nueva" }
+  // Montar el slide con la información que el equipo ha dirigido a él (logic/dirigidas.ts).
+  | { tipo: "slide"; informeId: string; slideId: string; modo: "dirigida"; slide: SlideJson }
   | { tipo: "ajuste"; informeId: string; slide: SlideJson; medida: MedidaAjuste }
   | { tipo: "resumen"; informeId: string; slides: SlideJson[] }
   | {
@@ -53,6 +57,10 @@ export function leerPeticion(raw: unknown): PeticionClaude | string {
       return { tipo, informeId };
     case "slide":
       if (typeof b.slideId !== "string" || !b.slideId) return "Falta el slide";
+      if (b.modo === "dirigida") {
+        if (!esSlide(b.slide) || b.slide.id !== b.slideId) return "Falta el slide";
+        return { tipo, informeId, slideId: b.slideId, modo: "dirigida", slide: b.slide };
+      }
       return { tipo, informeId, slideId: b.slideId, modo: b.modo === "actualizar" ? "actualizar" : "nueva" };
     case "ajuste": {
       const m = b.medida as MedidaAjuste | undefined;
@@ -82,6 +90,10 @@ export function montarPrompt(p: PeticionClaude, m: MaterialInforme): BloquePromp
     case "analisis":
       return promptAnalisis(m);
     case "slide": {
+      if (p.modo === "dirigida") {
+        const informacion = bloqueDirigido(m, p.slideId);
+        return informacion ? promptDirigida(m, p.slide, informacion) : "No hay información dirigida a ese slide";
+      }
       if (p.modo === "actualizar") {
         const prev = m.previo?.slides.find((s) => s.id === p.slideId);
         if (prev) return promptActualizar(m, prev);

@@ -1,5 +1,6 @@
 import { createElement, type ReactNode } from "react";
 
+import { flotantesValidos } from "../logic/flotantes";
 import { componente, ETIQUETAS_HTML } from "./components";
 import { Contenido, Slide, SlideHeader } from "./components/base";
 import { rt } from "./texto";
@@ -57,7 +58,42 @@ function valor(v: unknown): unknown {
   return v;
 }
 
+/**
+ * El slide y, encima, las imágenes que el equipo ha colocado a mano en un área
+ * (`flotantes`). Van en una capa hermana del slide para valer en cualquier
+ * plantilla; sin ellas, sale exactamente lo mismo que pinta la plantilla.
+ */
 export function elemento(s: SlideJson, pagina: number, meta: MetaInforme | null | undefined): ReactNode {
+  const base = elementoBase(s, pagina, meta);
+  const flotantes = flotantesValidos(s.flotantes);
+  if (!flotantes.length) return base;
+  return (
+    <>
+      {base}
+      <div className="iq-flotantes">
+        {flotantes.map((f) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={f.id}
+            className="iq-img iq-flotante"
+            data-flotante={f.id}
+            src={f.src}
+            alt=""
+            style={{
+              left: f.x,
+              top: f.y,
+              width: f.ancho,
+              height: f.alto,
+              objectPosition: (f.focalX != null ? f.focalX * 100 : 50) + "% " + (f.focalY != null ? f.focalY * 100 : 50) + "%",
+            }}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function elementoBase(s: SlideJson, pagina: number, meta: MetaInforme | null | undefined): ReactNode {
   const pie = meta?.pie;
   if (s.compuesto) {
     const c = s.compuesto;
@@ -68,6 +104,7 @@ export function elemento(s: SlideJson, pagina: number, meta: MetaInforme | null 
           {(c.contenido || []).map((x, i) => nodo(x, i))}
         </Contenido>
         {c.nota ? <div className="iq-nota">{rt(c.nota)}</div> : null}
+        {c.fuera?.length ? c.fuera.map((x, i) => nodo(x, i)) : null}
       </Slide>
     );
   }

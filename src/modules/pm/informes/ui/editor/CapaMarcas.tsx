@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ALTO, ANCHO, cajaMarca, contenidoBajo, trazarMarca, type Herramienta, type Marca, type Punto } from "./marcas";
+import { ALTO, ANCHO, cajaMarca, contenidoBajo, puntoEnSlide, trazarMarca, type Herramienta, type Marca, type Punto } from "./marcas";
 
 interface Props {
   marcas: Marca[];
@@ -32,11 +32,7 @@ export function CapaMarcas({ marcas, activa, herramienta, lienzo, onMarca, etiqu
   }, [marcas, trazo]);
 
   function punto(e: React.PointerEvent): Punto {
-    const r = cv.current!.getBoundingClientRect();
-    return [
-      Math.max(0, Math.min(ANCHO, ((e.clientX - r.left) * ANCHO) / r.width)),
-      Math.max(0, Math.min(ALTO, ((e.clientY - r.top) * ALTO) / r.height)),
-    ];
+    return puntoEnSlide(e, cv.current!);
   }
 
   function terminar() {

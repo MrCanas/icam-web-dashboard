@@ -5,7 +5,7 @@ import { Aviso } from "../componentes";
 import { VistaImpresion } from "../impresion/VistaImpresion";
 
 /** Vista de impresión (PDF) de un informe. */
-export default async function ImpresionPage({ ctx, id }: { ctx: UserContext; id: string }) {
+export default async function ImpresionPage({ ctx, id, modoPdf }: { ctx: UserContext; id: string; modoPdf?: boolean }) {
   const r = await obtenerInforme(ctx, id);
   if (r.error !== null) return <Aviso tipo="error">No se ha podido abrir el informe: {r.error}</Aviso>;
   if (!r.data) return <Aviso tipo="error">Ese informe ya no existe.</Aviso>;
@@ -18,6 +18,7 @@ export default async function ImpresionPage({ ctx, id }: { ctx: UserContext; id:
       estado={r.data.estado}
       version={r.data.version}
       contenido={r.data.contenido}
+      modoPdf={modoPdf}
     />
   );
 }

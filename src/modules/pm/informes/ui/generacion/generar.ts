@@ -4,6 +4,8 @@ import { componentesPermitidos } from "../../slides/components";
 import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
 import type { EntradaBiblioteca } from "../../logic/biblioteca";
+import { ESTRUCTURALES } from "../../logic/biblioteca";
+import { conFlotantesDe, flotantesAlHeredar, flotantesValidos } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, renumerar, slideDeterminista, tituloDe, validarSlide } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { qCierre } from "../../logic/trimestre";
@@ -44,6 +46,8 @@ export interface OpcionesGeneracion {
   previo: PrevioEstructurado | null;
   fotos: Foto[];
   biblioteca: EntradaBiblioteca[];
+  /** Slides con información dirigida a ellas (logic/dirigidas.ts): Claude las monta con su documento. */
+  dirigidas: Set<string>;
   signal: AbortSignal;
   /** Guarda el informe (en cola). */
   guardar: (contenido: InformeJson, extra?: { estado?: "generando" | "borrador"; qa?: { coherencia: IncidenciaCoherencia[]; fecha: string } }, cambio?: string) => Promise<boolean>;
@@ -97,9 +101,14 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
   } else {
     meta = metaInforme(d, previo);
     slides = [];
+    // Imágenes colocadas a mano: si este informe ya tenía slides (se regenera), las suyas; si no, las que se heredan del anterior.
+    const propias = d.contenido?.slides?.length ? new Map(d.contenido.slides.map((s) => [s.id, s])) : null;
     for (const e of sel.estructura) {
       const prev = prevPorId.get(e.id) ?? null;
       const s: SlideJson = prev ? clon(prev) : { id: e.id };
+      const flotantes = propias ? flotantesValidos(propias.get(e.id)?.flotantes) : flotantesAlHeredar(e.accion, e.id, prev);
+      if (flotantes.length) s.flotantes = flotantes;
+      else delete s.flotantes;
       if (e.accion === "ocultar") {
         s.oculto = true;
         slides.push(s);
@@ -132,9 +141,10 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
   const refrescar = () => o.onFilas(filas.map((f) => ({ ...f })));
   const fila = (id: string) => filas.find((f) => f.id === id)!;
   const contenido = (): InformeJson => ({ meta, slides });
+  // La generación rehace slides enteras: las imágenes que el equipo colocó a mano encima se quedan.
   const poner = (id: string, s: SlideJson) => {
     const i = slides.findIndex((x) => x.id === id);
-    if (i >= 0) slides[i] = s;
+    if (i >= 0) slides[i] = conFlotantesDe(slides[i], s);
   };
 
   refrescar();
@@ -207,6 +217,14 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
       return;
     }
     const actual = slides.find((x) => x.id === t.id) ?? { id: t.id };
+    // Con un documento dirigido a ella, la slide se monta con ese documento (también las de Finanzas, que si no irían como página pendiente).
+    if (o.dirigidas.has(t.id) && !ESTRUCTURALES.includes(t.id) && t.id !== "resumen-ejecutivo") {
+      f.estado = "curso";
+      f.detalle = "Montando con su información";
+      refrescar();
+      await redactar(t, f, { tipo: "slide", informeId: d.id, slideId: t.id, modo: "dirigida", slide: actual }, t.prev ? "actualizada" : "nueva");
+      return;
+    }
     const det = slideDeterminista(t, actual, periodo, o.fotos, urlFoto);
     if (det) {
       poner(t.id, det);

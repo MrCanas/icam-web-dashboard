@@ -76,6 +76,12 @@ export interface Analisis {
 export interface Seleccion {
   estructura: EntradaEstructura[];
   anadir: number[];
+  /**
+   * Fuentes dirigidas a slides concretas (logic/dirigidas.ts): id de la fuente →
+   * slides a las que va y en cuáles ya se ha aplicado. Sin entrada, la fuente es
+   * información general del trimestre.
+   */
+  dirigidas?: Record<string, { slides: string[]; aplicadas: string[] }>;
 }
 
 export interface IncidenciaCoherencia {

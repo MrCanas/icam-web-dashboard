@@ -3,6 +3,12 @@
 
 .iq-paginas { display: flex; flex-direction: column; gap: 24px; max-width: 1000px; margin: 0 auto; }
 .iq-pagina-pdf .iq-marco { outline: 1px solid #d6d3cf; }
+/* Fondos, rayados de tabla y barras salen siempre, sin depender de «Gráficos de fondo» del diálogo de impresión. */
+.iq-pagina-pdf { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* Vista que abre el servidor para hacer el PDF: cada slide a su tamaño real (escala 1), para que el
+   reparto de huecos se mida siempre igual, sea cual sea la ventana. */
+.iq-paginas.iq-modo-pdf { width: 960px; max-width: none; margin: 0; gap: 0; }
+.iq-paginas.iq-modo-pdf .iq-marco { outline: none; }
 
 /* @page (960 × 540 pt, sin márgenes) lo pone VistaImpresion mientras está abierta: aquí afectaría a todo el portal. */
 
@@ -18,9 +24,9 @@
     overflow: visible !important;
     background: #fff !important;
   }
-  .iq-paginas { display: block; max-width: none; gap: 0; margin: 0; }
+  .iq-paginas, .iq-paginas.iq-modo-pdf { display: block; width: auto; max-width: none; gap: 0; margin: 0; }
   .iq-pagina-pdf { break-after: page; page-break-after: always; }
   .iq-pagina-pdf:last-child { break-after: auto; page-break-after: auto; }
   .iq-pagina-pdf .iq-marco { width: 1280px; height: 720px; aspect-ratio: auto; outline: none; border: 0; }
-  .iq-pagina-pdf .iq-escala { transform: scale(1.33333) !important; }
+  .iq-pagina-pdf .iq-escala { transform: scale(calc(4 / 3)) !important; }
 }

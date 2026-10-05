@@ -31,6 +31,15 @@ export const NOMBRE_MARCA: Record<Herramienta, string> = {
 
 export type Punto = [number, number];
 
+/** Punto del puntero en unidades de slide, dentro de una capa que cubre la slide entera. */
+export function puntoEnSlide(e: { clientX: number; clientY: number }, capa: Element): Punto {
+  const r = capa.getBoundingClientRect();
+  return [
+    Math.max(0, Math.min(ANCHO, ((e.clientX - r.left) * ANCHO) / r.width)),
+    Math.max(0, Math.min(ALTO, ((e.clientY - r.top) * ALTO) / r.height)),
+  ];
+}
+
 export interface Marca {
   tipo: Herramienta;
   puntos: Punto[];

@@ -14,6 +14,8 @@ import { Boton, claseCampo } from "../componentes";
 import { ACEPTA_FOTOS } from "../lib/ficheros";
 
 interface Props {
+  /** «Añadir imagen», «Cambiar imagen»… */
+  titulo: string;
   informeId: string;
   /** Trimestre del informe abierto, para rotular sus fotos. */
   trimestre: string;
@@ -34,7 +36,7 @@ interface Props {
  * ordenador (que se sube y queda en la biblioteca) o una foto ya subida en
  * cualquier informe del proyecto.
  */
-export function DialogoImagen({ informeId, trimestre, actual, categoria, para, onElegir, onSubida, onCerrar }: Props) {
+export function DialogoImagen({ titulo: tituloDialogo, informeId, trimestre, actual, categoria, para, onElegir, onSubida, onCerrar }: Props) {
   const [fotos, setFotos] = useState<FotoBiblioteca[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function DialogoImagen({ informeId, trimestre, actual, categoria, para, o
       open
       elevated
       width="xl"
-      title="Elegir imagen"
+      title={tituloDialogo}
       subtitle="Sube un archivo de tu ordenador o elige una imagen de la biblioteca del proyecto."
       busy={!!subiendo}
       onClose={onCerrar}

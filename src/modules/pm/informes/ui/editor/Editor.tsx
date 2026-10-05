@@ -6,15 +6,17 @@ import { useEffect, useMemo, useState } from "react";
 
 import { accionBorrarInforme, accionGuardarVersion, accionHistorial } from "../../actions/informes";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
+import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
+import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, qaMecanico, renumerar, tituloDe, validarSlide, type MedidaQa } from "../../logic/informe";
-import { rutaImprimir, rutaListaInformes } from "../../logic/paths";
+import { rutaImprimir, rutaListaInformes, rutaPdf } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
 import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
-import type { Cambio, IncidenciaCoherencia, ResumenUso } from "../../types";
+import type { Cambio, IncidenciaCoherencia, ResumenUso, Seleccion } from "../../types";
 import { Aviso, Boton, ChipEstado, claseCampo, fechaCorta, Tarjeta } from "../componentes";
 import type { HerramientaInforme } from "../InformeApp";
-import { mensajeErrorClaude, pedirClaude } from "../lib/claude";
+import { esCancelado, mensajeErrorClaude, pedirClaude } from "../lib/claude";
 import type { ResultadoVisor } from "../slides/VisorSlide";
 import { TarjetaSlide } from "./TarjetaSlide";
 
@@ -35,6 +37,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const [confirmar, setConfirmar] = useState(false);
   const [historial, setHistorial] = useState<Cambio[] | null>(null);
   const [uso, setUso] = useState<ResumenUso | null>(usoInicial);
+  const [pdf, setPdf] = useState<{ generando: boolean; error: string | null }>({ generando: false, error: null });
 
   // Cada slide conserva su objeto mientras no cambie su contenido: así no se repintan todas tras cada guardado.
   const [cache] = useState(() => new Map<string, { json: string; slide: SlideJson }>());
@@ -61,6 +64,12 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   }, [contenido, cacheMeta]);
   // Slides anteriores a cada cambio de esta sesión, para «Deshacer» (la más reciente, al final).
   const [anteriores, setAnteriores] = useState<Record<string, SlideJson[]>>({});
+  // Información que el equipo ha dirigido a slides concretas y todavía no se ha usado para montarlas.
+  const pendientes = useMemo(
+    () => (contenido ? pendientesDirigidas(informe.seleccion, h.fuentes, contenido.slides) : []),
+    [contenido, informe.seleccion, h.fuentes],
+  );
+  const [montando, setMontando] = useState(false);
 
   // Historial y coste: se recargan tras cada guardado.
   useEffect(() => {
@@ -107,7 +116,14 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
    * Sustituye una slide (corrección de Claude o cambio a mano): comprueba que
    * pinta, la guarda y deja la anterior para «Deshacer». Devuelve su medida.
    */
-  async function cambiarSlide(id: string, pagina: number, nueva: SlideJson, cambio: string, deshaciendo = false): Promise<MedidaSlide> {
+  async function cambiarSlide(
+    id: string,
+    pagina: number,
+    nueva: SlideJson,
+    cambio: string,
+    deshaciendo = false,
+    seleccion?: Seleccion,
+  ): Promise<MedidaSlide> {
     const anterior = contenido!.slides.find((s) => s.id === id);
     if (!anterior) throw new Error("la slide ya no existe");
     const m = medirFuera(nueva, pagina, contenido!.meta);
@@ -115,7 +131,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     const c: InformeJson = clon(contenido!);
     c.slides = c.slides.map((x) => (x.id === id ? clon(nueva) : x));
     renumerar(c.slides);
-    if (!(await h.guardar({ contenido: c }, cambio))) throw new Error("no se ha podido guardar");
+    if (!(await h.guardar(seleccion ? { contenido: c, seleccion } : { contenido: c }, cambio))) throw new Error("no se ha podido guardar");
     setAnteriores((p) => ({ ...p, [id]: deshaciendo ? (p[id] ?? []).slice(0, -1) : [...(p[id] ?? []).slice(-19), anterior] }));
     return m;
   }
@@ -123,7 +139,81 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   function deshacer(id: string, pagina: number): Promise<MedidaSlide> {
     const previa = anteriores[id]?.at(-1);
     if (!previa) return Promise.reject(new Error("no hay cambios que deshacer"));
-    return cambiarSlide(id, pagina, previa, `${tituloDe(previa)}: cambio deshecho`, true);
+    // Si lo que se deshace es un montaje con información dirigida, esa información vuelve a estar pendiente.
+    const seleccion = slidesConDirigidas(informe.seleccion, h.fuentes).has(id)
+      ? desmarcarAplicadas(seleccionBase(informe.seleccion, informe.analisis), [id])
+      : undefined;
+    return cambiarSlide(id, pagina, previa, `${tituloDe(previa)}: cambio deshecho`, true, seleccion);
+  }
+
+  /**
+   * Monta con Claude las slides que tienen información dirigida sin aplicar
+   * (todas, o solo una): una petición por slide, que la rehace entera con su
+   * documento. Cada una queda con su «Deshacer».
+   */
+  async function montarDirigidas(soloId?: string) {
+    const lista = pendientes.filter((p) => !soloId || p.slide.id === soloId);
+    if (!lista.length || montando) return;
+    setMontando(true);
+    // Varias slides seguidas: se trabaja sobre lo último guardado, no sobre el estado de este render.
+    let base: InformeJson = clon(contenido!);
+    let seleccion = seleccionBase(informe.seleccion, informe.analisis);
+    const permitidos = componentesPermitidos();
+    const fallos: string[] = [];
+    let hechas = 0;
+    for (const [n, p] of lista.entries()) {
+      const actual = base.slides.find((s) => s.id === p.slide.id);
+      if (!actual) continue;
+      const documentos = p.fuentes.map((f) => f.nombre).join(", ");
+      setOcupado(`Claude está montando «${tituloDe(actual)}» con ${documentos} (${n + 1} de ${lista.length})…`);
+      try {
+        const { json } = await pedirClaude({ tipo: "slide", informeId: informe.id, slideId: actual.id, modo: "dirigida", slide: actual });
+        let s = actualizarPeriodo(validarSlide(json, actual.id, permitidos), informe);
+        s.origen = "actualizada";
+        let m = medirFuera(s, p.pagina, base.meta);
+        if (m.error) throw new Error(m.error);
+        if (m.desborde) {
+          // Como en la generación: un ajuste si desborda, y se queda solo si lo arregla.
+          setOcupado(`«${tituloDe(s)}» desborda: Claude la está ajustando (${n + 1} de ${lista.length})…`);
+          try {
+            const { json: j2 } = await pedirClaude({
+              tipo: "ajuste",
+              informeId: informe.id,
+              slide: s,
+              medida: { desborde: true, ocupacion: m.ocupacion, relleno: m.relleno },
+            });
+            const s2 = actualizarPeriodo(validarSlide(j2, actual.id, permitidos), informe);
+            s2.origen = "actualizada";
+            const m2 = medirFuera(s2, p.pagina, base.meta);
+            if (!m2.error && !m2.desborde) {
+              s = s2;
+              m = m2;
+            }
+          } catch (e) {
+            if (esCancelado(e)) throw e;
+          }
+        }
+        // Lo que el equipo colocó a mano encima de la slide no lo rehace Claude: se queda.
+        s = conFlotantesDe(actual, s);
+        const c: InformeJson = clon(base);
+        c.slides = c.slides.map((x) => (x.id === actual.id ? s : x));
+        renumerar(c.slides);
+        const marcada = marcarAplicadas(seleccion, [actual.id]);
+        if (!(await h.guardar({ contenido: c, seleccion: marcada }, `${tituloDe(s)}: montada con ${documentos}`))) throw new Error("no se ha podido guardar");
+        setAnteriores((prev) => ({ ...prev, [actual.id]: [...(prev[actual.id] ?? []).slice(-19), actual] }));
+        base = c;
+        seleccion = marcada;
+        hechas++;
+      } catch (e) {
+        fallos.push(`${tituloDe(actual)}: ${e instanceof Error && !("code" in e) ? e.message : mensajeErrorClaude(e)}`);
+        if (esCancelado(e)) break;
+      }
+    }
+    setMontando(false);
+    setOcupado(
+      (hechas ? `${hechas} slide(s) montada(s) con la información dirigida. Revísalas: cada una tiene «Deshacer». ` : "") +
+        (fallos.length ? `No se han podido montar: ${fallos.join(" · ")}` : ""),
+    );
   }
 
   function mover(id: string, delta: number) {
@@ -226,6 +316,29 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     router.push(rutaListaInformes());
   }
 
+  /** Descarga el PDF hecho en el servidor, con todo lo editado ya guardado. */
+  async function descargarPdf() {
+    setPdf({ generando: true, error: null });
+    try {
+      await h.guardadoAlDia();
+      const r = await fetch(rutaPdf(informe.id));
+      if (!r.ok) {
+        const cuerpo = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(cuerpo?.error ?? `el servidor ha respondido ${r.status}.`);
+      }
+      const nombre = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") ?? "")?.[1];
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre ? decodeURIComponent(nombre) : `${informe.id}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPdf({ generando: false, error: null });
+    } catch (e) {
+      setPdf({ generando: false, error: e instanceof Error ? e.message : "error desconocido." });
+    }
+  }
+
   const irA = (id: string) => document.getElementById(`ed-${id}`)?.scrollIntoView({ behavior: "smooth" });
   const coh = informe.qa?.coherencia ?? [];
 
@@ -268,13 +381,22 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
                   Eliminar informe
                 </Boton>
               ) : null}
-              <Link href={rutaImprimir(informe.id)} className="rounded-md bg-icam-900 px-4 py-2 text-sm font-medium text-white hover:bg-icam-800">
-                PDF
+              <Link href={rutaImprimir(informe.id)} className="text-sm font-medium text-icam-900 hover:underline">
+                Vista de impresión
               </Link>
+              <Boton variante="primario" disabled={pdf.generando} title="Descarga el informe en PDF, tal como se ve aquí" onClick={() => void descargarPdf()}>
+                {pdf.generando ? "Generando PDF…" : "PDF"}
+              </Boton>
             </>
           )}
         </div>
       </div>
+
+      {pdf.error ? (
+        <Aviso tipo="error">
+          No se ha podido generar el PDF: {pdf.error} Mientras tanto puedes sacarlo desde la «Vista de impresión».
+        </Aviso>
+      ) : null}
 
       <Tarjeta>
         <h2 className="text-sm font-semibold text-text-primary">Revisión</h2>
@@ -338,6 +460,12 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
               </select>
             </label>
             <Boton onClick={() => void anadir()}>Añadir</Boton>
+            <Boton
+              title="Vuelve a «Información del trimestre» para aportar más documentos, también dirigidos a slides concretas"
+              onClick={() => h.ir("paso2")}
+            >
+              Añadir información
+            </Boton>
             <Boton onClick={() => void coherencia()}>Revisar coherencia</Boton>
             <Boton onClick={() => void guardarVersion()}>Guardar versión</Boton>
             <Boton variante={informe.estado === "aprobado" ? "secundario" : "primario"} onClick={() => void aprobar()}>
@@ -349,6 +477,34 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
               {ocupado}
             </p>
           ) : null}
+        </Tarjeta>
+      ) : null}
+
+      {puedeEditar && pendientes.length ? (
+        <Tarjeta>
+          <h2 className="text-sm font-semibold text-text-primary">Información dirigida a slides, sin aplicar</h2>
+          <ul className="space-y-1 text-sm">
+            {pendientes.map((p) => (
+              <li key={p.slide.id}>
+                <b>
+                  Slide {p.pagina} · {tituloDe(p.slide)}
+                </b>
+                <span className="text-text-muted"> ← {p.fuentes.map((f) => f.nombre).join(", ")}</span>{" "}
+                <Boton variante="texto" onClick={() => irA(p.slide.id)}>
+                  Ir
+                </Boton>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-text-muted">
+            Claude rehace cada una de esas slides por completo con su documento: elige la plantilla y copia las cifras tal cual, sin calcular
+            ninguna. Es una petición por slide.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Boton variante="primario" disabled={montando} onClick={() => void montarDirigidas()}>
+              {montando ? "Montando…" : `Montar ${pendientes.length === 1 ? "la slide" : `las ${pendientes.length} slides`} con Claude`}
+            </Boton>
+          </div>
         </Tarjeta>
       ) : null}
 
@@ -369,6 +525,8 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
             ocultar={() => alternarOculto(s.id)}
             cambiar={(nueva, cambio) => cambiarSlide(s.id, i + 1, nueva, cambio)}
             deshacer={anteriores[s.id]?.length ? () => deshacer(s.id, i + 1) : null}
+            dirigida={pendientes.find((p) => p.slide.id === s.id)?.fuentes.map((f) => f.nombre) ?? null}
+            montarDirigida={montando ? null : () => void montarDirigidas(s.id)}
           />
         ))}
       </div>
