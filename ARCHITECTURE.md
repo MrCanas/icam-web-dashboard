@@ -134,7 +134,7 @@ export async function listProyectos(ctx: UserContext, options?: ListProyectosOpt
 | corporativo | `corpPeriodosRepository.ts`, `readClient.ts` (service role SIN variante de navegador) |
 | pm | `pmRepository.ts`, `readClient.ts` |
 | monday | `syncLogsRepository.ts`, `readClient.ts` (+ Monday GraphQL in `read.ts`, `dashboard-read.ts`) |
-| comunicaciones | `comunicacionesRepository.ts`, `readClient.ts` (service role SIN variante de navegador; + lecturas de Zoho en `zohoPlantillas.ts`, `zohoRegistros.ts`) |
+| comunicaciones | `comunicacionesRepository.ts`, `readClient.ts` (service role SIN variante de navegador; + lecturas de Zoho en `zohoPlantillas.ts`, `zohoRegistros.ts`; + `pasarela/`, la única puerta por la que sale un correo, con el candado de destinatarios delante) |
 
 Server pages and API routes obtain `ctx` via `await getCurrentUser()`; client hooks use `useCurrentUser()` then pass `user` into repository calls (browser client via `readClient`).
 

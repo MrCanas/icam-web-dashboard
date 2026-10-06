@@ -43,6 +43,9 @@ test("comunicaciones: «nueva» tiene su key y todo lo demás cae en el historia
     "comunicaciones.historial",
   );
   assert.equal(zoneForRouteKey("comunicaciones.nueva"), "comunicaciones");
+  // Lo mismo con «ajustes»: ahí están el interruptor de envíos y el modo real.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/ajustes"), "comunicaciones.ajustes");
+  assert.equal(zoneForRouteKey("comunicaciones.ajustes"), "comunicaciones");
 });
 
 test("una ruta fuera del registry devuelve null", () => {

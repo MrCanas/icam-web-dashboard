@@ -1,8 +1,13 @@
 # Comunicaciones · dónde vive cada cosa
 
 El módulo **Comunicaciones** (`/dashboard/comunicaciones`) prepara los correos a inversores
-enseñando a quién irían y con qué plantilla antes de que salga nada. Esta página es el mapa: qué
-piezas tiene el proyecto, en qué servicio vive cada una y cómo se llega a ella.
+enseñando a quién irían y con qué plantilla antes de que salga nada, y los envía con controles.
+Esta página es el mapa: qué piezas tiene el proyecto, en qué servicio vive cada una y cómo se llega
+a ella.
+
+**Hay un candado de destinatarios puesto**: hoy el módulo solo puede escribir a una dirección fija
+y a los contactos principales de la promoción de prueba del CRM. Ver
+[`02-envio-con-controles.md`](02-envio-con-controles.md) § 1.
 
 **Regla: el proyecto es este repo.** Todo lo demás son servicios que el repo usa, o copias suyas.
 Si algo de Comunicaciones no está aquí o enlazado desde aquí, está en el sitio equivocado.
@@ -14,8 +19,9 @@ Si algo de Comunicaciones no está aquí o enlazado desde aquí, está en el sit
 | Código | GitHub `MrCanas/icam-web-dashboard`, rama `main` | Las cinco carpetas de abajo | <https://github.com/MrCanas/icam-web-dashboard> |
 | Aplicación | Vercel, proyecto `icam-web-dashboard` (equipo `mrcanas-projects`) | Las pantallas de `/dashboard/comunicaciones` | <https://icam-web-dashboard.vercel.app/dashboard/comunicaciones> · panel: <https://vercel.com/mrcanas-projects/icam-web-dashboard> |
 | Datos | Supabase del portal (`SUPABASE_URL`) | Tablas `com_ajustes`, `com_comunicacion`, `com_destinatario` | Panel de Supabase > Table Editor, filtrando por `com_` |
-| Origen y envío | Zoho CRM, centro de datos `eu` | Cuentas, contactos, plantillas de correo y, en la fase 2, el envío | El CRM de siempre |
-| Secretos | Variables de entorno de Vercel; en local, `.env.local` | Las `ZOHO_*` del portal | Vercel > Settings > Environment Variables |
+| Origen y envío | Zoho CRM, centro de datos `eu` | Cuentas, contactos, plantillas de correo y el envío. Cada correo queda en la ficha del registro sobre el que se envió | El CRM de siempre |
+| Secretos | Variables de entorno de Vercel; en local, `.env.local` | Las `ZOHO_*` del portal y `ZOHO_REFRESH_TOKEN_ENVIOS`, que va **solo en Production** | Vercel > Settings > Environment Variables |
+| Rastro | Supabase, tabla `audit_log` | Quién preparó, revisó, probó, confirmó y envió, y cada cambio de ajustes | Acciones que empiezan por `comunicaciones.` |
 | Permisos | Supabase, tabla `app_user_zone_role` | Zona `comunicaciones` | `/dashboard/admin/usuarios` |
 
 Tres cosas del mapa que no se deducen solas:
@@ -25,6 +31,8 @@ Tres cosas del mapa que no se deducen solas:
   una migración aplicada vale para todas a la vez.
 - **Los secretos no están en GitHub.** `.env.local` está en `.gitignore`. Quien clone el repo
   necesita que alguien le pase las variables o las baje con `npx vercel env pull`.
+- **Dónde puede salir un correo de verdad**: solo donde exista el token de envíos. En las
+  previsualizaciones no existe, y allí la pasarela es la simulada.
 
 ## Dentro del repo
 
@@ -33,7 +41,7 @@ Tres cosas del mapa que no se deducen solas:
 | Código del módulo | `src/modules/comunicaciones/` — empezar por su `README.md` |
 | Páginas | `src/app/dashboard/comunicaciones/` |
 | Scripts | `scripts/comunicaciones/` |
-| Migración | `supabase/migrations/20261006120000_047_comunicaciones.sql` |
+| Migraciones | `supabase/migrations/…_047_comunicaciones.sql` y `…_048_comunicaciones_envio.sql` |
 | Documentos | `docs/comunicaciones/` (esta carpeta) |
 
 El módulo depende de dos piezas que no son suyas:
@@ -60,8 +68,11 @@ El módulo está aislado a propósito: carpeta propia, tablas con prefijo `com_`
 propia. Añadir funcionalidad es añadir dentro de esas mismas carpetas, con una PR a `main` y, si
 hace falta, una migración aditiva más.
 
-Si algún día se quisiera sacar a un servicio aparte, la frontera ya está pensada: en la fase 2
-todo envío pasa por una única pasarela de correo (ver `02-fase-2-envio.md`).
+Si algún día se quisiera sacar a un servicio aparte, la frontera ya existe: todo envío pasa por una
+única pasarela de correo (ver `02-envio-con-controles.md` § 3).
+
+Antes de abrirlo a audiencias reales hay dos cosas que resolver: quitar el candado, que es una
+decisión, y el límite de Zoho de 100 correos al día por usuario, que es un hecho.
 
 Un riesgo conocido: el repo y el proyecto de Vercel cuelgan de la cuenta personal `MrCanas`, no de
 una organización de Impar Capital.
@@ -71,6 +82,6 @@ una organización de Impar Capital.
 | Documento | Para qué |
 |---|---|
 | [`00-estado-y-pendientes.md`](00-estado-y-pendientes.md) | Qué pasó, qué está hecho, qué falta y quién lo hace |
-| [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) | Dejar la fase 1 funcionando y comprobarla |
-| [`02-fase-2-envio.md`](02-fase-2-envio.md) | Especificación del envío con controles |
-| [`03-guia-de-uso.md`](03-guia-de-uso.md) | Una página para quien prepara comunicaciones |
+| [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) | Dejarlo funcionando y comprobarlo, paso a paso |
+| [`02-envio-con-controles.md`](02-envio-con-controles.md) | El candado, los nueve controles, la pasarela y el token de envíos |
+| [`03-guia-de-uso.md`](03-guia-de-uso.md) | Para quien prepara y envía comunicaciones |

@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { withAudit } from "@/lib/audit/withAudit";
-import { getCurrentUser, type UserContext } from "@/lib/auth/currentUser";
-import { canAccessRouteKey, checkWriteAccess } from "@/lib/auth/permissions";
+import { usuarioConEscritura, usuarioConLectura } from "@/modules/comunicaciones/actions/permisos";
 import {
   cambiarExclusion,
   cancelarComunicacion,
@@ -29,7 +28,6 @@ import {
   comunicacionPath,
   HISTORIAL_ROUTE_KEY,
   NUEVA_ROUTE_KEY,
-  ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
 import { renderizarPlantilla, type VistaPrevia } from "@/modules/comunicaciones/logic/plantilla";
 import {
@@ -50,10 +48,11 @@ import { sincronizarInversores } from "@/modules/portfolio/inversores/logic/inve
 import { isZohoConfigured } from "@/lib/zoho/client";
 
 /**
- * Acciones del módulo Comunicaciones.
+ * Acciones de preparación del módulo Comunicaciones.
  *
- * NINGUNA envía un correo. Preparan la comunicación, guardan la foto de sus
- * destinatarios y enseñan la plantilla; el envío no existe en este código.
+ * NINGUNA de este fichero envía un correo. Preparan la comunicación, guardan la
+ * foto de sus destinatarios y enseñan la plantilla. El envío, con sus
+ * controles, está en `actions/envio.ts`.
  *
  * Todas repiten el corte de permisos: una Server Action es alcanzable por POST
  * directo, no solo desde su botón. Y ninguna lanza: devuelven el resultado y la
@@ -61,19 +60,6 @@ import { isZohoConfigured } from "@/lib/zoho/client";
  */
 
 export type ResultadoAccion<T = object> = ({ ok: true } & T) | { ok: false; mensaje: string };
-
-async function usuarioConLectura(routeKey: string): Promise<UserContext | string> {
-  const user = await getCurrentUser();
-  if (!user) return "Sesión no válida.";
-  if (!canAccessRouteKey(user, routeKey)) return "Sin acceso a Comunicaciones.";
-  return user;
-}
-
-async function usuarioConEscritura(routeKey: string): Promise<UserContext | string> {
-  const user = await usuarioConLectura(routeKey);
-  if (typeof user === "string") return user;
-  return checkWriteAccess(user, ZONA_COMUNICACIONES) ?? user;
-}
 
 function esUno<T extends string>(valor: unknown, validos: readonly T[]): valor is T {
   return typeof valor === "string" && (validos as readonly string[]).includes(valor);

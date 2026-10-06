@@ -70,7 +70,35 @@ export const ETIQUETA_ESTADO: Record<EstadoComunicacion, string> = {
 /** Estados en los que todavía se puede tocar la lista o la plantilla. */
 export const ESTADOS_EDITABLES: readonly EstadoComunicacion[] = ["borrador", "revisada", "probada"];
 
-export type EstadoEnvio = "pendiente" | "sin_destinatario" | "enviando" | "enviado" | "error";
+export type EstadoEnvio =
+  | "pendiente"
+  | "sin_destinatario"
+  | "enviando"
+  | "enviado"
+  | "error"
+  | "omitido";
+
+export const ETIQUETA_ESTADO_ENVIO: Record<EstadoEnvio, string> = {
+  pendiente: "Pendiente",
+  sin_destinatario: "Sin destinatario",
+  enviando: "Enviando",
+  enviado: "Enviado",
+  error: "Error",
+  omitido: "Omitido",
+};
+
+/** Por dónde sale un correo. La simulada no llama a nadie. */
+export type NombrePasarela = "zoho" | "simulada";
+
+export type ModoEnvio = "pruebas" | "real";
+
+/** A quién salió de verdad un correo. En modo pruebas no coincide con la lista. */
+export interface EnviadoPara {
+  remitente: string;
+  para: string[];
+  copia: string[];
+  copiaOculta: string[];
+}
 
 export const AVISOS = [
   "cuenta_de_prueba",
@@ -106,7 +134,7 @@ export interface Direccion {
 
 export interface ComAjustesRow {
   envios_activados: boolean;
-  modo: "pruebas" | "real";
+  modo: ModoEnvio;
   cuenta_pruebas_zoho_id: string | null;
   remitentes_permitidos: string[];
   dominios_internos: string[];
@@ -141,6 +169,12 @@ export interface ComComunicacionRow {
   enviada_at: string | null;
   created_at: string;
   updated_at: string;
+  // Migración 048. Opcionales: sin ella, `select("*")` no las trae.
+  prueba_enviada_at?: string | null;
+  prueba_enviada_por_email?: string | null;
+  prueba_enviada_plantilla_id?: string | null;
+  prueba_message_id?: string | null;
+  pasarela?: NombrePasarela | null;
 }
 
 export interface ComDestinatarioRow {
@@ -160,6 +194,9 @@ export interface ComDestinatarioRow {
   enviado_at: string | null;
   intentos: number;
   created_at: string;
+  // Migración 048.
+  enviado_para?: EnviadoPara | null;
+  pasarela?: NombrePasarela | null;
 }
 
 // ---------------------------------------------------------------------------

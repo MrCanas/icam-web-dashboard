@@ -4,12 +4,15 @@ import {
   leerComunicacion,
   listarComunicaciones,
 } from "@/modules/comunicaciones/data/comunicacionesRepository";
+import { nombreDePasarelaActiva } from "@/modules/comunicaciones/data/pasarela";
+import { calcularPermitidos } from "@/modules/comunicaciones/logic/candado";
 import { contarAudiencias, resumirDestinatarios } from "@/modules/comunicaciones/logic/destinatarios";
 import type {
   ComAjustesRow,
   ComComunicacionRow,
   ComDestinatarioRow,
   ComunicacionConResumen,
+  NombrePasarela,
   RecuentoAudiencias,
   ResumenDestinatarios,
 } from "@/modules/comunicaciones/types";
@@ -94,6 +97,43 @@ export async function loadNueva(ctx: UserContext): Promise<DatosNueva> {
       datosZohoAt: null,
       sinMigracion: false,
       error: mensaje(err, "No se pudieron leer los datos de inversores."),
+    };
+  }
+}
+
+/** Lo que hay que saber de los envíos antes de tocar nada: quién puede recibir y por dónde saldría. */
+export interface DatosDeEnvios {
+  ajustes: ComAjustesRow | null;
+  /** Direcciones que el candado deja pasar. */
+  emailsPermitidos: string[];
+  /** Cuentas de prueba sobre las que se puede enviar. */
+  cuentasPermitidas: { zohoId: string; nombre: string }[];
+  promocionEncontrada: boolean;
+  pasarela: NombrePasarela;
+  error: string | null;
+}
+
+export async function loadDatosDeEnvios(ctx: UserContext): Promise<DatosDeEnvios> {
+  const pasarela = nombreDePasarelaActiva();
+  try {
+    const [ajustes, espejos] = await Promise.all([leerAjustes(ctx), cargarEspejosDeContacto(ctx)]);
+    const permitidos = calcularPermitidos(espejos);
+    return {
+      ajustes,
+      emailsPermitidos: [...permitidos.emails].sort(),
+      cuentasPermitidas: permitidos.cuentas,
+      promocionEncontrada: permitidos.promocionEncontrada,
+      pasarela,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      ajustes: null,
+      emailsPermitidos: [],
+      cuentasPermitidas: [],
+      promocionEncontrada: false,
+      pasarela,
+      error: mensaje(err, "No se pudo leer el estado de los envíos."),
     };
   }
 }

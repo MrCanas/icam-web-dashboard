@@ -1,13 +1,15 @@
 import Link from "next/link";
 
 import type { UserContext } from "@/lib/auth/currentUser";
-import { checkWriteAccess } from "@/lib/auth/permissions";
+import { checkWriteAccess, getUserRole } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
-import { loadDetalle } from "@/modules/comunicaciones/logic/loadComunicaciones";
+import { calcularProgreso } from "@/modules/comunicaciones/logic/envio";
+import { loadDatosDeEnvios, loadDetalle } from "@/modules/comunicaciones/logic/loadComunicaciones";
 import { COMUNICACIONES_PATH, ZONA_COMUNICACIONES } from "@/modules/comunicaciones/logic/paths";
-import { AvisoSinEnvio } from "@/modules/comunicaciones/ui/components/AvisoSinEnvio";
 import { CancelarButton } from "@/modules/comunicaciones/ui/components/CancelarButton";
 import { DestinatariosPanel } from "@/modules/comunicaciones/ui/components/DestinatariosPanel";
+import { EnvioPanel } from "@/modules/comunicaciones/ui/components/EnvioPanel";
+import { EstadoDeEnvios } from "@/modules/comunicaciones/ui/components/EstadoDeEnvios";
 import { PlantillaPanel } from "@/modules/comunicaciones/ui/components/PlantillaPanel";
 import {
   ESTADOS_EDITABLES,
@@ -28,14 +30,17 @@ function Cifra({ etiqueta, valor, nota }: { etiqueta: string; valor: number; not
 }
 
 /**
- * Una comunicación preparada: a quién iría, uno por uno, y cómo queda la
- * plantilla con los datos de cada destinatario.
+ * Una comunicación: a quién iría, uno por uno, cómo queda la plantilla con los
+ * datos de cada destinatario y, después, los pasos hasta enviarla.
  *
  * Los destinatarios son una foto tomada al preparar. No se recalculan solos: lo
- * que se revisa aquí es exactamente lo que después se enviaría.
+ * que se revisa aquí es exactamente lo que después se envía.
  */
 export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: string }) {
-  const { comunicacion, destinatarios, resumen, ajustes, error } = await loadDetalle(ctx, id);
+  const [{ comunicacion, destinatarios, resumen, ajustes, error }, envios] = await Promise.all([
+    loadDetalle(ctx, id),
+    loadDatosDeEnvios(ctx),
+  ]);
 
   if (error) {
     return (
@@ -63,6 +68,7 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
   const editable = puedeEscribir && ESTADOS_EDITABLES.includes(comunicacion.estado);
   const roles = (lista: readonly (keyof typeof ETIQUETA_ROL)[]) =>
     lista.length > 0 ? lista.map((r) => ETIQUETA_ROL[r]).join(", ") : "nadie";
+  const aEnviar = destinatarios.filter((d) => !d.excluido && d.para.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
@@ -90,7 +96,7 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
         {editable ? <CancelarButton comunicacionId={comunicacion.id} /> : null}
       </header>
 
-      <AvisoSinEnvio />
+      <EstadoDeEnvios datos={envios} />
 
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Cifra etiqueta="Correos que saldrían" valor={resumen.aEnviar} nota="uno por cuenta" />
@@ -116,11 +122,22 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
         comunicacionId={comunicacion.id}
         plantillaId={comunicacion.plantilla_id}
         plantillaNombre={comunicacion.plantilla_nombre}
-        destinatarios={destinatarios
-          .filter((d) => !d.excluido && d.para.length > 0)
-          .map((d) => ({ id: d.id, nombre: d.cuenta_nombre }))}
+        destinatarios={aEnviar.map((d) => ({ id: d.id, nombre: d.cuenta_nombre }))}
         editable={editable}
       />
+
+      {ajustes ? (
+        <EnvioPanel
+          comunicacion={comunicacion}
+          resumen={resumen}
+          ajustes={ajustes}
+          rol={getUserRole(ctx, ZONA_COMUNICACIONES)}
+          usuarioEmail={ctx.email}
+          pasarela={envios.pasarela}
+          progreso={calcularProgreso(destinatarios)}
+          lineas={aEnviar.map((d) => `${d.cuenta_nombre} — ${d.para.map((p) => p.email).join(", ")}`)}
+        />
+      ) : null}
     </div>
   );
 }

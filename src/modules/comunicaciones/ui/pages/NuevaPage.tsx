@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { loadNueva } from "@/modules/comunicaciones/logic/loadComunicaciones";
 import { COMUNICACIONES_PATH, ZONA_COMUNICACIONES } from "@/modules/comunicaciones/logic/paths";
-import { AvisoSinEnvio } from "@/modules/comunicaciones/ui/components/AvisoSinEnvio";
 import { NuevaForm } from "@/modules/comunicaciones/ui/components/NuevaForm";
 
 /**
@@ -33,7 +32,10 @@ export default async function NuevaPage() {
         <h1 className="mt-1 text-xl font-semibold text-text-primary sm:text-2xl">Nueva comunicación</h1>
       </header>
 
-      <AvisoSinEnvio />
+      <p className="rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
+        <strong>Preparar no envía nada.</strong> Calcula y guarda a quién iría. Después vienen la revisión
+        de la lista, la prueba y la confirmación, en la página de la comunicación.
+      </p>
 
       {sinMigracion ? (
         <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">

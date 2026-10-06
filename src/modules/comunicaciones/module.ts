@@ -28,7 +28,8 @@ export const comunicacionesModule: ModuleDefinition = {
       match: (p) =>
         p === "/dashboard/comunicaciones" ||
         (p.startsWith("/dashboard/comunicaciones/") &&
-          !p.startsWith("/dashboard/comunicaciones/nueva")),
+          !p.startsWith("/dashboard/comunicaciones/nueva") &&
+          !p.startsWith("/dashboard/comunicaciones/ajustes")),
     },
     {
       key: "comunicaciones.nueva",
@@ -36,9 +37,18 @@ export const comunicacionesModule: ModuleDefinition = {
       label: "Nueva",
       match: (p) => p.startsWith("/dashboard/comunicaciones/nueva"),
     },
+    {
+      // El interruptor general y el modo. Los ve quien tenga la zona; los
+      // cambia solo su administrador (lo comprueba la acción).
+      key: "comunicaciones.ajustes",
+      path: "/dashboard/comunicaciones/ajustes",
+      label: "Ajustes",
+      match: (p) => p.startsWith("/dashboard/comunicaciones/ajustes"),
+    },
   ],
   actions: [
     { key: "comunicaciones.read", label: "Ver" },
-    { key: "comunicaciones.write", label: "Preparar" },
+    { key: "comunicaciones.write", label: "Preparar y enviar" },
+    { key: "comunicaciones.admin", label: "Cambiar los ajustes de envío" },
   ],
 };

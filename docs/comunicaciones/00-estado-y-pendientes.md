@@ -20,36 +20,33 @@ lista de a quién llegaron está fuera del repo, en
   aparte ni como repo nuevo.
 - **Zona de permisos propia**, `comunicaciones`, que nadie ve hasta que se le concede.
 - Los correos se siguen enviando **con Zoho CRM y sus plantillas actuales**, no con Microsoft 365.
-- El permiso de envío va en un **token de Zoho separado** que solo existe en Producción de Vercel.
+- El permiso de envío va en un **token de Zoho separado**.
 - Todo el material del proyecto vive junto, en este repo (ver [`README.md`](README.md)).
+- El módulo se construye entero, envío incluido, en una sola PR, **con un candado de
+  destinatarios**: el único destinatario posible es `javiercanas@imparcapital.com` o los contactos
+  principales de la promoción de prueba del CRM. Quitar el candado es una decisión aparte.
 
 Y una norma que no se negocia: nada que envíe correos a inversores se construye con el envío por
 defecto, ni sin pantalla de destinatarios, prueba previa y confirmación explícita.
 
-## 3. Fases
+## 3. Qué hay construido
 
-| Fase | Qué es | Estado |
-|---|---|---|
-| 0 | Retirar del CRM lo creado el 2026-10-05 | Casi: quedan dos borrados (§4) |
-| 1 | Módulo de solo lectura: audiencia, destinatarios, plantilla, historial | Código hecho, PR #64 abierta |
-| 2 | Envío con controles | Sin empezar. Especificada en [`02-fase-2-envio.md`](02-fase-2-envio.md) |
-| 3 | Puesta en marcha del envío con el equipo | Sin empezar |
-
-Fuera de alcance por ahora: seguimiento de aperturas y rebotes, recordatorios, confirmación de
-asistencia a eventos, listas propias y aprobación por una segunda persona.
-
-### Fase 1, pieza a pieza
+Todo en la PR #64 (`feat/comunicaciones-lectura`).
 
 | Pieza | Estado |
 |---|---|
-| Código (`feat/comunicaciones-lectura`) | Hecho. No contiene ninguna llamada de envío |
-| PR #64 a `main` | Abierta, sin conflictos, CI y previsualización en verde |
-| Migración 047 | Aplicada el 2026-10-06 |
-| Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin (2026-10-06) |
-| «Actualizar datos de Zoho» tras la migración | **Sin hacer**: hasta entonces «Inversores directos» sale vacía |
-| Recorrido en el navegador | **Sin hacer** |
+| Audiencia, destinatarios, plantilla, vista previa, historial | Hecho |
+| Envío con los nueve controles | Hecho. Ver [`02-envio-con-controles.md`](02-envio-con-controles.md) |
+| Candado de destinatarios | Hecho y **puesto**. Solo se puede enviar a `PROMOCIONTEST` |
+| Pasarela de correo, real y simulada | Hecho |
+| Pruebas automáticas del candado y de cada control | Hechas, dentro de `npm run check` |
+| Migración 047 (tablas y zona) | Aplicada el 2026-10-06 |
+| Migración 048 (columnas del envío) | Escrita y simulada. Ver §5 |
+| Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin |
+| Ajustes | Envíos **desactivados** y modo **pruebas** |
 
-Los pasos para cerrarla están en [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md).
+Fuera de alcance por ahora: seguimiento de aperturas y rebotes, recordatorios, confirmación de
+asistencia a eventos, listas propias y aprobación por una segunda persona.
 
 ## 4. Lo que queda por borrar en el CRM
 
@@ -81,14 +78,15 @@ desarrolladores > Conexiones.
 - Las fichas de Cuenta de Inversión ya no muestran «Comunicaciones recibidas» ni «Listas de
   comunicación».
 
-## 5. Quién hace qué
+## 5. Pendientes, y quién hace cada uno
 
 | Tarea | Quién |
 |---|---|
+| Aplicar la migración 048 | Javier, o quien él autorice (escribe en producción) |
+| Generar el token de envíos (`npm run comunicaciones:zoho-auth-envios`) | Javier: es un inicio de sesión suyo en Zoho |
+| Recorrido completo: primero con la pasarela simulada, después con envíos reales bajo el candado | Ver [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) § 5 y § 6 |
 | Borrar los cuatro módulos y la conexión del CRM (§4) | Javier |
-| Actualizar los datos de Zoho y ver las tres pantallas con datos reales | Javier |
 | Mergear la PR #64 (`main` es producción) | Javier |
-| Dar el visto bueno para empezar la fase 2 | Javier |
-| Generar el token de envío y guardarlo en Vercel, solo en Producción | Javier, en la fase 2 |
-| Programar la fase 2, en su propia rama y su propia PR | Quien desarrolle |
-| Activar el modo real y lanzar cualquier envío real | Javier. Nunca un asistente ni un script |
+| Guardar el token de envíos en Vercel, **solo en Production** | Javier, tras el merge |
+| Resolver el límite de 100 correos al día de Zoho | Antes de quitar el candado |
+| Quitar el candado, en otra PR | Cuando Javier lo decida |

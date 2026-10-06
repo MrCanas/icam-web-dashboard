@@ -24,7 +24,8 @@ const ROLE_OPTIONS: { value: "" | ZoneRole; label: string }[] = [
 /** Hoy solo la zona PM da capacidades extra al rol admin (ver ActasOperativoTab). */
 const ROLE_HELPER: Partial<Record<ZoneKey, string>> = {
   pm: "En PM, Admin permite además reordenar y archivar proyectos.",
-  comunicaciones: "En Comunicaciones, Lector solo ve el historial; Editor y Admin preparan comunicaciones.",
+  comunicaciones:
+    "En Comunicaciones, Lector solo ve el historial; Editor prepara y envía; Admin, además, activa los envíos y el modo real.",
 };
 
 interface PermissionMatrixProps {

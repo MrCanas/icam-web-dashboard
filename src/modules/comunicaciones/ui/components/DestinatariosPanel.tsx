@@ -48,7 +48,22 @@ function pasa(d: ComDestinatarioRow, filtro: Filtro): boolean {
 function situacion(d: ComDestinatarioRow): string {
   if (d.excluido) return `Excluido: ${d.excluido_motivo ?? "a mano"}`;
   if (d.para.length === 0) return "Sin destinatario";
-  return "Recibiría el correo";
+  // Una vez empezado el envío, lo que cuenta es qué pasó con cada uno y a qué
+  // dirección salió de verdad, que en modo pruebas no es la de la lista.
+  switch (d.estado_envio) {
+    case "enviado": {
+      const a = d.enviado_para?.para.join(", ");
+      return `${d.pasarela === "simulada" ? "Enviado (simulado)" : "Enviado"}${a ? ` a ${a}` : ""}`;
+    }
+    case "error":
+      return `Error: ${d.error ?? "sin detalle"}`;
+    case "omitido":
+      return `Omitido: ${d.error ?? "sin detalle"}`;
+    case "enviando":
+      return "Enviando…";
+    default:
+      return "Recibiría el correo";
+  }
 }
 
 /** Un campo de CSV: entre comillas si lleva separador, comillas o salto de línea. */

@@ -3,13 +3,13 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
-import { loadHistorial } from "@/modules/comunicaciones/logic/loadComunicaciones";
+import { loadDatosDeEnvios, loadHistorial } from "@/modules/comunicaciones/logic/loadComunicaciones";
 import {
   COMUNICACIONES_NUEVA_PATH,
   comunicacionPath,
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
-import { AvisoSinEnvio } from "@/modules/comunicaciones/ui/components/AvisoSinEnvio";
+import { EstadoDeEnvios } from "@/modules/comunicaciones/ui/components/EstadoDeEnvios";
 import { ETIQUETA_AUDIENCIA, ETIQUETA_ESTADO } from "@/modules/comunicaciones/types";
 
 /**
@@ -22,7 +22,10 @@ export default async function HistorialPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { comunicaciones, sinMigracion, error } = await loadHistorial(user);
+  const [{ comunicaciones, sinMigracion, error }, envios] = await Promise.all([
+    loadHistorial(user),
+    loadDatosDeEnvios(user),
+  ]);
   const puedePreparar = checkWriteAccess(user, ZONA_COMUNICACIONES) === null;
 
   return (
@@ -31,7 +34,8 @@ export default async function HistorialPage() {
         <div>
           <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Comunicaciones</h1>
           <p className="mt-0.5 text-sm text-text-muted">
-            Correos a inversores: a quién van y con qué plantilla, antes de que salga nada.
+            Correos a inversores: a quién van y con qué plantilla, antes de que salga nada, y el envío con
+            sus controles.
           </p>
         </div>
         {puedePreparar ? (
@@ -44,7 +48,7 @@ export default async function HistorialPage() {
         ) : null}
       </header>
 
-      <AvisoSinEnvio />
+      <EstadoDeEnvios datos={envios} />
 
       {sinMigracion ? (
         <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">
@@ -97,7 +101,13 @@ export default async function HistorialPage() {
                       ? c.promocion_nombre
                       : ETIQUETA_AUDIENCIA[c.audiencia]}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">{ETIQUETA_ESTADO[c.estado]}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {ETIQUETA_ESTADO[c.estado]}
+                    {/* Una comunicación «enviada» por la pasarela simulada no ha escrito a nadie. */}
+                    {c.pasarela === "simulada" && ["enviando", "pausada", "enviada"].includes(c.estado)
+                      ? " (simulada)"
+                      : ""}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.aEnviar)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.excluidos)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.sinDestinatario)}</td>
