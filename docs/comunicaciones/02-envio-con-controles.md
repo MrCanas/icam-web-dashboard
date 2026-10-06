@@ -14,6 +14,10 @@ Hay tres capas, y cada una funciona aunque fallen las otras:
 2. **Los nueve controles** (§2): qué tiene que pasar antes de cada envío.
 3. **Los ajustes** (§4): un interruptor general y el modo pruebas, apagado y en pruebas de salida.
 
+Sobre ellas van el **ensayo general** y las validaciones de cada correo, que llegaron con el
+seguimiento de aperturas y clics: están en
+[`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 4 y § 5.
+
 ## 1. El candado de destinatarios
 
 **Mientras exista, este módulo solo puede escribir a dos direcciones:**
@@ -71,8 +75,8 @@ esté apagado en pantalla no es un control.
 | 1 | **Datos recientes** | No se prepara sin la copia de Zoho de hoy, y no se confirma una comunicación preparada otro día |
 | 2 | **Revisión**: «He revisado los N destinatarios» | Sin ella no hay prueba. Excluir o incluir a alguien la anula |
 | 3 | **Prueba obligatoria**: la plantilla de verdad, enviada solo a quien ha iniciado sesión | Sin prueba enviada y marcada «La he recibido y está bien» no se confirma. Cambiar de plantilla la anula |
-| 4 | **Resumen final**: correos, direcciones externas, plantilla, remitente, modo y la lista completa | Es lo último que se ve antes de confirmar |
-| 5 | **Confirmación escrita**: teclear el número de correos | Si no coincide, no envía |
+| 4 | **Resumen final**: correos, direcciones externas, plantilla, remitente, modo y la lista completa. Y el **ensayo general**: se montan todos los correos sin enviar ninguno y se enseñan las direcciones exactas | Sin un ensayo correcto y vigente (30 minutos, mismo modo, misma lista) no se confirma |
+| 5 | **Confirmación escrita**: teclear el número de correos | Si no coincide, no envía. Tampoco si el envío no cabe en el tope diario |
 | 6 | **Tandas de 10**, con progreso y botón **Detener** | Detener para antes del siguiente correo. Las tandas las pide la pantalla: cerrarla deja de enviar |
 | 7 | **Interruptor general**, solo para el rol `admin` | Se consulta antes de **cada** correo. Apagado, no sale ni la prueba |
 | 8 | **Sin duplicados** | Cada destinatario se marca «enviando» antes de enviarle, así que repetir no reenvía. Una dirección recibe un solo correo por comunicación: la segunda cuenta queda «Omitida» |
@@ -99,8 +103,13 @@ Todo envío pasa por **una sola puerta**, `enviarConCandado`, con dos pasarelas 
 
 | Pasarela | Cuándo | Qué hace |
 |---|---|---|
-| Simulada | Donde no existe el token de envíos: previsualizaciones y cualquier copia local sin él | No llama a nadie. El recorrido se completa y lo que se guarda queda marcado «simulado» |
-| Zoho | Donde existe `ZOHO_REFRESH_TOKEN_ENVIOS` | Envía de verdad |
+| Simulada | Donde no existe el token de envíos (previsualizaciones y cualquier copia local sin él), o donde se fuerza con `COMUNICACIONES_PASARELA=simulada` | No llama a nadie. El recorrido se completa y lo que se guarda queda marcado «simulado» |
+| Zoho | Donde existe `ZOHO_REFRESH_TOKEN_ENVIOS` y no se ha forzado la simulada | Envía de verdad |
+
+`COMUNICACIONES_PASARELA` solo sirve para forzar la simulada: **no hay valor que fuerce la real**.
+Existe porque dejar vacía la variable del token al arrancar no basta —el cargador de `.env.local`
+la rellena—, y un servidor local que se creía simulado salía por Zoho (2026-10-06; se vio en la
+banda de la página antes de enviar nada).
 
 La llamada de envío de Zoho está en **un solo fichero** de todo el portal,
 `data/pasarela/pasarelaZoho.ts`, y lo vigila una prueba (`__tests__/arquitectura.test.ts`): si
@@ -121,16 +130,25 @@ POST {ZOHO_API_DOMAIN}/crm/v8/{módulo}/{id del registro}/actions/send_mail
       "to": [{ "email": "destinatario@ejemplo.com" }],
       "cc": [{ "email": "copia@ejemplo.com" }],
       "bcc": [{ "email": "remitente@imparcapital.com" }],
-      "template": { "id": "<id de la plantilla>" },
+      "subject": "<asunto ya resuelto>",
+      "content": "<HTML ya montado, con su seguimiento>",
+      "mail_format": "html",
+      "attachments": [{ "id": "<file_id del adjunto de la plantilla>" }],
       "org_email": false
     }
   ]
 }
 ```
 
+- **El correo lo monta el portal**, no Zoho: resuelve los campos combinados y pone la imagen de
+  apertura y los enlaces rastreados de ese destinatario
+  ([`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 2 y § 3). Por eso va `subject` +
+  `content` y no `template`.
 - El correo se envía **sobre un registro**: la cuenta de inversión, o el primer contacto en «Para»
-  si la plantilla es del módulo Contactos. Zoho resuelve los campos combinados con ese registro y
-  archiva el correo en su ficha.
+  si la plantilla es del módulo Contactos. Los campos combinados se resuelven con ese registro y
+  Zoho archiva el correo en su ficha.
+- Zoho incrusta las imágenes de la plantilla en el correo y envuelve cada enlace en uno suyo de
+  rastreo, que redirige al del portal.
 - En modo real el remitente va además en copia oculta, para que el correo le quede en su buzón,
   como hace el kiosk «Emails a Fondos/Promos».
 - `org_email` es `true` solo si el remitente es una dirección de la organización en Zoho.
@@ -149,6 +167,7 @@ zona; los cambia solo el rol `admin` de la zona. Tabla `com_ajustes`, una sola f
 | Modo | **Pruebas** | En pruebas, todo correo se redirige a quien lo envía. En real van a la lista (y el candado sigue mandando) |
 | Cuenta de pruebas | Ninguna | Sobre qué cuenta se envía la prueba obligatoria. Tiene que ser una cuenta de prueba de `PROMOCIONTEST` |
 | Remitentes permitidos | Ninguno | Con qué direcciones se puede enviar. Zoho solo acepta las del usuario dueño del token |
+| Tope diario | 100 | Cuántos correos reales pueden salir en un día, pruebas incluidas. No se confirma un envío que no quepa, y una tanda no lo pasa. Entre 1 y 100 |
 
 ## 5. El token de envíos
 
@@ -180,8 +199,11 @@ el token de lectura con uno que no puede leer.
 - **100 correos al día por usuario**, según la documentación de la API. «Toda la base» son unas 164
   cuentas: no cabe en un día con un solo token. Hay que resolverlo antes de quitar el candado
   (repartir en dos días, o confirmar con Zoho el límite real del plan contratado).
-- Al alcanzarlo Zoho contesta `LIMIT_EXCEEDED`; el destinatario queda en error y el resto sigue
-  intentándose y fallando igual. Si pasa, **Detener**.
+- El portal lleva su propia cuenta (el ajuste «Tope diario», §4) y se niega antes de llegar. Si aun
+  así Zoho contesta `LIMIT_EXCEEDED`, el destinatario queda en error y el resto sigue intentándose
+  y fallando igual: **Detener**.
+- La API de correos de Zoho no está disponible para 102 de las 164 cuentas (`NOT_SUPPORTED`): en
+  ellas no se puede comprobar después a quién dice Zoho que mandó el correo, ni si rebotó.
 
 ## 7. Pruebas automáticas
 
@@ -192,5 +214,5 @@ Dentro de `npm run check`, sin base de datos, sin red y sin credenciales:
 | `logic/__tests__/candado.test.ts` | A quién deja pasar el candado y a quién no, caso a caso |
 | `logic/__tests__/controles.test.ts` | Que cada control dice que no: sin revisión, sin prueba, número mal tecleado, interruptor apagado, datos de otro día, comunicación detenida |
 | `logic/__tests__/envio.test.ts` | A qué direcciones sale cada correo; que el modo pruebas redirige todo; que repetir no reenvía; y que de una audiencia de inversores reales no sale ningún correo en ningún modo |
-| `data/pasarela/__tests__/pasarela.test.ts` | Que lo que el candado rechaza no llega a ninguna pasarela; que la real no arranca sin token; que el token de lectura no sirve |
+| `data/pasarela/__tests__/pasarela.test.ts` | Que lo que el candado rechaza no llega a ninguna pasarela; que la real no arranca sin token; que el token de lectura no sirve; que `COMUNICACIONES_PASARELA=simulada` fuerza la simulada y nada fuerza la real |
 | `__tests__/arquitectura.test.ts` | Que la llamada de envío y el token de envíos solo existen en la pasarela de Zoho |

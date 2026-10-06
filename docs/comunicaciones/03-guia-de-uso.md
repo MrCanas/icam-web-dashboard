@@ -49,6 +49,9 @@ Y con sus avisos:
 | Sin destinatario | Falta el contacto con el papel elegido | Corregir el papel en el CRM y preparar otra |
 | Contacto dado de baja | El contacto pidió no recibir correos. No se le escribe | Nada |
 | Contacto sin correo | El contacto no tiene dirección en el CRM | Completarla en el CRM |
+| Dirección mal formada | La dirección no es un correo válido. No entra en «Para» | Corregirla en el CRM |
+| El dominio no recibe correo | El dominio de la dirección no existe o no admite correo. La cuenta nace excluida | Comprobar la dirección en el CRM |
+| Posible errata | El dominio se parece a uno habitual mal escrito (`gmial.com`) | Mirarla; si está bien, no hay que hacer nada |
 
 Puedes **excluir** cualquier cuenta y **volver a incluirla**, y descargar la lista en CSV.
 
@@ -60,9 +63,19 @@ no se entera: hay que preparar una comunicación nueva.
 Las plantillas son las del CRM y se siguen editando allí.
 
 1. Pulsa «Elegir plantilla» y búscala por nombre, carpeta o asunto.
-2. Elige un destinatario y pulsa «Ver vista previa». Un campo que la vista previa no sabe rellenar
-   aparece marcado en rojo y listado debajo.
+2. Elige un destinatario y pulsa «Ver vista previa». Es el correo tal como lo monta el portal.
 3. Repite con dos o tres destinatarios distintos.
+
+Dos avisos en rojo que conviene distinguir:
+
+- **«Con esta plantilla el correo no saldría»**: la plantilla usa un campo que el portal no sabe
+  rellenar (un importe, una fecha, un campo de otro módulo, la firma). Hay que cambiar la plantilla
+  en el CRM o elegir otra.
+- **«Campos vacíos para este destinatario»**: el campo existe pero esa cuenta lo tiene en blanco, y
+  saldría un hueco («Buenas tardes ,»). El correo sale igual; complétalo en el CRM si importa.
+
+Si la plantilla no trae ninguna imagen, el portal le añade al pie el logotipo de Impar Capital. Lo
+ves en la vista previa.
 
 ## 4. Enviar
 
@@ -74,8 +87,11 @@ Al final de la página, cuatro pasos. No se puede saltar ninguno.
    correo de verdad, solo a ti. Ábrelo, y si está bien pulsa «La he recibido y está bien». Si
    cambias de plantilla, hay que repetir la prueba.
 3. **Resumen y confirmación.** Lee el resumen: cuántos correos, con qué plantilla, desde qué
-   remitente, en qué modo y **a quién, uno por uno**. Escribe a mano el número de correos y pulsa
-   «Enviar».
+   remitente, en qué modo y **a quién, uno por uno**. Pulsa **«Hacer el ensayo general»**: el
+   portal monta todos los correos sin enviar ninguno y te dice cuántos saldrían, **a qué
+   direcciones exactas** y qué cuentas tienen algún campo vacío. Si algo falla, lo dice y no deja
+   seguir. Con el ensayo correcto, escribe a mano el número de correos y pulsa «Enviar». El ensayo
+   vale 30 minutos.
 4. **Envío.** Sale en tandas de 10 y ves el avance. **No cierres la página**: cerrarla detiene el
    envío. Con «Detener» se para antes del siguiente correo; con «Reanudar» sigue por donde iba, sin
    repetir a nadie.
@@ -104,6 +120,37 @@ En **Comunicaciones** están todas, de la más reciente a la más antigua.
 | Pausada | Detenida a mitad. Los pendientes siguen pendientes |
 | Enviada | Terminada |
 | Cancelada | Descartada antes de enviar. Se conserva en el historial |
+
+## 6. Quién lo ha abierto y quién ha pulsado
+
+Cada comunicación enviada tiene su **analítica** (enlace en su página y en el historial), y la
+pestaña **Analítica** enseña el conjunto: por comunicación, por plantilla y por cuenta.
+
+Cómo leerla:
+
+- **«No consta apertura» no significa «no lo ha leído».** Una apertura solo se registra si el
+  programa de correo carga las imágenes, y muchos no lo hacen.
+- **Los clics son el dato fiable.** Quien pulsa un enlace cuenta como que lo abrió.
+- Lo que envías en modo pruebas no entra en las cifras: esas aperturas son tuyas.
+- «Consultar entrega en Zoho» dice si un correo rebotó, pero Zoho solo da ese dato para una parte
+  de las cuentas. El resto queda «sin dato».
+
+En la tabla de destinatarios puedes filtrar (no consta apertura, abrió, hizo clic, abrió y no hizo
+clic, pulsó un enlace concreto, error, rebotado), buscar, descargar el CSV y abrir cada fila para
+ver cuándo abrió y qué pulsó.
+
+## 7. Reenviar a una parte
+
+En la analítica de una comunicación, aplica un filtro —por ejemplo «No consta apertura»— y pulsa
+**«Preparar reenvío»**.
+
+- **No envía nada.** Crea una comunicación nueva, en borrador, con solo esas cuentas.
+- Las direcciones se vuelven a leer con los datos de hoy. Una cuenta con una dirección que no
+  estaba en el envío original nace excluida, con el aviso «Dirección nueva»: mírala antes de
+  incluirla.
+- A partir de ahí es una comunicación como cualquier otra: revisar, prueba, ensayo, confirmar.
+  Puedes cambiar la plantilla por una de recordatorio.
+- El reenvío tiene sus propias cifras, separadas de las del envío original.
 
 ## Si algo no cuadra
 

@@ -192,7 +192,7 @@ export default async function AnaliticaGlobalPage({ periodo }: { periodo: string
                           {g.envios.length === 1 ? "1 envío" : `${fmtInt(g.envios.length)} envíos`}
                         </span>
                       </th>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(g.personas)} personas</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(g.personas)} {g.personas === 1 ? "persona" : "personas"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {fmtInt(g.personasQueAbrieron)}{" "}
                         <span className="text-text-muted">· {pct(tasa(g.personasQueAbrieron, g.personas))}</span>

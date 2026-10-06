@@ -302,7 +302,7 @@ export function EnvioPanel({
           {revisada ? (
             <p>
               Revisada por {comunicacion.revisada_por_email} el {fmtFechaHora(comunicacion.revisada_at)}:{" "}
-              {fmtInt(comunicacion.revisada_n ?? 0)} correos.
+              {cuantos(comunicacion.revisada_n ?? 0, "correo", "correos")}.
             </p>
           ) : (
             <>
@@ -411,8 +411,9 @@ export function EnvioPanel({
               <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
                 <dt className="text-text-muted">Correos</dt>
                 <dd>
-                  <strong>{fmtInt(resumen.aEnviar)}</strong>, uno por cuenta, a {fmtInt(resumen.direcciones)}{" "}
-                  direcciones ({fmtInt(resumen.direccionesExternas)} externas)
+                  <strong>{fmtInt(resumen.aEnviar)}</strong>, uno por cuenta, a{" "}
+                  {cuantos(resumen.direcciones, "dirección", "direcciones")} ({fmtInt(resumen.direccionesExternas)}{" "}
+                  {resumen.direccionesExternas === 1 ? "externa" : "externas"})
                 </dd>
                 <dt className="text-text-muted">Plantilla</dt>
                 <dd>{comunicacion.plantilla_nombre}</dd>

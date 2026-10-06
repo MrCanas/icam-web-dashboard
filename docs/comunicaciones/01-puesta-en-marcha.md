@@ -15,9 +15,11 @@ npm run comunicaciones:apply-migration-047             # simulación: aplica y r
 npm run comunicaciones:apply-migration-047 -- --apply
 npm run comunicaciones:apply-migration-048
 npm run comunicaciones:apply-migration-048 -- --apply
+npm run comunicaciones:apply-migration-049
+npm run comunicaciones:apply-migration-049 -- --apply
 ```
 
-Las dos son aditivas e idempotentes. Cada script aplica la suya dos veces dentro de una
+Las tres son aditivas e idempotentes. Cada script aplica la suya dos veces dentro de una
 transacción, enseña cómo queda y **solo confirma si todo cuadra**; si no, hace ROLLBACK.
 
 | Migración | Qué crea | Qué tiene que imprimir |
@@ -25,8 +27,23 @@ transacción, enseña cómo queda y **solo confirma si todo cuadra**; si no, hac
 | 047 | Zona `comunicaciones`, tablas `com_ajustes`, `com_comunicacion`, `com_destinatario` y dos columnas en el espejo de Inversores | Seis zonas, `Ajustes: 1 fila · envíos desactivados · modo pruebas`, tres tablas con RLS y 0 políticas |
 | 048 | Las columnas del envío: prueba enviada, pasarela, a quién salió de verdad cada correo y el estado `omitido` | Siete columnas con `✓` y un solo CHECK de `estado_envio` que incluye `omitido` |
 
+| 049 | Seguimiento y analítica: identificador y huella de cada correo, `com_enlace`, `com_evento`, la función `com_registrar_evento`, el ensayo general, el reenvío y el tope diario | «Columnas nuevas: N de N», las tablas `com_*` con RLS y 0 políticas, la función `com_registrar_evento` ejecutable solo por `service_role` y sus comprobaciones con `✓` |
+
 Sin la 047 las páginas dicen que falta. Sin la 048 se puede preparar y revisar, pero la prueba y la
-confirmación se niegan **antes** de enviar nada.
+confirmación se niegan **antes** de enviar nada. Sin la 049 no hay ensayo general, y sin ensayo no
+se confirma.
+
+## 1 bis. La dirección de seguimiento
+
+La prueba, el ensayo y el envío necesitan **`COMUNICACIONES_SEGUIMIENTO_URL`**: de ella cuelgan la
+imagen de apertura y los enlaces de cada correo. Sin ella se niegan antes de enviar nada.
+
+| Dónde | Valor |
+|---|---|
+| Producción (Vercel) | `https://go.imparcapital.com` |
+| Local | `http://localhost:<puerto>` del servidor de desarrollo. Los enlaces solo valen en ese equipo |
+
+El dominio y su registro DNS, en [`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 3.
 
 ## 2. Conceder la zona
 
@@ -66,11 +83,17 @@ En **Comunicaciones > Ajustes**, con rol admin:
 ## 5. Comprobar con la pasarela simulada
 
 Donde no existe el token de envíos (las previsualizaciones, o una copia local sin él) el recorrido
-se completa y **no sale ningún correo**. En local:
+se completa y **no sale ningún correo**. En una copia local que **sí** tiene el token en
+`.env.local`, hay que forzarla:
 
 ```bash
-npx next dev --webpack
+COMUNICACIONES_PASARELA=simulada npx next dev --webpack          # bash
+$env:COMUNICACIONES_PASARELA='simulada'; npx next dev --webpack  # PowerShell
 ```
+
+Arrancar con el token vacío **no basta**: el cargador de `.env.local` rellena las variables vacías.
+Antes de pulsar nada, comprobar que la banda de la página dice **«Pasarela simulada»** y no «Salen
+por Zoho».
 
 - [ ] **Historial**: carga, con la banda «Candado de destinatarios activo» y las direcciones
       permitidas. La pestaña le aparece a quien tiene la zona y a nadie más.
@@ -83,8 +106,10 @@ npx next dev --webpack
       comunicaciones:candado-verificar` contesta que el candado deja salir 0 correos de ella, en
       modo pruebas y en modo real.
 - [ ] **Recorrido completo con `PROMOCIONTEST`**: preparar, volver a incluir las cuentas de prueba
-      (nacen excluidas), revisar, enviarse la prueba, darla por buena, teclear el número y enviar.
-      Todo queda marcado «(simulado)».
+      (nacen excluidas), revisar, enviarse la prueba, darla por buena, hacer el ensayo general,
+      teclear el número y enviar. Todo queda marcado «(simulado)».
+- [ ] **Analítica**: la comunicación simulada tiene su página de analítica, con el aviso de que
+      sus cifras no miden a nadie, y aparece en el agregado bajo «Fuera de las cifras».
 - [ ] **Detener** a mitad y **Reanudar**.
 - [ ] **Sin regresiones**: la pestaña Inversores carga, y «Subir a Zoho» de Avance de obra sigue
       disponible.
@@ -107,7 +132,9 @@ npm run comunicaciones:zoho-envio-verificar
 3. Confirmar y enviar en modo pruebas: todos los correos llegan a quien envía.
 4. Cambiar a **modo real** y repetir con una comunicación nueva. Los correos llegan a los contactos
    principales de las cuentas incluidas, y solo a ellos.
-5. Al terminar: **modo pruebas y envíos desactivados**.
+5. Pulsar un enlace del correo recibido y ver el clic en **Analítica** de esa comunicación. Con un
+   filtro aplicado, «Preparar reenvío»: nace un borrador con solo esas cuentas.
+6. Al terminar: **modo pruebas y envíos desactivados**.
 
 Cada correo queda en la ficha de la cuenta de prueba en Zoho y, en el detalle de la comunicación,
 con la dirección a la que salió y su identificador.
@@ -130,7 +157,12 @@ npm run comunicaciones:zoho-envio-verificar   # el token de envíos y sus remite
 | «… no está entre los remitentes permitidos» | Falta esa dirección en Ajustes |
 | «Zoho no acepta … como remitente» | Esa dirección no es del usuario dueño del token |
 | «Candado de destinatarios: …» | Es el candado haciendo su trabajo |
-| «Pasarela simulada» donde debería enviar | Falta el token de envíos en ese entorno |
+| «Pasarela simulada» donde debería enviar | Falta el token de envíos en ese entorno, o está puesto `COMUNICACIONES_PASARELA=simulada` |
+| «Salen por Zoho» en una copia local que se quería simulada | Falta `COMUNICACIONES_PASARELA=simulada` al arrancar |
+| «Falta la dirección de seguimiento…» | Falta `COMUNICACIONES_SEGUIMIENTO_URL` en ese entorno |
+| «Con esta plantilla el correo no saldría» | La plantilla usa un campo que el portal no resuelve (importe, fecha, otro módulo, firma) |
+| «El correo ya no es el que se ensayó» | Algo cambió en Zoho o en la plantilla entre el ensayo y el envío. Preparar otra |
+| «Tope diario: …» | El envío no cabe en lo que queda del día |
 | `LIMIT_EXCEEDED` | El límite diario de Zoho: 100 correos por usuario |
 | No llegan plantillas | El token de lectura caducó: ver `docs/inversores/01-zoho.md` § Credenciales |
 

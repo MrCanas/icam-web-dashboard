@@ -188,7 +188,8 @@ export async function prepararReenvioAction(
     const creada = await crearComunicacion(
       user,
       {
-        nombre: `Reenvío (${ETIQUETA_FILTRO[filtro].toLowerCase()}) · ${original.comunicacion.nombre} · ${hoy}`.slice(0, 300),
+        // El nombre del original ya lleva su fecha: la del reenvío va delante.
+        nombre: `Reenvío del ${hoy} (${ETIQUETA_FILTRO[filtro].toLowerCase()}) · ${original.comunicacion.nombre}`.slice(0, 300),
         tipo: original.comunicacion.tipo,
         audiencia: "reenvio",
         promocionZohoId: original.comunicacion.promocion_zoho_id,

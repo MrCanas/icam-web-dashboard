@@ -42,9 +42,15 @@ Todo en la PR #64 (`feat/comunicaciones-lectura`).
 | Pruebas automáticas del candado y de cada control | Hechas, dentro de `npm run check` |
 | Migración 047 (tablas y zona) | Aplicada el 2026-10-06 |
 | Migración 048 (columnas del envío) | Aplicada el 2026-10-06 |
+| Seguimiento propio de aperturas y clics; el correo lo monta el portal | Hecho. Ver [`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) |
+| Ensayo general con huella, validaciones de direcciones y de cada correo, tope diario | Hecho |
+| Panel de analítica, por correo y agregado, y reenvío por filtro | Hecho |
+| Migración 049 (seguimiento y analítica) | Aplicada el 2026-10-06 |
+| Dominio `go.imparcapital.com` | Añadido al proyecto de Vercel. **Falta el registro DNS en Cloudflare** (§5) |
 | Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin |
-| Ajustes | Envíos **desactivados** y modo **pruebas**. Cuenta de pruebas: TEST CUENTA JCV_Updated. Remitente permitido: `javiercanas@imparcapital.com` |
+| Ajustes | Envíos **desactivados** y modo **pruebas**. Cuenta de pruebas: TEST CUENTA JCV_Updated. Remitente permitido: `javiercanas@imparcapital.com`. Tope diario: 100 |
 | Token de envíos | Generado el 2026-10-06 con el usuario de Javier Canas. Solo en el `.env.local` de su copia de trabajo; **falta ponerlo en Vercel (Production)** |
+| `COMUNICACIONES_SEGUIMIENTO_URL` | En local, `http://localhost:3100`. **Falta ponerla en Vercel**: `https://go.imparcapital.com` |
 
 ### Probado el 2026-10-06
 
@@ -75,8 +81,26 @@ Un detalle de datos que apareció: el correo enviado sobre CUENTA MASTER salió 
 porque esa cuenta de prueba tiene vacío el campo del saludo. La vista previa lo avisa como «campo
 vacío».
 
-Fuera de alcance por ahora: seguimiento de aperturas y rebotes, recordatorios, confirmación de
-asistencia a eventos, listas propias y aprobación por una segunda persona.
+### Probado el 2026-10-06, con el seguimiento
+
+Segundo recorrido, ya con el correo montado por el portal, el ensayo general y la analítica.
+Primero simulado y después real: **otros cuatro correos, los cuatro solo a
+`javiercanas@imparcapital.com`**, comprobados en su buzón (ocho en total en el día, más dos de una
+comprobación técnica previa, todos a esa misma dirección).
+
+| Qué | Modo | Registro de Zoho | Llegó a |
+|---|---|---|---|
+| Prueba obligatoria | — | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+| Envío a `PROMOCIONTEST`, solo TEST CUENTA JCV_Updated | Real | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+| Prueba obligatoria del reenvío | — | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+| Reenvío desde el filtro «Hizo clic» | Real | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+
+Qué se vio, y los tres fallos que destapó y quedaron corregidos, en
+[`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 9. Lo que **no** se ha podido comprobar
+todavía son las aperturas con el correo de verdad: hace falta que la PR esté en producción.
+
+Fuera de alcance por ahora: recordatorios automáticos, confirmación de asistencia a eventos, listas
+propias y aprobación por una segunda persona.
 
 ## 4. Lo que queda por borrar en el CRM
 
@@ -110,10 +134,16 @@ desarrolladores > Conexiones.
 
 ## 5. Pendientes, y quién hace cada uno
 
+Javier Canas pidió el 2026-10-06 dejar los cuatro primeros **para el final del todo**.
+
 | Tarea | Quién |
 |---|---|
 | Borrar los cuatro módulos y la conexión del CRM (§4) | Javier |
 | Mergear la PR #64 (`main` es producción) | Javier |
 | Guardar el token de envíos en Vercel, **solo en Production** | Javier, tras el merge |
-| Resolver el límite de 100 correos al día de Zoho | Antes de quitar el candado |
 | Quitar el candado, en otra PR | Cuando Javier lo decida |
+| Crear en Cloudflare `CNAME go → 1429ddcbf3c9f778.vercel-dns-017.com` (solo DNS, sin proxy), comprobando antes que no exista ya un registro `go` | Hace falta que Javier inicie sesión en Cloudflare |
+| Poner `COMUNICACIONES_SEGUIMIENTO_URL=https://go.imparcapital.com` en Vercel | Con el DNS ya creado |
+| Comprobar una apertura real: enviarse un correo desde producción y abrirlo cargando las imágenes | Tras el merge, con el candado puesto |
+| Confirmar con protección de datos el registro de aperturas y clics por persona | Antes de quitar el candado |
+| Resolver el límite de 100 correos al día de Zoho | Antes de quitar el candado |
