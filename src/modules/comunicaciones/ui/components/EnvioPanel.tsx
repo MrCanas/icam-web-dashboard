@@ -57,6 +57,11 @@ const BOTON_PRINCIPAL =
   "min-h-9 rounded-md bg-icam-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60";
 const CAMPO = "rounded-md border border-subtle bg-card px-3 py-2 text-sm text-text-body";
 
+/** «1 correo», «2 correos». */
+function cuantos(n: number, uno: string, varios: string): string {
+  return `${fmtInt(n)} ${n === 1 ? uno : varios}`;
+}
+
 function Paso({
   numero,
   titulo,
@@ -244,11 +249,13 @@ export function EnvioPanel({
 
       {!confirmada && candado ? (
         <p className="rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
-          Con el candado y el modo de ahora, de esta comunicación saldrían{" "}
-          <strong>{fmtInt(candado.permitidos)} correos</strong>
+          Con el candado y el modo de ahora, de esta comunicación{" "}
+          {candado.permitidos === 1 ? "saldría" : "saldrían"}{" "}
+          <strong>{cuantos(candado.permitidos, "correo", "correos")}</strong>
           {candado.direcciones.length > 0 ? (
             <>
-              , y las únicas direcciones que recibirían algo son{" "}
+              , y {candado.direcciones.length === 1 ? "la única dirección que recibiría" : "las únicas direcciones que recibirían"}{" "}
+              algo {candado.direcciones.length === 1 ? "es" : "son"}{" "}
               <strong>{candado.direcciones.join(", ")}</strong>
             </>
           ) : null}
@@ -272,9 +279,11 @@ export function EnvioPanel({
           ) : (
             <>
               <p>
-                Repasa la lista de arriba. Saldrían <strong>{fmtInt(resumen.aEnviar)} correos</strong>, a{" "}
-                {fmtInt(resumen.direcciones)} direcciones ({fmtInt(resumen.direccionesExternas)} externas). Si
-                después excluyes o incluyes a alguien, habrá que revisarla otra vez.
+                Repasa la lista de arriba. {resumen.aEnviar === 1 ? "Saldría" : "Saldrían"}{" "}
+                <strong>{cuantos(resumen.aEnviar, "correo", "correos")}</strong>, a{" "}
+                {cuantos(resumen.direcciones, "dirección", "direcciones")} (
+                {cuantos(resumen.direccionesExternas, "externa", "externas")}). Si después excluyes o incluyes a
+                alguien, habrá que revisarla otra vez.
               </p>
               {puedeEscribir ? (
                 <button
@@ -283,7 +292,9 @@ export function EnvioPanel({
                   onClick={() => ejecutar(() => revisarDestinatariosAction(comunicacion.id, resumen.aEnviar))}
                   className={BOTON_PRINCIPAL}
                 >
-                  He revisado los {fmtInt(resumen.aEnviar)} destinatarios
+                  {resumen.aEnviar === 1
+                    ? "He revisado el destinatario"
+                    : `He revisado los ${fmtInt(resumen.aEnviar)} destinatarios`}
                 </button>
               ) : null}
               {puedeEscribir && motivoRevisar ? <p className="text-text-muted">{motivoRevisar}</p> : null}
@@ -421,7 +432,7 @@ export function EnvioPanel({
                     onClick={confirmar}
                     className={BOTON_PRINCIPAL}
                   >
-                    Enviar {fmtInt(resumen.aEnviar)} correos
+                    Enviar {cuantos(resumen.aEnviar, "correo", "correos")}
                   </button>
                 </div>
               ) : null}

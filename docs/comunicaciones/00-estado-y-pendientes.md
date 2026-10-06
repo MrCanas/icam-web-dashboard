@@ -41,9 +41,39 @@ Todo en la PR #64 (`feat/comunicaciones-lectura`).
 | Pasarela de correo, real y simulada | Hecho |
 | Pruebas automáticas del candado y de cada control | Hechas, dentro de `npm run check` |
 | Migración 047 (tablas y zona) | Aplicada el 2026-10-06 |
-| Migración 048 (columnas del envío) | Escrita y simulada. Ver §5 |
+| Migración 048 (columnas del envío) | Aplicada el 2026-10-06 |
 | Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin |
-| Ajustes | Envíos **desactivados** y modo **pruebas** |
+| Ajustes | Envíos **desactivados** y modo **pruebas**. Cuenta de pruebas: TEST CUENTA JCV_Updated. Remitente permitido: `javiercanas@imparcapital.com` |
+| Token de envíos | Generado el 2026-10-06 con el usuario de Javier Canas. Solo en el `.env.local` de su copia de trabajo; **falta ponerlo en Vercel (Production)** |
+
+### Probado el 2026-10-06
+
+Recorrido completo en local, primero con la pasarela simulada y después con envíos reales por
+Zoho, siempre bajo el candado. Salieron **cuatro correos reales, los cuatro solo a
+`javiercanas@imparcapital.com`**, y llegaron a su buzón:
+
+| Qué | Modo | Registro de Zoho | Llegó a |
+|---|---|---|---|
+| Prueba obligatoria | — | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+| Envío a `PROMOCIONTEST`, dos cuentas | Pruebas | CUENTA MASTER | `javiercanas@imparcapital.com` (redirigido). La segunda cuenta, omitida por dirección repetida |
+| Prueba obligatoria | — | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+| Envío a `PROMOCIONTEST`, solo TEST CUENTA JCV_Updated | Real | TEST CUENTA JCV_Updated | `javiercanas@imparcapital.com` |
+
+Además:
+
+- Una comunicación a «Toda la base» (125 correos) se preparó y se descartó sin enviar. El candado
+  no dejaba salir ninguno de sus correos, ni en modo pruebas ni en modo real, y la página no ofrecía
+  ningún paso de envío.
+- El número mal tecleado no dejó confirmar.
+- `npm run comunicaciones:candado-verificar` termina con «Ningún correo, enviado o por enviar,
+  lleva una dirección fuera de la lista cerrada».
+
+Sin probar en el navegador: Detener y Reanudar a mitad de un envío (con dos correos la tanda acaba
+de una vez). Lo cubren las pruebas automáticas de `logic/controles.ts`.
+
+Un detalle de datos que apareció: el correo enviado sobre CUENTA MASTER salió con «Buenas tardes ,»
+porque esa cuenta de prueba tiene vacío el campo del saludo. La vista previa lo avisa como «campo
+vacío».
 
 Fuera de alcance por ahora: seguimiento de aperturas y rebotes, recordatorios, confirmación de
 asistencia a eventos, listas propias y aprobación por una segunda persona.
@@ -82,9 +112,6 @@ desarrolladores > Conexiones.
 
 | Tarea | Quién |
 |---|---|
-| Aplicar la migración 048 | Javier, o quien él autorice (escribe en producción) |
-| Generar el token de envíos (`npm run comunicaciones:zoho-auth-envios`) | Javier: es un inicio de sesión suyo en Zoho |
-| Recorrido completo: primero con la pasarela simulada, después con envíos reales bajo el candado | Ver [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) § 5 y § 6 |
 | Borrar los cuatro módulos y la conexión del CRM (§4) | Javier |
 | Mergear la PR #64 (`main` es producción) | Javier |
 | Guardar el token de envíos en Vercel, **solo en Production** | Javier, tras el merge |

@@ -154,6 +154,19 @@ export async function remitentesDeZoho(): Promise<RemitenteZoho[]> {
   return lista;
 }
 
+/**
+ * La entrada de Zoho que corresponde a un remitente.
+ *
+ * La misma dirección puede venir dos veces: como buzón del usuario (`pop`,
+ * `imap`, `primary`) y como dirección de la organización (`org_email`). Se
+ * prefiere la de la organización, que es por donde envía el kiosk «Emails a
+ * Fondos/Promos» y no depende del buzón personal de nadie.
+ */
+export function elegirRemitente(remitentes: readonly RemitenteZoho[], email: string): RemitenteZoho | null {
+  const suyas = remitentes.filter((r) => r.email === normalizarEmail(email));
+  return suyas.find((r) => r.tipo === "org_email") ?? suyas[0] ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Envío
 // ---------------------------------------------------------------------------
@@ -186,8 +199,7 @@ export function cuerpoDeEnvio(correo: CorreoSaliente, remitente: RemitenteZoho):
 
 async function enviar(correo: CorreoSaliente): Promise<RespuestaPasarela> {
   try {
-    const remitentes = await remitentesDeZoho();
-    const remitente = remitentes.find((r) => r.email === normalizarEmail(correo.remitente));
+    const remitente = elegirRemitente(await remitentesDeZoho(), correo.remitente);
     if (!remitente) {
       return {
         ok: false,

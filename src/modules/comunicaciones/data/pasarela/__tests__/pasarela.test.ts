@@ -8,6 +8,7 @@ import { PREFIJO_SIMULADO } from "../pasarelaSimulada";
 import {
   crearPasarelaZoho,
   cuerpoDeEnvio,
+  elegirRemitente,
   hayTokenDeEnvios,
   SinTokenDeEnviosError,
   VARIABLE_TOKEN_ENVIOS,
@@ -129,6 +130,18 @@ test("el token de lectura del portal no sirve para enviar", async () => {
     if (lectura === undefined) delete process.env.ZOHO_REFRESH_TOKEN;
     else process.env.ZOHO_REFRESH_TOKEN = lectura;
   }
+});
+
+test("si Zoho da la misma dirección como buzón y como organización, se envía por la de la organización", () => {
+  const remitentes = [
+    { email: "javiercanas@imparcapital.com", nombre: "Javier Canas", tipo: "pop" },
+    { email: "javiercanas@imparcapital.com", nombre: "Javier Canas Valverde", tipo: "org_email" },
+    { email: "marketing@imparcapital.com", nombre: "Impar Capital", tipo: "org_email" },
+  ];
+  assert.equal(elegirRemitente(remitentes, " JavierCanas@imparcapital.com ")?.tipo, "org_email");
+  assert.equal(elegirRemitente(remitentes.slice(0, 1), "javiercanas@imparcapital.com")?.tipo, "pop");
+  // Una dirección que Zoho no ofrece no es remitente, esté o no en los ajustes.
+  assert.equal(elegirRemitente(remitentes, "otro@imparcapital.com"), null);
 });
 
 test("el cuerpo de la llamada lleva la plantilla y solo las direcciones del correo", () => {
