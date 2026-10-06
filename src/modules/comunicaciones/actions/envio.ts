@@ -64,7 +64,7 @@ import {
   TANDA,
   type Progreso,
 } from "@/modules/comunicaciones/logic/envio";
-import { huellaDeCorreo } from "@/modules/comunicaciones/logic/huella";
+import { HUELLA_DE_OMITIDO, huellaDeCorreo } from "@/modules/comunicaciones/logic/huella";
 import {
   AJUSTES_ROUTE_KEY,
   COMUNICACIONES_AJUSTES_PATH,
@@ -322,7 +322,6 @@ export async function ensayarEnvioAction(
     const pendientes = pendientesDe(destinatarios);
     const yaEnviadas = direccionesYaEnviadas(destinatarios);
     const turnos: { destinatario: ComDestinatarioRow; token: string; yaEnviadas: Set<string> }[] = [];
-    let omitidos = 0;
     for (const destinatario of pendientes) {
       const reales = [...destinatario.para, ...destinatario.copia]
         .map((d) => normalizarEmail(d.email))
@@ -333,8 +332,7 @@ export async function ensayarEnvioAction(
         token: destinatario.seguimiento_token ?? nuevoToken(),
         yaEnviadas: new Set(yaEnviadas),
       });
-      if (paraReal.length === 0) omitidos++;
-      else for (const e of reales) yaEnviadas.add(e);
+      if (paraReal.length > 0) for (const e of reales) yaEnviadas.add(e);
     }
 
     // 2. Montar y validar cada correo. Aquí sí en paralelo: cada uno lee su
@@ -371,6 +369,7 @@ export async function ensayarEnvioAction(
     const direcciones = new Set<string>();
     const conCamposVacios: ResumenDeEnsayo["conCamposVacios"] = [];
     const correos: { destinatarioId: string; token: string; enlaces: string[]; huella: string }[] = [];
+    const omitidosEnsayados: typeof correos = [];
     let imagen: ImagenApertura = "pixel";
 
     for (const turno of turnos) {
@@ -380,7 +379,16 @@ export async function ensayarEnvioAction(
         problemas.push({ cuenta, problema: "No se llegó a montar." });
         continue;
       }
-      if (montado.tipo === "omitido") continue;
+      if (montado.tipo === "omitido") {
+        // También queda ensayado: como alguien que no recibe nada.
+        omitidosEnsayados.push({
+          destinatarioId: turno.destinatario.id,
+          token: turno.token,
+          enlaces: [],
+          huella: HUELLA_DE_OMITIDO,
+        });
+        continue;
+      }
       if (montado.tipo === "error") {
         problemas.push({ cuenta, problema: montado.motivo });
         continue;
@@ -415,7 +423,7 @@ export async function ensayarEnvioAction(
     const resumen: ResumenDeEnsayo = {
       asunto: material.plantilla.asunto ?? "",
       correos: correos.length,
-      omitidos,
+      omitidos: omitidosEnsayados.length,
       direcciones: [...direcciones].sort(),
       conCamposVacios,
       enlaces: material.enlaces.length,
@@ -436,7 +444,7 @@ export async function ensayarEnvioAction(
         resumen,
         imagen,
         enlacesDePlantilla: material.enlaces,
-        correos,
+        correos: [...correos, ...omitidosEnsayados],
       });
       if (!r.ok) return { ok: false, mensaje: r.error };
       refrescar(comunicacionId);
@@ -595,6 +603,14 @@ export async function enviarTandaAction(comunicacionId: string): Promise<Resulta
         anotado = await anotarResultado(user, comunicacionId, destinatario.id, {
           estado: "omitido",
           motivo: montado.motivo,
+        });
+      } else if (destinatario.huella === HUELLA_DE_OMITIDO) {
+        // En el ensayo no recibía nada, y ahora sí saldría (el correo que
+        // llevaba su dirección no llegó a salir). Sin ensayar no sale.
+        anotado = await anotarResultado(user, comunicacionId, destinatario.id, {
+          estado: "omitido",
+          motivo:
+            "En el ensayo general se omitía por dirección repetida, y el correo que llevaba esa dirección no ha salido. No se envía sin ensayar: prepara un reenvío.",
         });
       } else if (montado.tipo === "error" || montado.problemas.length > 0) {
         const error = montado.tipo === "error" ? montado.motivo : montado.problemas.join(" ");

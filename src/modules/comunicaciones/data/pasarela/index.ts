@@ -18,12 +18,26 @@ import type { NombrePasarela } from "@/modules/comunicaciones/types";
 
 export type { PasarelaCorreo, ResultadoEnvio } from "@/modules/comunicaciones/data/pasarela/tipos";
 
+/**
+ * `COMUNICACIONES_PASARELA=simulada` fuerza la pasarela simulada aunque exista
+ * el token de envíos. Solo sirve para eso: no hay valor que fuerce la real.
+ *
+ * Hace falta porque dejar la variable del token vacía al arrancar NO basta: el
+ * cargador de `.env.local` rellena las variables vacías, y un servidor local
+ * que se creía simulado saldría por Zoho.
+ */
+export const VARIABLE_DE_PASARELA = "COMUNICACIONES_PASARELA";
+
+function simuladaALaFuerza(): boolean {
+  return process.env[VARIABLE_DE_PASARELA]?.trim().toLowerCase() === "simulada";
+}
+
 export function nombreDePasarelaActiva(): NombrePasarela {
-  return hayTokenDeEnvios() ? "zoho" : "simulada";
+  return hayTokenDeEnvios() && !simuladaALaFuerza() ? "zoho" : "simulada";
 }
 
 function pasarelaActiva(): PasarelaCorreo {
-  return hayTokenDeEnvios() ? crearPasarelaZoho() : pasarelaSimulada;
+  return nombreDePasarelaActiva() === "zoho" ? crearPasarelaZoho() : pasarelaSimulada;
 }
 
 /**

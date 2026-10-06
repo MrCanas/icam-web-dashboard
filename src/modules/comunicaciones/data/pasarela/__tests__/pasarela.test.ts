@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { PermitidosCandado } from "@/modules/comunicaciones/logic/candado";
 import type { CorreoSaliente } from "@/modules/comunicaciones/logic/envio";
-import { enviarConCandado, nombreDePasarelaActiva } from "../index";
+import { enviarConCandado, nombreDePasarelaActiva, VARIABLE_DE_PASARELA } from "../index";
 import { PREFIJO_SIMULADO } from "../pasarelaSimulada";
 import {
   crearPasarelaZoho,
@@ -106,6 +106,35 @@ test("sin token de envíos la pasarela activa es la simulada, y lo que «sale» 
     assert.equal(r.pasarela, "simulada");
     assert.ok(r.ok && r.messageId.startsWith(PREFIJO_SIMULADO));
   });
+});
+
+test("COMUNICACIONES_PASARELA=simulada fuerza la simulada aunque haya token, y nada fuerza la real", async () => {
+  const antes = process.env[VARIABLE_DE_PASARELA];
+  try {
+    await conToken("un-token-de-envios", async () => {
+      delete process.env[VARIABLE_DE_PASARELA];
+      assert.equal(nombreDePasarelaActiva(), "zoho");
+      for (const valor of ["simulada", " Simulada ", "SIMULADA"]) {
+        process.env[VARIABLE_DE_PASARELA] = valor;
+        assert.equal(nombreDePasarelaActiva(), "simulada", valor);
+        const r = await enviarConCandado(correo(), PERMITIDOS);
+        assert.equal(r.ok && r.pasarela, "simulada", valor);
+      }
+      // Cualquier otro valor no cambia nada: manda el token.
+      process.env[VARIABLE_DE_PASARELA] = "zoho";
+      assert.equal(nombreDePasarelaActiva(), "zoho");
+    });
+    // Sin token, ningún valor de la variable enciende la pasarela real.
+    await conToken(undefined, () => {
+      for (const valor of ["zoho", "real", "simulada", ""]) {
+        process.env[VARIABLE_DE_PASARELA] = valor;
+        assert.equal(nombreDePasarelaActiva(), "simulada", valor);
+      }
+    });
+  } finally {
+    if (antes === undefined) delete process.env[VARIABLE_DE_PASARELA];
+    else process.env[VARIABLE_DE_PASARELA] = antes;
+  }
 });
 
 test("la pasarela real se niega a arrancar sin el token de envíos", async () => {

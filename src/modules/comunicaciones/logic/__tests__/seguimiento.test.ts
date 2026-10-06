@@ -81,6 +81,18 @@ test("si el correo ya trae imágenes se añade una invisible, y las suyas no se 
   assert.ok(r.html.endsWith("</body></html>"), "la imagen va dentro del body");
 });
 
+test("un enlace que envuelve una imagen se nombra por la imagen, no queda sin nombre", () => {
+  const html =
+    `<a href="https://ejemplo.com/a"><img src="x.png" alt="Ver vídeos &amp; fotos"></a>` +
+    `<a href="https://ejemplo.com/b"><img src="y.png"></a>` +
+    `<a href="https://ejemplo.com/c"><img src="z.png" alt="icono"> Con texto</a>` +
+    `<a href="https://ejemplo.com/d"></a>`;
+  assert.deepEqual(
+    enlacesDe(html).map((e) => e.texto),
+    ["Imagen: Ver vídeos & fotos", "(imagen)", "Con texto", ""],
+  );
+});
+
 test("si el correo no trae ninguna imagen se le añade el logotipo, a la vista", () => {
   const sinImagen = `<html><body><p>Solo texto</p><a href="https://ejemplo.com">x</a></body></html>`;
   const r = instrumentar(sinImagen, BASE, TOKEN);

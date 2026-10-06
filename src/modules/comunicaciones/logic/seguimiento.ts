@@ -95,9 +95,20 @@ export function enlacesDe(html: string): EnlaceDePlantilla[] {
   for (const m of html.matchAll(ENLACE_RE)) {
     const url = decodificar(m[3] ?? "").trim();
     if (!esEnlaceRastreable(url)) continue;
-    enlaces.push({ posicion: enlaces.length, url, texto: quitarEtiquetas(m[5] ?? "").slice(0, 200) });
+    enlaces.push({ posicion: enlaces.length, url, texto: textoDeEnlace(m[5] ?? "") });
   }
   return enlaces;
+}
+
+/**
+ * Cómo se nombra un enlace en el panel. Un enlace que envuelve una imagen (un
+ * botón, un icono de red social) no tiene texto: se nombra por la imagen.
+ */
+function textoDeEnlace(interior: string): string {
+  const texto = quitarEtiquetas(interior).trim().slice(0, 200);
+  if (texto || !/<img\b/i.test(interior)) return texto;
+  const alt = decodificar(/<img\b[^>]*?\balt\s*=\s*(["'])(.*?)\1/i.exec(interior)?.[2] ?? "").trim();
+  return alt ? `Imagen: ${alt}`.slice(0, 200) : "(imagen)";
 }
 
 export interface Instrumentado {

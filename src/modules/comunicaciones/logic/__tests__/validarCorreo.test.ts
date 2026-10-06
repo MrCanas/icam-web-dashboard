@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { MODULO_CUENTAS } from "../candado";
 import { adjuntosDePlantilla, adjuntosSinIdentificador, componerCorreo, type ComponerEntrada } from "../composicion";
 import type { CorreoSaliente } from "../envio";
-import { huellaDeCorreo } from "../huella";
+import { huellaDeCorreo, sinClavesDeImagen } from "../huella";
 import { TIPOS_DE_CAMPO_ADMITIDOS, renderizarPlantilla } from "../plantilla";
 import { validarCorreo, type Esperado } from "../validarCorreo";
 
@@ -237,6 +237,32 @@ test("cualquier cambio respecto a lo ensayado cambia la huella", async () => {
   for (const [nombre, cambiado] of cambiados) {
     assert.notEqual(await huellaDeCorreo(cambiado), ensayada, nombre);
   }
+});
+
+test("la clave de imagen que Zoho cambia en cada lectura no entra en la huella, y solo ella", async () => {
+  const { correo } = correoDe();
+  const c = correo.contenido!;
+  const conImagen = (clave: string, ancho = "600") =>
+    ({
+      ...correo,
+      contenido: {
+        ...c,
+        html: `<img width="${ancho}" src="https://crm.zoho.eu/crm/viewInLineImage?fileContent=${clave}">${c.html}`,
+      },
+    }) satisfies CorreoSaliente;
+
+  // La misma plantilla leída dos veces: misma imagen, otra clave.
+  const ensayada = await huellaDeCorreo(conImagen("26ca7abd0e9a6d77a09a24"));
+  assert.equal(await huellaDeCorreo(conImagen("bb2342e6243e73b7600976")), ensayada);
+  // Todo lo demás de la imagen sigue contando.
+  assert.notEqual(await huellaDeCorreo(conImagen("26ca7abd0e9a6d77a09a24", "300")), ensayada);
+  assert.notEqual(await huellaDeCorreo(correo), ensayada, "quitar la imagen cambia la huella");
+  // Y no abre la mano con nada que no sea esa clave.
+  assert.equal(sinClavesDeImagen('<a href="https://ejemplo.com/?fileContent=abc123">x</a>'), '<a href="https://ejemplo.com/?fileContent=abc123">x</a>');
+  assert.equal(
+    sinClavesDeImagen('src="https://crm.zoho.eu/crm/viewInLineImage?fileContent=ABCDEF0123&x=1"'),
+    'src="https://crm.zoho.eu/crm/viewInLineImage?fileContent=*&x=1"',
+  );
 });
 
 test("dos destinatarios distintos nunca comparten huella: cada uno lleva su identificador", async () => {
