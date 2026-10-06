@@ -42,6 +42,7 @@ export function pathnameToZone(pathname: string): ZoneKey | null {
   if (pathname.startsWith("/dashboard/corporativo")) return "corporativo";
   if (pathname.startsWith("/dashboard/pm")) return "pm";
   if (pathname.startsWith("/dashboard/monday")) return "adquisiciones";
+  if (pathname.startsWith("/dashboard/comunicaciones")) return "comunicaciones";
   if (pathname.startsWith("/dashboard/data")) return "data";
   return null;
 }

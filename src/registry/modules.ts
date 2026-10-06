@@ -1,3 +1,4 @@
+import { comunicacionesModule } from "@/modules/comunicaciones/module";
 import { corporativoModule } from "@/modules/corporativo/module";
 import { mondayModule } from "@/modules/monday/module";
 import { pmModule } from "@/modules/pm/module";
@@ -9,6 +10,7 @@ export const MODULES = {
   corporativo: corporativoModule,
   pm: pmModule,
   monday: mondayModule,
+  comunicaciones: comunicacionesModule,
 } as const;
 
 export const MODULES_LIST = Object.values(MODULES);
@@ -19,6 +21,7 @@ export const ZONE_TO_MODULE = {
   corporativo: "corporativo",
   pm: "pm",
   adquisiciones: "monday",
+  comunicaciones: "comunicaciones",
   data: null,
 } as const;
 
@@ -29,6 +32,7 @@ export const MODULE_TO_ZONE: Record<string, ZoneKey> = {
   corporativo: "corporativo",
   pm: "pm",
   monday: "adquisiciones",
+  comunicaciones: "comunicaciones",
 };
 
 /** Orden de pestañas (alineado con app_zone.sort_order). */
@@ -37,6 +41,7 @@ export const ZONE_ORDER: ZoneKey[] = [
   "corporativo",
   "pm",
   "adquisiciones",
+  "comunicaciones",
   "data",
 ];
 

@@ -33,6 +33,18 @@ test("monday.logs ya tiene su propia key (antes devolvía null)", () => {
   assert.equal(routeKeyForPathname("/dashboard/monday/logs"), "monday.logs");
 });
 
+test("comunicaciones: «nueva» tiene su key y todo lo demás cae en el historial", () => {
+  // El historial excluye «nueva» a propósito (el primer match gana). Si se
+  // rompe, el detalle de una comunicación se gobernaría con el permiso equivocado.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones"), "comunicaciones.historial");
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/nueva"), "comunicaciones.nueva");
+  assert.equal(
+    routeKeyForPathname("/dashboard/comunicaciones/3f0c1a52-9d1e-4a2b-8a43-0d2f6b1c7e55"),
+    "comunicaciones.historial",
+  );
+  assert.equal(zoneForRouteKey("comunicaciones.nueva"), "comunicaciones");
+});
+
 test("una ruta fuera del registry devuelve null", () => {
   assert.equal(routeKeyForPathname("/dashboard/perfil"), null);
 });

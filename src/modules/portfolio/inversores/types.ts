@@ -36,6 +36,14 @@ export interface InvCuentaRow extends InvFilaSync {
   propietario_zoho_id: string | null;
   propietario_nombre: string | null;
   zoho_modified_at: string | null;
+  /** Marcada a mano como prueba o técnica (migración 041). El sync no la toca. */
+  excluida?: boolean;
+  excluida_motivo?: string | null;
+  /**
+   * Casilla «Tiene intermediario» del CRM (migración 047). `null` hasta el
+   * primer sync posterior a la migración. La usa Comunicaciones.
+   */
+  tiene_intermediario?: boolean | null;
 }
 
 export interface InvContactoRow extends InvFilaSync {
@@ -47,6 +55,8 @@ export interface InvContactoRow extends InvFilaSync {
   email_secundario: string | null;
   telefono: string | null;
   zoho_modified_at: string | null;
+  /** Baja de correo del contacto en el CRM (migración 047). La usa Comunicaciones. */
+  email_opt_out?: boolean | null;
 }
 
 export interface InvCuentaContactoRow extends InvFilaSync {

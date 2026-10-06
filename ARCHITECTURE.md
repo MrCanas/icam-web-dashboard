@@ -72,7 +72,7 @@ export const portfolioModule: ModuleDefinition = {
 
 `src/lib/auth/permissions.ts` + `src/registry`. `UserContext` lleva `zones: UserZoneRole[]`, `isPlatformAdmin` y `deniedRouteKeys` (no un campo `roles`).
 
-- **Zona**: `financiero` · `corporativo` · `pm` · `adquisiciones` · `data`. Cada usuario tiene un **rol** por zona: `admin` · `editor` · `lector`.
+- **Zona**: `financiero` · `corporativo` · `pm` · `adquisiciones` · `comunicaciones` · `data`. Cada usuario tiene un **rol** por zona: `admin` · `editor` · `lector`.
 - `hasZoneAccess(user, zona)` — ve la zona (cualquier rol). `checkWriteAccess(user, zona)` — editor/admin escriben, lector no.
 - **Denylist por ruta**: `app_user_route_deny.route_key` apunta a `ModuleRoute.key` (sin FK; renombrar una key deja denies huérfanos — ver auditoría §5.2). `canAccessRouteKey(user, key)` combina zona + denylist.
 - **Corte de servidor**: cada page shell del registry llama `await requireRouteAccess("<key>")`. Es el único corte que no se salta por URL; `DashboardZoneGuard` (cliente) es solo UX.
@@ -134,6 +134,7 @@ export async function listProyectos(ctx: UserContext, options?: ListProyectosOpt
 | corporativo | `corpPeriodosRepository.ts`, `readClient.ts` (service role SIN variante de navegador) |
 | pm | `pmRepository.ts`, `readClient.ts` |
 | monday | `syncLogsRepository.ts`, `readClient.ts` (+ Monday GraphQL in `read.ts`, `dashboard-read.ts`) |
+| comunicaciones | `comunicacionesRepository.ts`, `readClient.ts` (service role SIN variante de navegador; + lecturas de Zoho en `zohoPlantillas.ts`, `zohoRegistros.ts`) |
 
 Server pages and API routes obtain `ctx` via `await getCurrentUser()`; client hooks use `useCurrentUser()` then pass `user` into repository calls (browser client via `readClient`).
 
