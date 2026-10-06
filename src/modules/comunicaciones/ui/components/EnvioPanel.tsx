@@ -41,6 +41,14 @@ interface Props {
   progreso: Progreso;
   /** Una línea por correo que saldría: «Cuenta — direcciones». */
   lineas: string[];
+  /** Lo que el candado dejaría salir de esta comunicación, simulado en el servidor. */
+  candado: {
+    permitidos: number;
+    rechazados: number;
+    primerRechazo: { cuenta: string; motivo: string } | null;
+    /** Las direcciones exactas a las que saldría algo. */
+    direcciones: string[];
+  } | null;
 }
 
 const BOTON =
@@ -78,7 +86,17 @@ function Paso({
  * quien lo impide: cada acción vuelve a comprobarlo en el servidor. Las tandas
  * las pide esta pantalla una a una, así que cerrarla deja de enviar.
  */
-export function EnvioPanel({ comunicacion, resumen, ajustes, rol, usuarioEmail, pasarela, progreso, lineas }: Props) {
+export function EnvioPanel({
+  comunicacion,
+  resumen,
+  ajustes,
+  rol,
+  usuarioEmail,
+  pasarela,
+  progreso,
+  lineas,
+  candado,
+}: Props) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -190,11 +208,53 @@ export function EnvioPanel({ comunicacion, resumen, ajustes, rol, usuarioEmail, 
   const numeroEscrito = numero.trim() !== "";
   const simulada = pasarela === "simulada";
 
+  // Antes de empezar, si el candado rechazaría un solo correo, aquí no hay nada
+  // que pulsar: se dice por qué y no se ofrece ningún paso.
+  if (!confirmada && candado && candado.rechazados > 0) {
+    return (
+      <section className="space-y-2" aria-labelledby="com-envio">
+        <h2 id="com-envio" className="text-base font-semibold text-text-primary">
+          Envío
+        </h2>
+        <div className="space-y-1 rounded-lg border border-[#9B3B3B]/40 bg-card p-3 text-sm text-text-body sm:p-4">
+          <p>
+            <strong className="text-[#9B3B3B]">Esta comunicación no se puede enviar.</strong> El candado de
+            destinatarios rechazaría {fmtInt(candado.rechazados)} de sus{" "}
+            {fmtInt(candado.rechazados + candado.permitidos)} correos, así que no se envía ninguno.
+          </p>
+          {candado.primerRechazo ? (
+            <p className="text-text-muted">
+              Por ejemplo, {candado.primerRechazo.cuenta}: {candado.primerRechazo.motivo}.
+            </p>
+          ) : null}
+          <p className="text-text-muted">
+            La lista de arriba es a quién iría si no hubiera candado. Sirve para revisarla; a nadie de ella se
+            le escribe.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-2" aria-labelledby="com-envio">
       <h2 id="com-envio" className="text-base font-semibold text-text-primary">
         Envío
       </h2>
+
+      {!confirmada && candado ? (
+        <p className="rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
+          Con el candado y el modo de ahora, de esta comunicación saldrían{" "}
+          <strong>{fmtInt(candado.permitidos)} correos</strong>
+          {candado.direcciones.length > 0 ? (
+            <>
+              , y las únicas direcciones que recibirían algo son{" "}
+              <strong>{candado.direcciones.join(", ")}</strong>
+            </>
+          ) : null}
+          .
+        </p>
+      ) : null}
 
       {!puedeEscribir ? (
         <p className="rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">

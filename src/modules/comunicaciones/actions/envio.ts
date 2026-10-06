@@ -27,7 +27,6 @@ import { enviarConCandado, nombreDePasarelaActiva } from "@/modules/comunicacion
 import {
   calcularPermitidos,
   normalizarEmail,
-  verificarCandado,
   type PermitidosCandado,
 } from "@/modules/comunicaciones/logic/candado";
 import {
@@ -48,6 +47,7 @@ import {
   enviadoPara,
   montarCorreo,
   montarCorreoDePrueba,
+  simularCandado,
   TANDA,
   type Progreso,
 } from "@/modules/comunicaciones/logic/envio";
@@ -224,44 +224,6 @@ export async function marcarPruebaVistaAction(comunicacionId: string): Promise<R
 // ---------------------------------------------------------------------------
 
 /**
- * Lo que el candado diría de cada correo de la comunicación, sin enviar nada.
- *
- * Se hace al confirmar para que el «no» llegue antes de empezar y explique por
- * qué. El candado de verdad sigue estando en `enviarConCandado`.
- */
-function rechazosDelCandado(
-  ctx: Contexto,
-  permitidos: PermitidosCandado,
-  usuarioEmail: string,
-): { cuenta: string; motivo: string }[] {
-  const { comunicacion, destinatarios } = ctx.completa;
-  const yaEnviadas = direccionesYaEnviadas(destinatarios);
-  const rechazos: { cuenta: string; motivo: string }[] = [];
-
-  for (const destinatario of destinatarios) {
-    if (destinatario.excluido || destinatario.para.length === 0) continue;
-    if (destinatario.estado_envio !== "pendiente") continue;
-    const montado = montarCorreo({
-      comunicacion,
-      destinatario,
-      modo: ctx.ajustes.modo,
-      usuarioEmail,
-      remitente: comunicacion.remitente_email ?? "",
-      yaEnviadas,
-    });
-    if (montado.tipo === "omitido") continue;
-    if (montado.tipo === "error") {
-      rechazos.push({ cuenta: destinatario.cuenta_nombre, motivo: montado.motivo });
-      continue;
-    }
-    const veredicto = verificarCandado(montado.correo, permitidos);
-    if (!veredicto.ok) rechazos.push({ cuenta: destinatario.cuenta_nombre, motivo: veredicto.motivo });
-    for (const direccion of montado.direccionesReales) yaEnviadas.add(direccion);
-  }
-  return rechazos;
-}
-
-/**
  * La confirmación: teclear el número de correos que van a salir.
  *
  * No envía nada todavía. Deja la comunicación «enviando» y es la pantalla la
@@ -281,13 +243,24 @@ export async function confirmarEnvioAction(
     if (motivo) return { ok: false, mensaje: motivo };
     if (!(await hayColumnasDeEnvio(user))) return { ok: false, mensaje: FALTA_MIGRACION_048 };
 
-    const rechazos = rechazosDelCandado(ctx, await permitidosAhora(user), user.email);
-    if (rechazos.length > 0) {
-      const primero = rechazos[0]!;
+    // Lo que el candado diría de CADA correo, antes de empezar: si uno solo no
+    // puede salir, no se empieza. El candado de verdad sigue en `enviarConCandado`.
+    const { rechazados } = simularCandado(
+      ctx.completa.comunicacion,
+      ctx.completa.destinatarios,
+      {
+        modo: ctx.ajustes.modo,
+        usuarioEmail: user.email,
+        remitente: ctx.completa.comunicacion.remitente_email ?? "",
+      },
+      await permitidosAhora(user),
+    );
+    if (rechazados.length > 0) {
+      const primero = rechazados[0]!;
       return {
         ok: false,
         mensaje:
-          `Candado de destinatarios: ${rechazos.length} de ${ctx.controles.resumen.aEnviar} correos no pueden salir. ` +
+          `Candado de destinatarios: ${rechazados.length} de ${ctx.controles.resumen.aEnviar} correos no pueden salir. ` +
           `${primero.cuenta}: ${primero.motivo}.`,
       };
     }

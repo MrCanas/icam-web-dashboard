@@ -2,7 +2,9 @@ import {
   MODULO_CONTACTOS,
   MODULO_CUENTAS,
   normalizarEmail,
+  verificarCandado,
   type CorreoParaCandado,
+  type PermitidosCandado,
 } from "@/modules/comunicaciones/logic/candado";
 import type {
   ComComunicacionRow,
@@ -190,6 +192,61 @@ export function direccionesYaEnviadas(
     for (const dir of [...d.para, ...d.copia]) enviadas.add(normalizarEmail(dir.email));
   }
   return enviadas;
+}
+
+export interface SimulacionDeCandado {
+  /** Los correos que saldrían, con sus direcciones exactas. */
+  permitidos: { cuenta: string; correo: CorreoSaliente }[];
+  /** Los que el candado no deja salir, o que no se pueden montar, y por qué. */
+  rechazados: { cuenta: string; motivo: string }[];
+  /** Los que no se enviarían porque sus direcciones ya recibirían el correo por otra cuenta. */
+  omitidos: { cuenta: string; motivo: string }[];
+}
+
+/**
+ * Lo que pasaría con cada correo pendiente de una comunicación, SIN enviar nada.
+ *
+ * Recorre los destinatarios en el mismo orden y con las mismas funciones que el
+ * envío de verdad (`montarCorreo` + `verificarCandado`), así que lo que dice es
+ * lo que haría el envío. Se usa para enseñarlo en pantalla antes de empezar,
+ * para negarse al confirmar y para comprobarlo desde la consola.
+ */
+export function simularCandado(
+  comunicacion: Pick<ComComunicacionRow, "plantilla_id" | "plantilla_modulo">,
+  destinatarios: readonly Pick<
+    ComDestinatarioRow,
+    "cuenta_zoho_id" | "cuenta_nombre" | "para" | "copia" | "excluido" | "estado_envio"
+  >[],
+  opciones: { modo: ModoEnvio; usuarioEmail: string; remitente: string },
+  permitidos: PermitidosCandado,
+): SimulacionDeCandado {
+  const yaEnviadas = direccionesYaEnviadas(destinatarios);
+  const simulacion: SimulacionDeCandado = { permitidos: [], rechazados: [], omitidos: [] };
+
+  for (const destinatario of destinatarios) {
+    if (destinatario.excluido || destinatario.para.length === 0) continue;
+    if (destinatario.estado_envio !== "pendiente") continue;
+    const cuenta = destinatario.cuenta_nombre;
+    const montado = montarCorreo({ comunicacion, destinatario, ...opciones, yaEnviadas });
+
+    if (montado.tipo === "omitido") {
+      simulacion.omitidos.push({ cuenta, motivo: montado.motivo });
+      continue;
+    }
+    if (montado.tipo === "error") {
+      simulacion.rechazados.push({ cuenta, motivo: montado.motivo });
+      continue;
+    }
+    const veredicto = verificarCandado(montado.correo, permitidos);
+    if (veredicto.ok) {
+      simulacion.permitidos.push({ cuenta, correo: montado.correo });
+      // Solo lo que saldría cuenta como enviado para el siguiente.
+      for (const direccion of montado.direccionesReales) yaEnviadas.add(direccion);
+    } else {
+      simulacion.rechazados.push({ cuenta, motivo: veredicto.motivo });
+    }
+  }
+  return simulacion;
 }
 
 export interface Progreso {

@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ComDestinatarioRow, Direccion } from "@/modules/comunicaciones/types";
-import { MODULO_CONTACTOS, MODULO_CUENTAS } from "../candado";
+import { MODULO_CONTACTOS, MODULO_CUENTAS, type PermitidosCandado } from "../candado";
 import {
   calcularProgreso,
   direccionesYaEnviadas,
   montarCorreo,
   montarCorreoDePrueba,
+  simularCandado,
   type MontarCorreoEntrada,
 } from "../envio";
 
@@ -132,6 +133,92 @@ test("sin cuenta de pruebas designada no hay prueba", () => {
     remitente: "javiercanas@imparcapital.com",
   });
   assert.equal(m.ok, false);
+});
+
+// ---------------------------------------------------------------------------
+// La simulación: lo mismo que haría el envío, sin enviar
+// ---------------------------------------------------------------------------
+
+const PERMITIDOS: PermitidosCandado = {
+  emails: new Set(["javiercanas@imparcapital.com", "iranzuvicente@imparcapital.com"]),
+  cuentasZohoId: new Set(["master", "jcv"]),
+  contactosZohoId: new Set(["c-javier", "c-iranzu"]),
+  cuentas: [],
+  promocionEncontrada: true,
+};
+
+type FilaSimulada = Parameters<typeof simularCandado>[1][number];
+const pendiente = (cuenta: string, para: string[], p: Partial<FilaSimulada> = {}): FilaSimulada => ({
+  cuenta_zoho_id: cuenta,
+  cuenta_nombre: cuenta,
+  para: para.map((e) => dir(e)),
+  copia: [],
+  excluido: false,
+  estado_envio: "pendiente",
+  ...p,
+});
+const PLANTILLA = { plantilla_id: "plantilla-1", plantilla_modulo: MODULO_CUENTAS };
+const OPCIONES = { usuarioEmail: "javiercanas@imparcapital.com", remitente: "javiercanas@imparcapital.com" };
+
+/** Todas las direcciones a las que saldría algo, en cualquier campo. */
+function direccionesQueSaldrian(simulacion: ReturnType<typeof simularCandado>): string[] {
+  return [
+    ...new Set(
+      simulacion.permitidos.flatMap(({ correo }) => [...correo.para, ...correo.copia, ...correo.copiaOculta]),
+    ),
+  ].sort();
+}
+
+test("una audiencia de inversores reales: no sale NINGÚN correo, ni en modo real ni en modo pruebas", () => {
+  const inversores = Array.from({ length: 125 }, (_, i) => pendiente(`real-${i}`, [`inversor${i}@real.com`]));
+  for (const modo of ["real", "pruebas"] as const) {
+    const s = simularCandado(PLANTILLA, inversores, { ...OPCIONES, modo }, PERMITIDOS);
+    assert.equal(s.permitidos.length, 0, modo);
+    assert.equal(s.rechazados.length, 125, modo);
+    assert.deepEqual(direccionesQueSaldrian(s), [], modo);
+  }
+});
+
+test("una audiencia mezclada: los inversores se rechazan y solo sale lo de las cuentas de prueba", () => {
+  const lista = [
+    pendiente("real-1", ["inversor1@real.com"]),
+    pendiente("jcv", ["javiercanas@imparcapital.com"]),
+    // Un inversor real con una dirección de la lista cerrada entre las suyas.
+    pendiente("real-2", ["javiercanas@imparcapital.com", "inversor2@real.com"]),
+  ];
+  const s = simularCandado(PLANTILLA, lista, { ...OPCIONES, modo: "real" }, PERMITIDOS);
+  assert.deepEqual(s.permitidos.map((p) => p.cuenta), ["jcv"]);
+  assert.equal(s.rechazados.length, 2);
+  assert.deepEqual(direccionesQueSaldrian(s), ["javiercanas@imparcapital.com"]);
+});
+
+test("la promoción de pruebas en modo real: solo direcciones de la lista cerrada", () => {
+  const lista = [
+    pendiente("master", ["iranzuvicente@imparcapital.com", "javiercanas@imparcapital.com"]),
+    pendiente("jcv", ["javiercanas@imparcapital.com"]),
+    pendiente("inv2", [], { estado_envio: "sin_destinatario" }),
+  ];
+  const s = simularCandado(PLANTILLA, lista, { ...OPCIONES, modo: "real" }, PERMITIDOS);
+  assert.deepEqual(s.permitidos.map((p) => p.cuenta), ["master"]);
+  // La segunda cuenta se omite: su única dirección ya recibe el correo por la primera.
+  assert.deepEqual(s.omitidos.map((o) => o.cuenta), ["jcv"]);
+  assert.deepEqual(direccionesQueSaldrian(s), ["iranzuvicente@imparcapital.com", "javiercanas@imparcapital.com"]);
+});
+
+test("una cuenta de prueba con una copia a una dirección externa se rechaza entera", () => {
+  const lista = [pendiente("master", ["javiercanas@imparcapital.com"], { copia: [dir("alguien@gmail.com")] })];
+  const s = simularCandado(PLANTILLA, lista, { ...OPCIONES, modo: "real" }, PERMITIDOS);
+  assert.equal(s.permitidos.length, 0);
+  assert.equal(s.rechazados.length, 1);
+});
+
+test("la simulación no cuenta excluidos ni lo ya enviado", () => {
+  const lista = [
+    pendiente("jcv", ["javiercanas@imparcapital.com"], { excluido: true }),
+    pendiente("master", ["iranzuvicente@imparcapital.com"], { estado_envio: "enviado" }),
+  ];
+  const s = simularCandado(PLANTILLA, lista, { ...OPCIONES, modo: "real" }, PERMITIDOS);
+  assert.deepEqual([s.permitidos.length, s.rechazados.length, s.omitidos.length], [0, 0, 0]);
 });
 
 type Fila = Pick<ComDestinatarioRow, "estado_envio" | "excluido" | "para" | "copia">;

@@ -78,8 +78,10 @@ npx next dev --webpack
 - [ ] **Detalle** de «Toda la base»: alrededor de **22 «Sin destinatario»**; las cuentas de prueba y
       las internas, marcadas y excluidas. El CSV trae la misma lista.
 - [ ] **Plantilla**: la vista previa resuelve los campos combinados.
-- [ ] **El candado para una audiencia real**: con «Toda la base» revisada y probada, al confirmar
-      contesta «Candado de destinatarios: N de N correos no pueden salir».
+- [ ] **El candado para una audiencia real**: en el detalle de «Toda la base», la sección «Envío»
+      dice «Esta comunicación no se puede enviar» y no ofrece ningún paso. Y `npm run
+      comunicaciones:candado-verificar` contesta que el candado deja salir 0 correos de ella, en
+      modo pruebas y en modo real.
 - [ ] **Recorrido completo con `PROMOCIONTEST`**: preparar, volver a incluir las cuentas de prueba
       (nacen excluidas), revisar, enviarse la prueba, darla por buena, teclear el número y enviar.
       Todo queda marcado «(simulado)».

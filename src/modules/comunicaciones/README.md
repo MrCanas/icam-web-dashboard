@@ -31,9 +31,14 @@ controles— se envía.
 ## Lo que no puede hacer
 
 **Escribir a un inversor.** Hay un candado de destinatarios en `logic/candado.ts`: mientras exista,
-el único destinatario posible es una dirección fija o un contacto principal de una cuenta de prueba
-de la promoción de pruebas del CRM, y solo sobre los registros de esas cuentas. Quitarlo es una PR
-aparte. Todo el detalle, en `docs/comunicaciones/02-envio-con-controles.md`.
+los únicos destinatarios posibles son las direcciones de una lista cerrada escrita en el código
+(hoy, dos), y solo sobre los registros de las cuentas de prueba de la promoción de pruebas del CRM.
+Nada que se toque en Zoho la ensancha. Quitarlo es una PR aparte. Todo el detalle, en
+`docs/comunicaciones/02-envio-con-controles.md`.
+
+La lista de destinatarios de una audiencia real se puede preparar y revisar, pero no es a quién se
+va a escribir: la página no ofrece ningún paso de envío para ella. Para comprobarlo sin enviar:
+`npm run comunicaciones:candado-verificar`.
 
 Tampoco envía nada por defecto: `com_ajustes` nace con los envíos desactivados y en modo pruebas, y
 donde no existe el token de envíos la pasarela es la simulada.

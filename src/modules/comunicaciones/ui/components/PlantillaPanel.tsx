@@ -40,7 +40,12 @@ export function PlantillaPanel({ comunicacionId, plantillaId, plantillaNombre, d
   const router = useRouter();
   const [plantillas, setPlantillas] = useState<OpcionPlantilla[] | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [destinatarioId, setDestinatarioId] = useState(destinatarios[0]?.id ?? "");
+  const [elegidoId, setDestinatarioId] = useState(destinatarios[0]?.id ?? "");
+  // La lista cambia al excluir o incluir a alguien: si el elegido ya no está (o
+  // al cargar no había nadie), vale el primero, que es el que enseña el desplegable.
+  const destinatarioId = destinatarios.some((d) => d.id === elegidoId)
+    ? elegidoId
+    : (destinatarios[0]?.id ?? "");
   const [vista, setVista] = useState<VistaPreviaDeDestinatario | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, empezar] = useTransition();

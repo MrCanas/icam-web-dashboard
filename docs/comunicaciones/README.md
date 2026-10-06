@@ -5,8 +5,9 @@ enseñando a quién irían y con qué plantilla antes de que salga nada, y los e
 Esta página es el mapa: qué piezas tiene el proyecto, en qué servicio vive cada una y cómo se llega
 a ella.
 
-**Hay un candado de destinatarios puesto**: hoy el módulo solo puede escribir a una dirección fija
-y a los contactos principales de la promoción de prueba del CRM. Ver
+**Hay un candado de destinatarios puesto**: hoy el módulo solo puede escribir a dos direcciones
+(`javiercanas@imparcapital.com` e `iranzuvicente@imparcapital.com`), y solo sobre las cuentas de
+prueba del CRM. Se comprueba sin enviar nada con `npm run comunicaciones:candado-verificar`. Ver
 [`02-envio-con-controles.md`](02-envio-con-controles.md) § 1.
 
 **Regla: el proyecto es este repo.** Todo lo demás son servicios que el repo usa, o copias suyas.

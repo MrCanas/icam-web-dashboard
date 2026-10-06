@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { UserContext } from "@/lib/auth/currentUser";
 import { checkWriteAccess, getUserRole } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
-import { calcularProgreso } from "@/modules/comunicaciones/logic/envio";
+import { calcularProgreso, simularCandado } from "@/modules/comunicaciones/logic/envio";
 import { loadDatosDeEnvios, loadDetalle } from "@/modules/comunicaciones/logic/loadComunicaciones";
 import { COMUNICACIONES_PATH, ZONA_COMUNICACIONES } from "@/modules/comunicaciones/logic/paths";
 import { CancelarButton } from "@/modules/comunicaciones/ui/components/CancelarButton";
@@ -69,6 +69,36 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
   const roles = (lista: readonly (keyof typeof ETIQUETA_ROL)[]) =>
     lista.length > 0 ? lista.map((r) => ETIQUETA_ROL[r]).join(", ") : "nadie";
   const aEnviar = destinatarios.filter((d) => !d.excluido && d.para.length > 0);
+
+  // Qué dejaría salir el candado de ESTA comunicación, calculado con las mismas
+  // funciones que el envío. Se enseña desde el principio: quien ve 125 inversores
+  // en la lista tiene que leer, al lado, que no se les puede escribir.
+  const simulacion =
+    ajustes && envios.permitidos
+      ? simularCandado(
+          { plantilla_id: comunicacion.plantilla_id ?? "(sin elegir)", plantilla_modulo: comunicacion.plantilla_modulo },
+          destinatarios,
+          {
+            modo: ajustes.modo,
+            usuarioEmail: ctx.email,
+            remitente: comunicacion.remitente_email ?? ctx.email,
+          },
+          envios.permitidos,
+        )
+      : null;
+  const candado = simulacion
+    ? {
+        permitidos: simulacion.permitidos.length,
+        rechazados: simulacion.rechazados.length,
+        primerRechazo: simulacion.rechazados[0] ?? null,
+        // Las direcciones EXACTAS a las que saldría algo, juntas y sin repetir.
+        direcciones: [
+          ...new Set(
+            simulacion.permitidos.flatMap(({ correo }) => [...correo.para, ...correo.copia, ...correo.copiaOculta]),
+          ),
+        ].sort(),
+      }
+    : null;
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
@@ -136,6 +166,7 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
           pasarela={envios.pasarela}
           progreso={calcularProgreso(destinatarios)}
           lineas={aEnviar.map((d) => `${d.cuenta_nombre} — ${d.para.map((p) => p.email).join(", ")}`)}
+          candado={candado}
         />
       ) : null}
     </div>

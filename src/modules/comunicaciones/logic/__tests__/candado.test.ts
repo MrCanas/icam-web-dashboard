@@ -56,7 +56,7 @@ function espejos(cambios: Partial<EspejosParaCandado> = {}): EspejosParaCandado 
     ],
     contactos: [
       contacto("c-javier", "JavierCanas@imparcapital.com"),
-      contacto("c-iranzu", "iranzu@imparcapital.com"),
+      contacto("c-iranzu", "iranzuvicente@imparcapital.com"),
       contacto("c-externo", "alguien@gmail.com"),
       contacto("c-real", "inversor@real.com"),
       contacto("c-colado", "colado@real.com"),
@@ -86,12 +86,49 @@ function correo(p: Partial<CorreoParaCandado> = {}): CorreoParaCandado {
   };
 }
 
-test("permite la dirección fija y los contactos principales de las cuentas de prueba", () => {
+const LISTA_CERRADA = ["iranzuvicente@imparcapital.com", "javiercanas@imparcapital.com"];
+
+test("las direcciones permitidas son la lista cerrada del código, y los registros los de las cuentas de prueba", () => {
+  assert.deepEqual([...CANDADO.emailsPermitidos].sort(), LISTA_CERRADA);
   const permitidos = calcularPermitidos(espejos());
-  assert.deepEqual([...permitidos.emails].sort(), ["iranzu@imparcapital.com", "javiercanas@imparcapital.com"]);
+  assert.deepEqual([...permitidos.emails].sort(), LISTA_CERRADA);
   assert.deepEqual([...permitidos.cuentasZohoId].sort(), ["inv2", "jcv", "master"]);
   assert.deepEqual([...permitidos.contactosZohoId].sort(), ["c-iranzu", "c-javier"]);
   assert.equal(permitidos.promocionEncontrada, true);
+});
+
+test("nada de lo que se toque en el CRM añade una dirección: un principal nuevo en una cuenta de prueba no entra", () => {
+  const base = espejos();
+  const permitidos = calcularPermitidos({
+    ...base,
+    contactos: [...base.contactos, contacto("c-nuevo", "alguien.nuevo@gmail.com")],
+    // Alguien marca a otra persona como contacto principal de una cuenta de prueba.
+    cuentaContacto: [...base.cuentaContacto, enlace("jcv", "c-nuevo", true), enlace("master", "c-real", true)],
+  });
+  assert.deepEqual([...permitidos.emails].sort(), LISTA_CERRADA);
+  assert.equal(permitidos.contactosZohoId.has("c-nuevo"), false);
+  assert.equal(permitidos.contactosZohoId.has("c-real"), false);
+  assert.equal(verificarCandado(correo({ para: ["alguien.nuevo@gmail.com"] }), permitidos).ok, false);
+  assert.equal(verificarCandado(correo({ para: ["inversor@real.com"] }), permitidos).ok, false);
+  assert.equal(
+    verificarCandado(correo({ registro: { modulo: MODULO_CONTACTOS, id: "c-nuevo" } }), permitidos).ok,
+    false,
+  );
+});
+
+test("con todo el espejo de inversores reales delante, las direcciones siguen siendo solo las de la lista", () => {
+  // Cien cuentas reales con su contacto principal: ninguna cambia nada.
+  const base = espejos();
+  const reales = Array.from({ length: 100 }, (_, i) => i);
+  const permitidos = calcularPermitidos({
+    ...base,
+    cuentas: [...base.cuentas, ...reales.map((i) => cuenta(`r${i}`, `Inversor ${i}`))],
+    contactos: [...base.contactos, ...reales.map((i) => contacto(`cr${i}`, `inversor${i}@real.com`))],
+    cuentaContacto: [...base.cuentaContacto, ...reales.map((i) => enlace(`r${i}`, `cr${i}`, true))],
+    cuentaPromocion: [...base.cuentaPromocion, ...reales.map((i) => suscripcion(`r${i}`, "p-real"))],
+  });
+  assert.deepEqual([...permitidos.emails].sort(), LISTA_CERRADA);
+  assert.deepEqual([...permitidos.cuentasZohoId].sort(), ["inv2", "jcv", "master"]);
 });
 
 test("un contacto NO principal de una cuenta de prueba no está permitido", () => {
@@ -107,11 +144,14 @@ test("un inversor real suscrito a la promoción de pruebas no entra: no está ma
   assert.equal(permitidos.emails.has("colado@real.com"), false);
 });
 
-test("si la promoción de pruebas no está, solo queda la dirección fija", () => {
+test("si la promoción de pruebas no está, no queda ningún registro sobre el que enviar: no sale nada", () => {
   const sinPromocion = calcularPermitidos(espejos({ promociones: [promocion("p-real", "ZUR5")] }));
-  assert.deepEqual([...sinPromocion.emails], ["javiercanas@imparcapital.com"]);
+  assert.deepEqual([...sinPromocion.emails].sort(), LISTA_CERRADA);
   assert.equal(sinPromocion.cuentasZohoId.size, 0);
+  assert.equal(sinPromocion.contactosZohoId.size, 0);
   assert.equal(sinPromocion.promocionEncontrada, false);
+  // Ni siquiera a una dirección de la lista: no hay ficha de prueba donde archivarlo.
+  assert.equal(verificarCandado(correo(), sinPromocion).ok, false);
 });
 
 test("el código reutilizado en otra promoción, o el id con otro código, no abren el candado", () => {
@@ -137,7 +177,7 @@ test("una promoción, cuenta o enlace borrados en Zoho no cuentan", () => {
       e.contacto_zoho_id === "c-iranzu" ? { ...e, borrado_at: "2026-10-01T00:00:00Z" } : e,
     ),
   });
-  assert.equal(enlaceBorrado.emails.has("iranzu@imparcapital.com"), false);
+  assert.equal(enlaceBorrado.contactosZohoId.has("c-iranzu"), false);
 });
 
 test("deja pasar un correo a una dirección permitida sobre una cuenta de prueba", () => {

@@ -5,7 +5,7 @@ import {
   listarComunicaciones,
 } from "@/modules/comunicaciones/data/comunicacionesRepository";
 import { nombreDePasarelaActiva } from "@/modules/comunicaciones/data/pasarela";
-import { calcularPermitidos } from "@/modules/comunicaciones/logic/candado";
+import { calcularPermitidos, type PermitidosCandado } from "@/modules/comunicaciones/logic/candado";
 import { contarAudiencias, resumirDestinatarios } from "@/modules/comunicaciones/logic/destinatarios";
 import type {
   ComAjustesRow,
@@ -109,6 +109,8 @@ export interface DatosDeEnvios {
   /** Cuentas de prueba sobre las que se puede enviar. */
   cuentasPermitidas: { zohoId: string; nombre: string }[];
   promocionEncontrada: boolean;
+  /** El candado entero, para simular en el servidor qué dejaría salir. No viaja al navegador. */
+  permitidos: PermitidosCandado | null;
   pasarela: NombrePasarela;
   error: string | null;
 }
@@ -123,6 +125,7 @@ export async function loadDatosDeEnvios(ctx: UserContext): Promise<DatosDeEnvios
       emailsPermitidos: [...permitidos.emails].sort(),
       cuentasPermitidas: permitidos.cuentas,
       promocionEncontrada: permitidos.promocionEncontrada,
+      permitidos,
       pasarela,
       error: null,
     };
@@ -132,6 +135,7 @@ export async function loadDatosDeEnvios(ctx: UserContext): Promise<DatosDeEnvios
       emailsPermitidos: [],
       cuentasPermitidas: [],
       promocionEncontrada: false,
+      permitidos: null,
       pasarela,
       error: mensaje(err, "No se pudo leer el estado de los envíos."),
     };

@@ -16,28 +16,43 @@ Hay tres capas, y cada una funciona aunque fallen las otras:
 
 ## 1. El candado de destinatarios
 
-**Mientras exista, este módulo solo puede escribir a:**
+**Mientras exista, este módulo solo puede escribir a dos direcciones:**
 
-- `javiercanas@imparcapital.com`, y
-- los contactos **principales** de las cuentas de prueba de la promoción `PROMOCIONTEST` del CRM.
+- `javiercanas@imparcapital.com`
+- `iranzuvicente@imparcapital.com`
+
+**y solo sobre las cuentas de prueba de la promoción `PROMOCIONTEST` del CRM.**
 
 Está en `src/modules/comunicaciones/logic/candado.ts`. No es un ajuste ni una variable de entorno:
 es una constante en el código.
 
 | Qué | Cómo |
 |---|---|
-| Qué cuentas valen | Suscritas a `PROMOCIONTEST` (se exigen su id de Zoho **y** su código) **y** marcadas como cuenta de prueba (`inv_cuentas.excluida`). Suscribir por error a un inversor real no lo convierte en destinatario |
-| Qué direcciones valen | Solo las de contactos con la casilla «Contacto principal» en esas cuentas. Los demás papeles de esas cuentas tienen direcciones externas de verdad |
+| Qué direcciones valen | Las de la **lista cerrada** `CANDADO.emailsPermitidos`, escrita en el código. No se calcula a partir del CRM: marcar a otra persona como contacto principal de una cuenta de prueba **no** la convierte en destinataria. Nada que se toque en Zoho ensancha a quién se escribe |
+| Sobre qué registros se puede enviar | Las cuentas suscritas a `PROMOCIONTEST` (se exigen su id de Zoho **y** su código) **y** marcadas como cuenta de prueba (`inv_cuentas.excluida`). Suscribir por error a un inversor real no la convierte en registro válido |
 | Qué mira de cada correo | **Todas** las direcciones («Para», copia y copia oculta) y **el registro de Zoho sobre el que se envía**: Zoho archiva el correo en esa ficha, y un correo de pruebas no pinta nada en la de un inversor |
 | Qué hace si algo sobra | Rechaza el correo entero. No quita la dirección que sobra y envía el resto |
-| Dónde se aplica | En `enviarConCandado` (`data/pasarela/index.ts`), pegado a la llamada, para la pasarela real y la simulada. Además, al confirmar, para avisar antes de empezar |
-| Si la promoción de pruebas desaparece o cambia | Se cierra sobre la dirección fija |
+| Dónde se aplica | En `enviarConCandado` (`data/pasarela/index.ts`), pegado a la llamada, para la pasarela real y la simulada. Además, al confirmar, para negarse antes de empezar |
+| Si la promoción de pruebas desaparece o cambia | No queda ningún registro sobre el que enviar: no sale nada |
 
 Consecuencia práctica: se puede **preparar y revisar** cualquier audiencia, pero solo se puede
-**confirmar y enviar** una comunicación a `PROMOCIONTEST`.
+**enviar** una comunicación a `PROMOCIONTEST`.
 
-Se calcula del espejo de Inversores en cada tanda, y la pantalla lo dice siempre: la banda
-«Candado de destinatarios activo» enseña las direcciones permitidas.
+**La lista de destinatarios de una audiencia real no es a quién se va a escribir.** Es a quién iría
+si no hubiera candado, y sirve para revisarla. La página lo dice junto a la lista: la sección
+«Envío» de una comunicación que el candado no dejaría salir no ofrece ningún paso, solo el aviso
+«Esta comunicación no se puede enviar». Y en las que sí, enseña las direcciones exactas que
+recibirían algo antes del primer botón.
+
+### Cómo comprobarlo sin enviar nada
+
+```bash
+npm run comunicaciones:candado-verificar
+```
+
+Solo lee. Coge cada comunicación guardada y le pasa las mismas funciones que usa el envío, en modo
+pruebas y en modo real, y dice cuántos correos dejaría salir el candado y a qué direcciones
+exactas. Termina con error si alguna no está en la lista cerrada.
 
 ### Cómo se quita
 
@@ -176,6 +191,6 @@ Dentro de `npm run check`, sin base de datos, sin red y sin credenciales:
 |---|---|
 | `logic/__tests__/candado.test.ts` | A quién deja pasar el candado y a quién no, caso a caso |
 | `logic/__tests__/controles.test.ts` | Que cada control dice que no: sin revisión, sin prueba, número mal tecleado, interruptor apagado, datos de otro día, comunicación detenida |
-| `logic/__tests__/envio.test.ts` | A qué direcciones sale cada correo; que el modo pruebas redirige todo; que repetir no reenvía |
+| `logic/__tests__/envio.test.ts` | A qué direcciones sale cada correo; que el modo pruebas redirige todo; que repetir no reenvía; y que de una audiencia de inversores reales no sale ningún correo en ningún modo |
 | `data/pasarela/__tests__/pasarela.test.ts` | Que lo que el candado rechaza no llega a ninguna pasarela; que la real no arranca sin token; que el token de lectura no sirve |
 | `__tests__/arquitectura.test.ts` | Que la llamada de envío y el token de envíos solo existen en la pasarela de Zoho |

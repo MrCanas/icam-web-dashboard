@@ -9,10 +9,16 @@ import type {
 /**
  * El candado de destinatarios.
  *
- * Mientras exista, este módulo solo puede escribir a una dirección fija y a los
- * contactos PRINCIPALES de las cuentas de prueba de la promoción de pruebas del
- * CRM. No es un ajuste ni una variable de entorno: es código, y abrirlo a
- * inversores reales es una PR aparte, decidida por una persona.
+ * Mientras exista, este módulo solo puede escribir a las direcciones de una
+ * lista CERRADA, escrita aquí abajo, y solo sobre las cuentas de prueba de la
+ * promoción de pruebas del CRM. No es un ajuste ni una variable de entorno: es
+ * código, y abrirlo a inversores reales es una PR aparte, decidida por una
+ * persona.
+ *
+ * La lista de direcciones no se calcula a partir del CRM a propósito: si mañana
+ * alguien marca a otra persona como contacto principal de una cuenta de prueba,
+ * esa persona NO pasa a poder recibir correo. Nada que se toque en Zoho puede
+ * ensanchar a quién se escribe.
  *
  * Por qué existe: el 2026-10-05 un kiosk de Zoho envió 60 correos a inversores
  * reales por error. Los controles del envío (revisión, prueba, confirmación)
@@ -24,12 +30,16 @@ import type {
  */
 
 export const CANDADO = {
-  /** Direcciones que pueden recibir correo siempre. */
-  emailsFijos: ["javiercanas@imparcapital.com"],
   /**
-   * La promoción de pruebas del CRM. Se exigen el id Y el código: si alguien
-   * renombra la promoción o reutiliza el código en otra, el candado se cierra
-   * sobre las direcciones fijas en vez de abrirse a lo que no se ha mirado.
+   * Las ÚNICAS direcciones que pueden recibir un correo de este módulo, en
+   * «Para», en copia o en copia oculta. Lista cerrada: añadir una es tocar esta
+   * línea, en una PR.
+   */
+  emailsPermitidos: ["javiercanas@imparcapital.com", "iranzuvicente@imparcapital.com"],
+  /**
+   * La promoción de pruebas del CRM, que decide sobre qué REGISTROS se puede
+   * enviar. Se exigen el id Y el código: si alguien renombra la promoción o
+   * reutiliza el código en otra, no queda ningún registro sobre el que enviar.
    */
   promocionZohoId: "261199000045049136",
   promocionCodigo: "PROMOCIONTEST",
@@ -48,7 +58,7 @@ export interface EspejosParaCandado {
 }
 
 export interface PermitidosCandado {
-  /** Direcciones, en minúsculas. */
+  /** Las direcciones de la lista cerrada, en minúsculas. Nunca más que esas. */
   emails: ReadonlySet<string>;
   /** Cuentas de Inversión sobre las que se puede enviar. */
   cuentasZohoId: ReadonlySet<string>;
@@ -69,17 +79,19 @@ function viva(fila: { borrado_at?: string | null }): boolean {
 }
 
 /**
- * A quién se puede escribir hoy, según el espejo.
+ * A quién se puede escribir y sobre qué registros, hoy.
  *
- * Una cuenta entra solo si está suscrita a la promoción de pruebas Y marcada
- * como cuenta de prueba (`inv_cuentas.excluida`): suscribir por error a un
- * inversor real a PROMOCIONTEST no lo convierte en destinatario.
+ * Las DIRECCIONES son siempre las de `CANDADO.emailsPermitidos`: el espejo no
+ * añade ninguna.
  *
- * De cada cuenta entran solo sus contactos PRINCIPALES. Los demás papeles de
- * esas cuentas tienen direcciones externas de verdad.
+ * Del espejo salen solo los REGISTROS sobre los que se puede enviar. Una cuenta
+ * entra si está suscrita a la promoción de pruebas Y marcada como cuenta de
+ * prueba (`inv_cuentas.excluida`): suscribir por error a un inversor real a
+ * PROMOCIONTEST no la convierte en registro válido. Un contacto entra si es
+ * contacto principal de una de esas cuentas Y su dirección está en la lista.
  */
 export function calcularPermitidos(espejos: EspejosParaCandado): PermitidosCandado {
-  const emails = new Set<string>(CANDADO.emailsFijos.map(normalizarEmail));
+  const emails = new Set<string>(CANDADO.emailsPermitidos.map(normalizarEmail));
   const cuentasZohoId = new Set<string>();
   const contactosZohoId = new Set<string>();
   const cuentas: { zohoId: string; nombre: string }[] = [];
@@ -110,8 +122,8 @@ export function calcularPermitidos(espejos: EspejosParaCandado): PermitidosCanda
     if (!enlace.cuenta_zoho_id || !cuentasZohoId.has(enlace.cuenta_zoho_id)) continue;
     const contacto = enlace.contacto_zoho_id ? contactoPorId.get(enlace.contacto_zoho_id) : undefined;
     const email = contacto?.email ? normalizarEmail(contacto.email) : "";
-    if (!contacto || !email) continue;
-    emails.add(email);
+    // La dirección tiene que estar YA en la lista cerrada: aquí no se añade ninguna.
+    if (!contacto || !emails.has(email)) continue;
     contactosZohoId.add(contacto.zoho_id);
   }
 

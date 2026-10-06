@@ -71,6 +71,7 @@
     "comunicaciones:zoho-descubrir": "tsx scripts/comunicaciones/zoho-descubrir.ts",
     "comunicaciones:apply-migration-047": "tsx scripts/comunicaciones/apply-migration-047.ts",
     "comunicaciones:apply-migration-048": "tsx scripts/comunicaciones/apply-migration-048.ts",
+    "comunicaciones:candado-verificar": "tsx scripts/comunicaciones/candado-verificar.ts",
     "comunicaciones:zoho-auth-envios": "tsx scripts/comunicaciones/zoho-auth-envios.ts",
     "comunicaciones:zoho-envio-verificar": "tsx scripts/comunicaciones/zoho-envio-verificar.ts",
     "comunicaciones:check-scripts": "tsc --noEmit -p scripts/comunicaciones/tsconfig.json",
