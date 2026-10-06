@@ -7,15 +7,19 @@ import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import {
   confirmarEnvioAction,
   detenerEnvioAction,
+  ensayarEnvioAction,
   enviarPruebaAction,
+  type InformeDeEnsayo,
   enviarTandaAction,
   marcarPruebaVistaAction,
   reanudarEnvioAction,
   revisarDestinatariosAction,
 } from "@/modules/comunicaciones/actions/envio";
 import {
+  ensayoVigente,
   pruebaVigente,
   puedeConfirmar,
+  puedeEnsayar,
   puedeEnviarPrueba,
   puedeMarcarPrueba,
   puedeRevisar,
@@ -115,6 +119,8 @@ export function EnvioPanel({
   // El envío en curso manda sobre lo que trajo la página: se actualiza tanda a tanda.
   const [enVivo, setEnVivo] = useState<{ progreso: Progreso; estado: EstadoComunicacion } | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [ensayando, setEnsayando] = useState(false);
+  const [informe, setInforme] = useState<InformeDeEnsayo | null>(null);
   const parar = useRef(false);
 
   const estado = enVivo?.estado ?? comunicacion.estado;
@@ -164,6 +170,25 @@ export function EnvioPanel({
     router.refresh();
   };
 
+  /** Monta y valida todos los correos sin enviar ninguno. */
+  const ensayar = async () => {
+    setOcupado(true);
+    setEnsayando(true);
+    setError(null);
+    setAviso(null);
+    setInforme(null);
+    const r = await ensayarEnvioAction(comunicacion.id);
+    if (r.ok) {
+      setInforme(r.informe);
+      if (r.informe.problemas.length === 0) setAviso("Ensayo general correcto. Ya puedes confirmar.");
+      router.refresh();
+    } else {
+      setError(r.mensaje);
+    }
+    setEnsayando(false);
+    setOcupado(false);
+  };
+
   const confirmar = async () => {
     setOcupado(true);
     setError(null);
@@ -211,6 +236,9 @@ export function EnvioPanel({
   const motivoMarcar = puedeMarcarPrueba(ctx);
   const motivoConfirmar = puedeConfirmar(ctx, Number(numero));
   const numeroEscrito = numero.trim() !== "";
+  const motivoEnsayar = puedeEnsayar(ctx);
+  const motivoDelEnsayo = ensayoVigente(ctx);
+  const ensayoHecho = motivoEnsayar === null && motivoDelEnsayo === null;
   const simulada = pasarela === "simulada";
 
   // Antes de empezar, si el candado rechazaría un solo correo, aquí no hay nada
@@ -413,7 +441,87 @@ export function EnvioPanel({
                   ))}
                 </ul>
               </div>
-              {puedeEscribir ? (
+              <div className="space-y-2 border-t border-subtle pt-3">
+                <p>
+                  <strong>Ensayo general.</strong> Antes de confirmar, el portal monta todos los correos —con
+                  los datos de cada cuenta, sus enlaces y sus adjuntos—, los valida uno a uno y los pasa por el
+                  candado, sin enviar ninguno. Lo que después se envíe tiene que ser exactamente lo ensayado.
+                </p>
+                {puedeEscribir ? (
+                  <button
+                    type="button"
+                    disabled={ocupado || enviando || motivoEnsayar !== null}
+                    onClick={ensayar}
+                    className={ensayoHecho ? BOTON : BOTON_PRINCIPAL}
+                  >
+                    {ensayando ? "Montando y validando los correos…" : ensayoHecho ? "Repetir el ensayo general" : "Hacer el ensayo general"}
+                  </button>
+                ) : null}
+                {puedeEscribir && motivoEnsayar ? <p className="text-text-muted">{motivoEnsayar}</p> : null}
+
+                {informe && informe.problemas.length > 0 ? (
+                  <div role="alert" className="rounded-md border border-[#9B3B3B]/40 p-3 text-[#9B3B3B]">
+                    <p>
+                      <strong>El ensayo ha encontrado {cuantos(informe.problemas.length, "problema", "problemas")}.</strong>{" "}
+                      No se puede enviar hasta resolverlos.
+                    </p>
+                    <ul className="mt-1 max-h-56 list-disc overflow-auto pl-5">
+                      {informe.problemas.map((p, i) => (
+                        <li key={`${p.cuenta}-${i}`}>
+                          {p.cuenta}: {p.problema}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {ensayoHecho && comunicacion.ensayo_resumen ? (
+                  <div className="rounded-md border border-subtle p-3">
+                    <p>
+                      Ensayado el {fmtFechaHora(comunicacion.ensayo_at)} por {comunicacion.ensayo_por_email}:{" "}
+                      <strong>{cuantos(comunicacion.ensayo_resumen.correos, "correo correcto", "correos correctos")}</strong>
+                      {comunicacion.ensayo_resumen.omitidos > 0
+                        ? `, ${cuantos(comunicacion.ensayo_resumen.omitidos, "omitido", "omitidos")} por dirección repetida`
+                        : ""}
+                      .
+                    </p>
+                    <p>
+                      Direcciones exactas que recibirían algo:{" "}
+                      <strong>{comunicacion.ensayo_resumen.direcciones.join(", ") || "ninguna"}</strong>
+                    </p>
+                    <p className="text-text-muted">
+                      {cuantos(comunicacion.ensayo_resumen.enlaces, "enlace rastreado", "enlaces rastreados")} ·{" "}
+                      {comunicacion.ensayo_resumen.adjuntos.length > 0
+                        ? `adjuntos: ${comunicacion.ensayo_resumen.adjuntos.join(", ")}`
+                        : "sin adjuntos"}{" "}
+                      ·{" "}
+                      {comunicacion.ensayo_resumen.imagen === "logo"
+                        ? "la plantilla no trae imágenes: se añade el logotipo al pie"
+                        : "imagen de apertura invisible"}
+                    </p>
+                    {comunicacion.ensayo_resumen.conCamposVacios.length > 0 ? (
+                      <div className="mt-1 text-[#9B3B3B]">
+                        <p>
+                          {cuantos(comunicacion.ensayo_resumen.conCamposVacios.length, "cuenta tiene", "cuentas tienen")}{" "}
+                          vacío algún campo de la plantilla, y ese hueco saldría en blanco:
+                        </p>
+                        <ul className="max-h-40 list-disc overflow-auto pl-5">
+                          {comunicacion.ensayo_resumen.conCamposVacios.map((c) => (
+                            <li key={c.cuenta}>
+                              {c.cuenta}: {c.campos.join(", ")}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {!ensayoHecho && motivoEnsayar === null && motivoDelEnsayo ? (
+                  <p className="text-text-muted">{motivoDelEnsayo}</p>
+                ) : null}
+              </div>
+
+              {puedeEscribir && ensayoHecho ? (
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="text-sm text-text-body">
                     Escribe el número de correos que van a salir
@@ -436,7 +544,7 @@ export function EnvioPanel({
                   </button>
                 </div>
               ) : null}
-              {puedeEscribir && motivoConfirmar && numeroEscrito ? (
+              {puedeEscribir && ensayoHecho && motivoConfirmar && numeroEscrito ? (
                 <p className="text-text-muted">{motivoConfirmar}</p>
               ) : null}
             </>

@@ -18,6 +18,10 @@ import {
   MODULOS_DE_PLANTILLA,
 } from "@/modules/comunicaciones/data/zohoPlantillas";
 import { leerRegistro } from "@/modules/comunicaciones/data/zohoRegistros";
+import { dominiosSinCorreo } from "@/modules/comunicaciones/data/dns";
+import { adjuntosDePlantilla } from "@/modules/comunicaciones/logic/composicion";
+import { dominioDe } from "@/modules/comunicaciones/logic/direcciones";
+import { instrumentarParaVistaPrevia } from "@/modules/comunicaciones/logic/seguimiento";
 import {
   cuentasDeAudiencia,
   resolverDestinatarios,
@@ -45,7 +49,7 @@ import {
   ultimoSyncOk,
 } from "@/modules/portfolio/inversores/data/inversoresRepository";
 import { sincronizarInversores } from "@/modules/portfolio/inversores/logic/inversoresSync";
-import { isZohoConfigured } from "@/lib/zoho/client";
+import { isZohoConfigured, listarCampos } from "@/lib/zoho/client";
 
 /**
  * Acciones de preparación del módulo Comunicaciones.
@@ -150,6 +154,11 @@ export async function prepararComunicacionAction(
       rolesPara,
       rolesCopia,
       dominiosInternos: ajustes.dominios_internos,
+      // Se le pregunta al DNS si cada dominio recibe correo. Si no contesta, no
+      // se excluye a nadie por ello.
+      dominiosSinCorreo: await dominiosSinCorreo(
+        espejos.contactos.map((c) => dominioDe(c.email ?? "")).filter(Boolean),
+      ).catch(() => new Set<string>()),
     });
 
     const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
@@ -306,6 +315,10 @@ export interface VistaPreviaDeDestinatario extends VistaPrevia {
   registroNombre: string;
   para: string[];
   copia: string[];
+  /** Los adjuntos de la plantilla, que viajarán con el correo. */
+  adjuntos: string[];
+  /** Qué imagen se añade para saber si se abre: una invisible o el logotipo. */
+  imagen: "pixel" | "logo";
 }
 
 /**
@@ -340,10 +353,19 @@ export async function vistaPreviaAction(
     const registro = await leerRegistro(modulo, registroId);
     if (!registro) return { ok: false, mensaje: "Zoho no devolvió el registro del destinatario." };
 
+    // Con los tipos de campo, igual que al enviar: lo que aquí salga en rojo es
+    // lo que impediría que el correo saliera.
+    const tipos = new Map((await listarCampos(modulo)).map((c) => [c.api_name, c.data_type]));
+    const montado = renderizarPlantilla({ asunto: plantilla.asunto, html: plantilla.html }, modulo, registro, tipos);
+    const conImagen = instrumentarParaVistaPrevia(montado.html);
+
     return {
       ok: true,
       vista: {
-        ...renderizarPlantilla({ asunto: plantilla.asunto, html: plantilla.html }, modulo, registro),
+        ...montado,
+        html: conImagen.html,
+        imagen: conImagen.imagen,
+        adjuntos: adjuntosDePlantilla(plantilla.crudo).map((a) => a.nombre),
         plantillaNombre: plantilla.nombre,
         registroNombre:
           modulo === "Contacts" ? (destinatario.para[0]?.nombre ?? "") : destinatario.cuenta_nombre,

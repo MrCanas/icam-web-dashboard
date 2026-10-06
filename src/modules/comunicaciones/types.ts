@@ -21,13 +21,17 @@ export const ETIQUETA_TIPO: Record<TipoComunicacion, string> = {
   otro: "Otro",
 };
 
+/** Las audiencias que se pueden elegir al preparar una comunicación nueva. */
 export const AUDIENCIAS = ["promocion", "toda_la_base", "inversores_directos"] as const;
-export type Audiencia = (typeof AUDIENCIAS)[number];
+export type AudienciaElegible = (typeof AUDIENCIAS)[number];
+/** `reenvio` no se elige: nace del panel de analítica, a partir de otra comunicación. */
+export type Audiencia = AudienciaElegible | "reenvio";
 
 export const ETIQUETA_AUDIENCIA: Record<Audiencia, string> = {
   promocion: "Promoción o fondo",
   toda_la_base: "Toda la base",
   inversores_directos: "Inversores directos",
+  reenvio: "Reenvío",
 };
 
 /** Las cinco casillas de papel del CRM (`inv_cuenta_contacto.es_*`). */
@@ -107,6 +111,10 @@ export const AVISOS = [
   "sin_destinatario",
   "dado_de_baja",
   "sin_correo",
+  "direccion_mal_formada",
+  "dominio_sin_correo",
+  "posible_errata",
+  "direccion_nueva",
 ] as const;
 export type Aviso = (typeof AVISOS)[number];
 
@@ -117,6 +125,10 @@ export const ETIQUETA_AVISO: Record<Aviso, string> = {
   sin_destinatario: "Sin destinatario",
   dado_de_baja: "Contacto dado de baja",
   sin_correo: "Contacto sin correo",
+  direccion_mal_formada: "Dirección mal escrita en el CRM",
+  dominio_sin_correo: "El dominio no recibe correo",
+  posible_errata: "Posible errata en el dominio",
+  direccion_nueva: "Dirección nueva respecto al envío original",
 };
 
 // ---------------------------------------------------------------------------
@@ -138,6 +150,33 @@ export interface ComAjustesRow {
   cuenta_pruebas_zoho_id: string | null;
   remitentes_permitidos: string[];
   dominios_internos: string[];
+  /** Migración 049. Correos reales que el módulo puede enviar al día (Zoho: 100). */
+  limite_diario?: number;
+}
+
+/** Sin la 049 no hay columna: vale el límite de Zoho. */
+export const LIMITE_DIARIO_ZOHO = 100;
+
+export type ImagenApertura = "pixel" | "logo";
+
+/** Lo que se guarda del ensayo general. Sin direcciones: esas están en los destinatarios. */
+export interface ResumenDeEnsayo {
+  /** El asunto de la plantilla, antes de resolver sus campos. */
+  asunto: string;
+  correos: number;
+  omitidos: number;
+  direcciones: string[];
+  conCamposVacios: { cuenta: string; campos: string[] }[];
+  enlaces: number;
+  adjuntos: string[];
+  imagen: ImagenApertura;
+  modo: ModoEnvio;
+}
+
+export interface FiltroDeReenvio {
+  filtro: string;
+  /** Posición del enlace, cuando el filtro es «pulsó un enlace concreto». */
+  enlace: number | null;
 }
 
 export interface ComComunicacionRow {
@@ -175,6 +214,17 @@ export interface ComComunicacionRow {
   prueba_enviada_plantilla_id?: string | null;
   prueba_message_id?: string | null;
   pasarela?: NombrePasarela | null;
+  // Migración 049.
+  modo_envio?: ModoEnvio | null;
+  asunto_enviado?: string | null;
+  imagen_apertura?: ImagenApertura | null;
+  prueba_token?: string | null;
+  prueba_enlaces?: string[] | null;
+  ensayo_at?: string | null;
+  ensayo_por_email?: string | null;
+  ensayo_resumen?: ResumenDeEnsayo | null;
+  origen_comunicacion_id?: string | null;
+  reenvio_filtro?: FiltroDeReenvio | null;
 }
 
 export interface ComDestinatarioRow {
@@ -197,6 +247,41 @@ export interface ComDestinatarioRow {
   // Migración 048.
   enviado_para?: EnviadoPara | null;
   pasarela?: NombrePasarela | null;
+  // Migración 049.
+  seguimiento_token?: string | null;
+  enlaces?: string[] | null;
+  huella?: string | null;
+  aperturas?: number;
+  primera_apertura_at?: string | null;
+  ultima_apertura_at?: string | null;
+  clics?: number;
+  primer_clic_at?: string | null;
+  ultimo_clic_at?: string | null;
+  entrega_estado?: "entregado" | "rebotado" | "sin_dato" | null;
+  rebote_motivo?: string | null;
+  entrega_consultada_at?: string | null;
+  verificado_zoho?: "coincide" | "no_coincide" | "sin_dato" | null;
+}
+
+export interface ComEnlaceRow {
+  id: string;
+  comunicacion_id: string;
+  posicion: number;
+  url: string;
+  texto: string | null;
+}
+
+export interface ComEventoRow {
+  id: number;
+  comunicacion_id: string;
+  destinatario_id: string | null;
+  token: string;
+  tipo: "apertura" | "clic";
+  enlace: number | null;
+  automatico: boolean;
+  es_prueba: boolean;
+  agente: string | null;
+  ocurrido_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +316,8 @@ export interface ResumenDestinatarios {
 export interface ComunicacionConResumen {
   comunicacion: ComComunicacionRow;
   resumen: ResumenDestinatarios;
+  /** Correos que salieron y, de esos, cuántos se abrieron y en cuántos se pulsó algo. */
+  seguimiento: { enviados: number; abiertos: number; conClic: number };
 }
 
 export interface OpcionPromocion {

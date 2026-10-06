@@ -7,10 +7,13 @@ import type {
   ResumenDestinatarios,
 } from "@/modules/comunicaciones/types";
 import {
+  cabeEnElDia,
+  ensayoVigente,
   ENVIOS_DESACTIVADOS,
   puedeCambiarAjustes,
   puedeConfirmar,
   puedeDetener,
+  puedeEnsayar,
   puedeEnviarPrueba,
   puedeMarcarPrueba,
   puedeReanudar,
@@ -60,6 +63,19 @@ function comunicacion(p: Partial<ComComunicacionRow> = {}): ComComunicacionRow {
     prueba_enviada_plantilla_id: "plantilla-1",
     prueba_message_id: "m1",
     pasarela: "simulada",
+    ensayo_at: "2026-10-06T09:55:00Z",
+    ensayo_por_email: REMITENTE,
+    ensayo_resumen: {
+      asunto: "Asunto",
+      correos: 2,
+      omitidos: 0,
+      direcciones: [REMITENTE],
+      conCamposVacios: [],
+      enlaces: 2,
+      adjuntos: [],
+      imagen: "pixel",
+      modo: "pruebas",
+    },
     ...p,
   };
 }
@@ -163,6 +179,43 @@ test("confirmar: si la lista o la plantilla cambiaron después del control, no v
   assert.ok(puedeConfirmar(ctx({ resumen: { ...RESUMEN, aEnviar: 3 } }), 3, AHORA), "la lista creció");
   assert.ok(puedeConfirmar(ctx({ comunicacion: comunicacion({ probada_plantilla_id: "otra" }) }), 2, AHORA));
   assert.ok(puedeConfirmar(ctx({ comunicacion: comunicacion({ remitente_email: null }) }), 2, AHORA));
+});
+
+test("confirmar: sin ensayo general no se envía", () => {
+  assert.ok(puedeConfirmar(ctx({ comunicacion: comunicacion({ ensayo_at: null }) }), 2, AHORA));
+  assert.ok(puedeConfirmar(ctx({ comunicacion: comunicacion({ ensayo_resumen: null }) }), 2, AHORA));
+});
+
+test("confirmar: un ensayo viejo, de otro modo o de otra lista no vale", () => {
+  const resumen = comunicacion().ensayo_resumen!;
+  const viejo = ctx({ comunicacion: comunicacion({ ensayo_at: "2026-10-06T09:00:00Z" }) });
+  assert.ok(puedeConfirmar(viejo, 2, AHORA), "de hace una hora");
+  const delFuturo = ctx({ comunicacion: comunicacion({ ensayo_at: "2026-10-06T11:00:00Z" }) });
+  assert.ok(puedeConfirmar(delFuturo, 2, AHORA));
+  // Se ensayó en pruebas y ahora el modo es real: los destinatarios son otros.
+  assert.ok(puedeConfirmar(ctx({ ajustes: { ...AJUSTES, modo: "real" } }), 2, AHORA));
+  const otraLista = ctx({ comunicacion: comunicacion({ ensayo_resumen: { ...resumen, correos: 1 } }) });
+  assert.ok(puedeConfirmar(otraLista, 2, AHORA));
+  // Un omitido por dirección repetida cuenta: 1 correo + 1 omitido son los 2 de la lista.
+  const conOmitido = ctx({ comunicacion: comunicacion({ ensayo_resumen: { ...resumen, correos: 1, omitidos: 1 } }) });
+  assert.equal(puedeConfirmar(conOmitido, 2, AHORA), null);
+  assert.equal(ensayoVigente(ctx(), AHORA), null);
+});
+
+test("ensayar exige lo mismo que confirmar, menos el propio ensayo y el número", () => {
+  assert.equal(puedeEnsayar(ctx({ comunicacion: comunicacion({ ensayo_at: null, ensayo_resumen: null }) }), AHORA), null);
+  assert.ok(puedeEnsayar(ctx({ comunicacion: comunicacion({ estado: "revisada" }) }), AHORA));
+  assert.ok(puedeEnsayar(ctx({ ajustes: { ...AJUSTES, envios_activados: false } }), AHORA));
+  assert.ok(puedeEnsayar(ctx({ rol: "lector" }), AHORA));
+});
+
+test("el tope diario: no se confirma lo que no cabe en lo que queda del día", () => {
+  assert.equal(cabeEnElDia(0, 100, 100), null);
+  assert.equal(cabeEnElDia(98, 2, 100), null);
+  assert.ok(cabeEnElDia(98, 3, 100));
+  assert.ok(cabeEnElDia(100, 1, 100));
+  assert.ok(cabeEnElDia(120, 1, 100), "si ya se pasó, no queda nada");
+  assert.equal(cabeEnElDia(100, 0, 100), null);
 });
 
 test("antes de cada correo: el interruptor apagado o la comunicación detenida paran el envío", () => {

@@ -4,11 +4,14 @@ import { getCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import { loadDatosDeEnvios, loadHistorial } from "@/modules/comunicaciones/logic/loadComunicaciones";
+import { esMedible, tasa } from "@/modules/comunicaciones/logic/analitica";
 import {
   COMUNICACIONES_NUEVA_PATH,
+  comunicacionAnaliticaPath,
   comunicacionPath,
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
+import { pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
 import { EstadoDeEnvios } from "@/modules/comunicaciones/ui/components/EstadoDeEnvios";
 import { ETIQUETA_AUDIENCIA, ETIQUETA_ESTADO } from "@/modules/comunicaciones/types";
 
@@ -71,7 +74,7 @@ export default async function HistorialPage() {
 
       {comunicaciones.length > 0 ? (
         <div className="overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <caption className="sr-only">Comunicaciones preparadas, de la más reciente a la más antigua.</caption>
             <thead>
               <tr className="border-b border-subtle text-left text-text-muted">
@@ -81,12 +84,14 @@ export default async function HistorialPage() {
                 <th scope="col" className="px-3 py-2 text-right font-medium">Correos</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">Excluidos</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">Sin destinatario</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Abrieron</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Clic</th>
                 <th scope="col" className="px-3 py-2 font-medium">Plantilla</th>
                 <th scope="col" className="px-3 py-2 font-medium">Preparada</th>
               </tr>
             </thead>
             <tbody>
-              {comunicaciones.map(({ comunicacion: c, resumen }) => (
+              {comunicaciones.map(({ comunicacion: c, resumen, seguimiento }) => (
                 <tr key={c.id} className="border-b border-subtle/60 text-text-body last:border-b-0">
                   <th scope="row" className="px-3 py-2 text-left font-normal">
                     <Link
@@ -111,6 +116,24 @@ export default async function HistorialPage() {
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.aEnviar)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.excluidos)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.sinDestinatario)}</td>
+                  {/* Solo de lo que salió de verdad y a sus destinatarios: lo demás no mide nada. */}
+                  {esMedible(c) && seguimiento.enviados > 0 ? (
+                    <>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
+                          {pct(tasa(seguimiento.abiertos, seguimiento.enviados))}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {pct(tasa(seguimiento.conClic, seguimiento.enviados))}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-3 py-2 text-right text-text-muted">—</td>
+                      <td className="px-3 py-2 text-right text-text-muted">—</td>
+                    </>
+                  )}
                   <td className="px-3 py-2">{c.plantilla_nombre ?? "—"}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-text-muted">
                     {fmtFechaHora(c.created_at)} · {c.creada_por_email}

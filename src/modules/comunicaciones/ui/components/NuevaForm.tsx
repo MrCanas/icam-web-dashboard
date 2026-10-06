@@ -15,7 +15,7 @@ import {
   ETIQUETA_TIPO,
   ROLES_CONTACTO,
   TIPOS_COMUNICACION,
-  type Audiencia,
+  type AudienciaElegible as Audiencia,
   type RecuentoAudiencias,
   type RolContacto,
   type TipoComunicacion,

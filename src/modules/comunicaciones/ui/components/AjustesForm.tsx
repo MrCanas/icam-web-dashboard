@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { guardarAjustesAction } from "@/modules/comunicaciones/actions/envio";
-import type { ComAjustesRow, ModoEnvio } from "@/modules/comunicaciones/types";
+import { LIMITE_DIARIO_ZOHO, type ComAjustesRow, type ModoEnvio } from "@/modules/comunicaciones/types";
 
 interface Props {
   ajustes: ComAjustesRow;
@@ -25,6 +25,7 @@ export function AjustesForm({ ajustes, cuentasDePrueba }: Props) {
   const [modo, setModo] = useState<ModoEnvio>(ajustes.modo);
   const [cuentaPruebas, setCuentaPruebas] = useState(ajustes.cuenta_pruebas_zoho_id ?? "");
   const [remitentes, setRemitentes] = useState(ajustes.remitentes_permitidos.join("\n"));
+  const [limiteDiario, setLimiteDiario] = useState(String(ajustes.limite_diario ?? LIMITE_DIARIO_ZOHO));
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, empezar] = useTransition();
 
@@ -36,6 +37,7 @@ export function AjustesForm({ ajustes, cuentasDePrueba }: Props) {
         modo,
         cuentaPruebasZohoId: cuentaPruebas || null,
         remitentesPermitidos: remitentes.split(/[\s,;]+/).filter(Boolean),
+        limiteDiario: Number(limiteDiario),
       });
       if (r.ok) {
         setMensaje({ ok: true, texto: "Ajustes guardados." });
@@ -111,6 +113,23 @@ export function AjustesForm({ ajustes, cuentasDePrueba }: Props) {
           rows={3}
           className={CAMPO}
           spellCheck={false}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className={LEYENDA}>Tope diario de correos</span>
+        <span className="block text-sm text-text-muted">
+          Zoho no deja enviar más de {LIMITE_DIARIO_ZOHO} correos al día por usuario. Un envío que no quepa en lo
+          que queda del día no se puede confirmar. Cuentan también las pruebas.
+        </span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={LIMITE_DIARIO_ZOHO}
+          value={limiteDiario}
+          onChange={(e) => setLimiteDiario(e.target.value)}
+          className={`${CAMPO} max-w-40`}
         />
       </label>
 

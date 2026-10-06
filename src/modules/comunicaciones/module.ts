@@ -29,7 +29,17 @@ export const comunicacionesModule: ModuleDefinition = {
         p === "/dashboard/comunicaciones" ||
         (p.startsWith("/dashboard/comunicaciones/") &&
           !p.startsWith("/dashboard/comunicaciones/nueva") &&
-          !p.startsWith("/dashboard/comunicaciones/ajustes")),
+          !p.startsWith("/dashboard/comunicaciones/ajustes") &&
+          // La analítica agregada tiene su clave; la de un correo
+          // (`/<id>/analitica`) es parte de su detalle y cae aquí.
+          !p.startsWith("/dashboard/comunicaciones/analitica")),
+    },
+    {
+      // Quién abre y quién pulsa, de todas las comunicaciones juntas.
+      key: "comunicaciones.analitica",
+      path: "/dashboard/comunicaciones/analitica",
+      label: "Analítica",
+      match: (p) => p.startsWith("/dashboard/comunicaciones/analitica"),
     },
     {
       key: "comunicaciones.nueva",

@@ -46,6 +46,14 @@ test("comunicaciones: «nueva» tiene su key y todo lo demás cae en el historia
   // Lo mismo con «ajustes»: ahí están el interruptor de envíos y el modo real.
   assert.equal(routeKeyForPathname("/dashboard/comunicaciones/ajustes"), "comunicaciones.ajustes");
   assert.equal(zoneForRouteKey("comunicaciones.ajustes"), "comunicaciones");
+  // La analítica agregada tiene su clave; la de un correo concreto es parte de
+  // su detalle y se gobierna como él.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/analitica"), "comunicaciones.analitica");
+  assert.equal(zoneForRouteKey("comunicaciones.analitica"), "comunicaciones");
+  assert.equal(
+    routeKeyForPathname("/dashboard/comunicaciones/3f0c1a52-9d1e-4a2b-8a43-0d2f6b1c7e55/analitica"),
+    "comunicaciones.historial",
+  );
 });
 
 test("una ruta fuera del registry devuelve null", () => {

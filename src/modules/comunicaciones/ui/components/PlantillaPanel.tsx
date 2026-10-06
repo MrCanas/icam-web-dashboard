@@ -211,11 +211,24 @@ export function PlantillaPanel({ comunicacionId, plantillaId, plantillaNombre, d
               ) : null}
               <dt className="text-text-muted">Datos de</dt>
               <dd className="text-text-body">{vista.registroNombre}</dd>
+              <dt className="text-text-muted">Adjuntos</dt>
+              <dd className="text-text-body">
+                {vista.adjuntos.length > 0 ? vista.adjuntos.join(", ") : "Ninguno"}
+              </dd>
+              <dt className="text-text-muted">Seguimiento</dt>
+              <dd className="text-text-body">
+                {vista.imagen === "logo"
+                  ? "La plantilla no trae imágenes: se le añade el logotipo de Impar Capital al pie, como se ve abajo, para poder saber si se abre."
+                  : "Se le añade una imagen invisible para saber si se abre."}{" "}
+                Al enviar, cada enlace pasa por go.imparcapital.com.
+              </dd>
             </dl>
 
             {vista.sinResolver.length > 0 ? (
               <p className="text-sm text-[#9B3B3B]">
-                Campos que esta vista previa no sabe resolver (marcados en rojo): {vista.sinResolver.join(", ")}
+                <strong>Con esta plantilla el correo no saldría.</strong> Usa campos que el portal no sabe
+                resolver (marcados en rojo): {vista.sinResolver.join(", ")}. Son campos de otro módulo, la firma
+                del usuario, o importes y fechas, que Zoho escribe a su manera.
               </p>
             ) : null}
             {vista.vacios.length > 0 ? (
@@ -232,7 +245,8 @@ export function PlantillaPanel({ comunicacionId, plantillaId, plantillaNombre, d
               className="h-[640px] w-full rounded-md border border-subtle bg-white"
             />
             <p className="text-xs text-text-muted">
-              Es una imitación de lo que hará Zoho al enviar. La comprobación fiel será el envío de prueba.
+              Así lo monta el portal. Las imágenes de la plantilla solo se ven aquí si tienes abierta la sesión de
+              Zoho; al enviar, Zoho las incrusta en el correo. La comprobación fiel es el envío de prueba.
             </p>
           </div>
         ) : null}

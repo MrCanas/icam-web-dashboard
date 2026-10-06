@@ -93,14 +93,10 @@ export function puedeMarcarPrueba(ctx: ContextoControles): string | null {
 }
 
 /**
- * Controles 1, 4 y 5 — todo lo que tiene que ser cierto para empezar a enviar,
- * más el número de correos tecleado a mano.
+ * Control 1 y lo que tiene que ser cierto para ENSAYAR el envío: montar todos
+ * los correos sin enviar ninguno.
  */
-export function puedeConfirmar(
-  ctx: ContextoControles,
-  numeroTecleado: number,
-  ahora: Date = new Date(),
-): string | null {
+export function puedeEnsayar(ctx: ContextoControles, ahora: Date = new Date()): string | null {
   const permiso = sinPermiso(ctx.rol);
   if (permiso) return permiso;
   const { comunicacion, resumen, ajustes } = ctx;
@@ -120,10 +116,63 @@ export function puedeConfirmar(
   if (comunicacion.revisada_n !== resumen.aEnviar) {
     return "La lista ha cambiado desde que se revisó. Hay que revisarla otra vez.";
   }
-  if (!Number.isInteger(numeroTecleado) || numeroTecleado !== resumen.aEnviar) {
-    return `El número no coincide: van a salir ${resumen.aEnviar} correos.`;
+  return null;
+}
+
+/** Cuánto vale un ensayo. Pasado este tiempo hay que repetirlo. */
+export const VIGENCIA_DEL_ENSAYO_MIN = 30;
+
+/**
+ * ¿Hay un ensayo general que valga para lo que se va a enviar ahora?
+ *
+ * Tiene que ser reciente, haberse hecho en el modo en que se va a enviar (en
+ * modo pruebas los destinatarios son otros) y haber contado los mismos correos.
+ */
+export function ensayoVigente(ctx: ContextoControles, ahora: Date = new Date()): string | null {
+  const { comunicacion, resumen, ajustes } = ctx;
+  const ensayo = comunicacion.ensayo_resumen;
+  if (!comunicacion.ensayo_at || !ensayo) return "Falta el ensayo general: monta todos los correos antes de confirmar.";
+  const minutos = (ahora.getTime() - new Date(comunicacion.ensayo_at).getTime()) / 60_000;
+  if (minutos > VIGENCIA_DEL_ENSAYO_MIN || minutos < 0) {
+    return `El ensayo general es de hace más de ${VIGENCIA_DEL_ENSAYO_MIN} minutos. Repítelo.`;
+  }
+  if (ensayo.modo !== ajustes.modo) {
+    return "El ensayo se hizo en otro modo de envío. Repítelo.";
+  }
+  if (ensayo.correos + ensayo.omitidos !== resumen.aEnviar) {
+    return "La lista ha cambiado desde el ensayo general. Repítelo.";
   }
   return null;
+}
+
+/**
+ * Controles 4 y 5 — todo lo que tiene que ser cierto para empezar a enviar: lo
+ * del ensayo, un ensayo vigente y el número de correos tecleado a mano.
+ */
+export function puedeConfirmar(
+  ctx: ContextoControles,
+  numeroTecleado: number,
+  ahora: Date = new Date(),
+): string | null {
+  const previo = puedeEnsayar(ctx, ahora) ?? ensayoVigente(ctx, ahora);
+  if (previo) return previo;
+  if (!Number.isInteger(numeroTecleado) || numeroTecleado !== ctx.resumen.aEnviar) {
+    return `El número no coincide: van a salir ${ctx.resumen.aEnviar} correos.`;
+  }
+  return null;
+}
+
+/**
+ * El tope diario. Devuelve el motivo si `nuevos` correos reales no caben en lo
+ * que queda del día.
+ */
+export function cabeEnElDia(enviadosHoy: number, nuevos: number, limite: number): string | null {
+  const quedan = Math.max(0, limite - enviadosHoy);
+  if (nuevos <= quedan) return null;
+  return (
+    `Tope diario: hoy se han enviado ${enviadosHoy} correos de un máximo de ${limite}, ` +
+    `quedan ${quedan} y esta comunicación necesita ${nuevos}.`
+  );
 }
 
 /** Controles 6 y 7 — se consultan antes de CADA correo, no una vez al empezar. */

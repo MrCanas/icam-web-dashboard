@@ -188,10 +188,20 @@ export function cuerpoDeEnvio(correo: CorreoSaliente, remitente: RemitenteZoho):
       ? { user_name: remitente.nombre, email: remitente.email }
       : { email: remitente.email },
     to: direcciones(correo.para),
-    template: { id: correo.plantillaId },
     // Solo las direcciones de la organización salen por el servidor de Zoho.
     org_email: remitente.tipo === "org_email",
   };
+  if (correo.contenido) {
+    // El correo ya viene montado: Zoho no vuelve a aplicar la plantilla.
+    mensaje.subject = correo.contenido.asunto;
+    mensaje.content = correo.contenido.html;
+    mensaje.mail_format = "html";
+    if (correo.contenido.adjuntos.length > 0) {
+      mensaje.attachments = correo.contenido.adjuntos.map((id) => ({ id }));
+    }
+  } else {
+    mensaje.template = { id: correo.plantillaId };
+  }
   if (correo.copia.length > 0) mensaje.cc = direcciones(correo.copia);
   if (correo.copiaOculta.length > 0) mensaje.bcc = direcciones(correo.copiaOculta);
   return { data: [mensaje] };

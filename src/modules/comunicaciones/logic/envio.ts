@@ -23,9 +23,25 @@ import type {
 /** Correos por tanda. Entre tanda y tanda se puede detener. */
 export const TANDA = 10;
 
+/**
+ * El correo ya montado por el portal: asunto y cuerpo con los campos combinados
+ * resueltos, la imagen de apertura y los enlaces rastreados.
+ */
+export interface ContenidoDeCorreo {
+  asunto: string;
+  html: string;
+  /** Identificadores de fichero de Zoho de los adjuntos de la plantilla. */
+  adjuntos: string[];
+}
+
 /** Un correo listo para la pasarela. */
 export interface CorreoSaliente extends CorreoParaCandado {
   plantillaId: string;
+  /**
+   * Con contenido, Zoho envía exactamente esto. Sin él, monta el correo a
+   * partir de la plantilla, y entonces no hay seguimiento propio.
+   */
+  contenido?: ContenidoDeCorreo;
 }
 
 export function enviadoPara(correo: CorreoSaliente): EnviadoPara {

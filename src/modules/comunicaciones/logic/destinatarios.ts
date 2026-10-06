@@ -5,6 +5,7 @@ import type {
   InvCuentaRow,
   InvPromocionRow,
 } from "@/modules/portfolio/inversores/types";
+import { dominioDe, esEmailValido, posibleErrata } from "@/modules/comunicaciones/logic/direcciones";
 import {
   ETIQUETA_ROL,
   type Audiencia,
@@ -45,6 +46,11 @@ export interface OpcionesDestinatarios {
   rolesCopia: readonly RolContacto[];
   /** Dominios propios: sus direcciones se marcan como internas. */
   dominiosInternos: readonly string[];
+  /**
+   * Dominios que, preguntado el DNS, no reciben correo. Una cuenta con una
+   * dirección ahí nace excluida. Sin esto no se comprueba (pruebas, o DNS caído).
+   */
+  dominiosSinCorreo?: ReadonlySet<string>;
 }
 
 function porNombre(a: { nombre: string }, b: { nombre: string }): number {
@@ -189,10 +195,18 @@ export function resolverDestinatarios(
         avisos.add("sin_correo");
         continue;
       }
+      // Una dirección mal escrita no entra en la lista: no se adivina cuál quiso
+      // poner quien la tecleó. Se corrige en el CRM.
+      if (!esEmailValido(email)) {
+        avisos.add("direccion_mal_formada");
+        continue;
+      }
       if (contacto?.email_opt_out === true) {
         avisos.add("dado_de_baja");
         continue;
       }
+      if (opciones.dominiosSinCorreo?.has(dominioDe(email))) avisos.add("dominio_sin_correo");
+      if (posibleErrata(email)) avisos.add("posible_errata");
 
       const direccion: Direccion = {
         email,
@@ -215,6 +229,8 @@ export function resolverDestinatarios(
     let excluidoMotivo: string | null = null;
     if (cuenta.excluida) {
       excluidoMotivo = cuenta.excluida_motivo ?? "Cuenta de prueba o técnica";
+    } else if (avisos.has("dominio_sin_correo")) {
+      excluidoMotivo = "El dominio de alguna de sus direcciones no recibe correo";
     } else if (para.length > 0 && internas.length === para.length) {
       excluidoMotivo = "Todas sus direcciones son internas";
     }

@@ -5,12 +5,21 @@ import {
   listarComunicaciones,
 } from "@/modules/comunicaciones/data/comunicacionesRepository";
 import { nombreDePasarelaActiva } from "@/modules/comunicaciones/data/pasarela";
+import {
+  leerEnlaces,
+  leerEventos,
+  leerParaElAgregado,
+  type DatosDelAgregado,
+} from "@/modules/comunicaciones/data/seguimientoRepository";
+import { abrio, hizoClic } from "@/modules/comunicaciones/logic/analitica";
 import { calcularPermitidos, type PermitidosCandado } from "@/modules/comunicaciones/logic/candado";
 import { contarAudiencias, resumirDestinatarios } from "@/modules/comunicaciones/logic/destinatarios";
 import type {
   ComAjustesRow,
   ComComunicacionRow,
   ComDestinatarioRow,
+  ComEnlaceRow,
+  ComEventoRow,
   ComunicacionConResumen,
   NombrePasarela,
   RecuentoAudiencias,
@@ -48,13 +57,19 @@ export async function loadHistorial(ctx: UserContext): Promise<DatosHistorial> {
       porComunicacion.set(d.comunicacion_id, grupo);
     }
     return {
-      comunicaciones: lista.comunicaciones.map((comunicacion) => ({
-        comunicacion,
-        resumen: resumirDestinatarios(
-          porComunicacion.get(comunicacion.id) ?? [],
-          ajustes.dominios_internos,
-        ),
-      })),
+      comunicaciones: lista.comunicaciones.map((comunicacion) => {
+        const suyos = porComunicacion.get(comunicacion.id) ?? [];
+        const enviados = suyos.filter((d) => !d.excluido && d.estado_envio === "enviado");
+        return {
+          comunicacion,
+          resumen: resumirDestinatarios(suyos, ajustes.dominios_internos),
+          seguimiento: {
+            enviados: enviados.length,
+            abiertos: enviados.filter((d) => abrio(d)).length,
+            conClic: enviados.filter((d) => hizoClic(d)).length,
+          },
+        };
+      }),
       sinMigracion: lista.sinMigracion,
       error: null,
     };
@@ -138,6 +153,74 @@ export async function loadDatosDeEnvios(ctx: UserContext): Promise<DatosDeEnvios
       permitidos: null,
       pasarela,
       error: mensaje(err, "No se pudo leer el estado de los envíos."),
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Analítica
+// ---------------------------------------------------------------------------
+
+export interface DatosDeAnalitica {
+  comunicacion: ComComunicacionRow | null;
+  destinatarios: ComDestinatarioRow[];
+  eventos: ComEventoRow[];
+  enlaces: ComEnlaceRow[];
+  /** La comunicación de la que sale esta, si es un reenvío. */
+  origen: { id: string; nombre: string } | null;
+  /** Los reenvíos que han salido de esta. */
+  reenvios: { id: string; nombre: string; estado: string }[];
+  error: string | null;
+}
+
+export async function loadAnalitica(ctx: UserContext, id: string): Promise<DatosDeAnalitica> {
+  const vacio: DatosDeAnalitica = {
+    comunicacion: null,
+    destinatarios: [],
+    eventos: [],
+    enlaces: [],
+    origen: null,
+    reenvios: [],
+    error: null,
+  };
+  try {
+    const completa = await leerComunicacion(ctx, id);
+    if (!completa) return vacio;
+    const [eventos, enlaces, lista] = await Promise.all([
+      leerEventos(ctx, id),
+      leerEnlaces(ctx, id),
+      listarComunicaciones(ctx, 500),
+    ]);
+    const origenId = completa.comunicacion.origen_comunicacion_id;
+    const origen = origenId ? lista.comunicaciones.find((c) => c.id === origenId) : undefined;
+    return {
+      comunicacion: completa.comunicacion,
+      destinatarios: completa.destinatarios,
+      eventos,
+      enlaces,
+      origen: origen ? { id: origen.id, nombre: origen.nombre } : null,
+      reenvios: lista.comunicaciones
+        .filter((c) => c.origen_comunicacion_id === id)
+        .map((c) => ({ id: c.id, nombre: c.nombre, estado: c.estado })),
+      error: null,
+    };
+  } catch (err) {
+    return { ...vacio, error: mensaje(err, "No se pudo leer la analítica.") };
+  }
+}
+
+export interface DatosDelAgregadoDePantalla {
+  datos: DatosDelAgregado;
+  error: string | null;
+}
+
+export async function loadAnaliticaGlobal(ctx: UserContext, desdeIso: string | null): Promise<DatosDelAgregadoDePantalla> {
+  try {
+    return { datos: await leerParaElAgregado(ctx, desdeIso), error: null };
+  } catch (err) {
+    return {
+      datos: { comunicaciones: [], destinatarios: [] },
+      error: mensaje(err, "No se pudo leer la analítica."),
     };
   }
 }

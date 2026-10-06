@@ -14,6 +14,13 @@ export async function proxy(request: NextRequest) {
   );
   const isAuthenticated = session !== null;
   const pathname = request.nextUrl.pathname;
+
+  // El dominio de seguimiento de Comunicaciones (go.imparcapital.com) apunta a
+  // este mismo proyecto, pero no es una puerta al portal: por él solo se sirven
+  // la imagen de apertura y los enlaces de los correos. Todo lo demás, 404.
+  if (esHostDeSeguimiento(request.headers.get("host")) && !pathname.startsWith("/api/s/")) {
+    return new NextResponse(null, { status: 404 });
+  }
   const isLoginPage = pathname === "/login";
   const isApiRoute = pathname.startsWith("/api/");
   const isProtectedDataApi =
@@ -86,6 +93,27 @@ async function withRenewedSession(
   return response;
 }
 
+/**
+ * ¿Llega la petición por el dominio de seguimiento?
+ *
+ * Se compara con el host de `COMUNICACIONES_SEGUIMIENTO_URL`. En local esa
+ * variable apunta a `localhost`, que es también el host del portal: ahí no se
+ * restringe nada.
+ */
+function esHostDeSeguimiento(host: string | null): boolean {
+  const base = process.env.COMUNICACIONES_SEGUIMIENTO_URL?.trim();
+  if (!host || !base) return false;
+  try {
+    const seguimiento = new URL(base).hostname.toLowerCase();
+    if (seguimiento === "localhost" || seguimiento === "127.0.0.1") return false;
+    return host.split(":")[0]!.toLowerCase() === seguimiento;
+  } catch {
+    return false;
+  }
+}
+
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-icam.png).*)"],
+  // `logo-correo-impar.png` es el logotipo de la vista previa de Comunicaciones:
+  // se pide desde un iframe sin sesión, como `logo-icam.png` en el login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-icam.png|logo-correo-impar.png).*)"],
 };

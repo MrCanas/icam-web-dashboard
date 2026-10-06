@@ -44,6 +44,25 @@ function comoTexto(v: unknown): string {
   return "";
 }
 
+/**
+ * Tipos de campo de Zoho cuyo valor es el mismo texto que Zoho escribiría.
+ *
+ * Los demás (importes, fechas, números, listas múltiples, lookups) Zoho los
+ * formatea a su manera —separador de miles, símbolo de moneda, orden de la
+ * fecha— y aquí no se sabe reproducirlo con garantía. Un campo de esos NO se
+ * resuelve: el correo que lo use no sale, que es mejor que salir con un importe
+ * mal escrito.
+ */
+export const TIPOS_DE_CAMPO_ADMITIDOS: readonly string[] = [
+  "text",
+  "textarea",
+  "email",
+  "phone",
+  "website",
+  "picklist",
+  "autonumber",
+];
+
 function sustituir(
   texto: string,
   modulo: string,
@@ -51,10 +70,13 @@ function sustituir(
   comoHtml: boolean,
   sinResolver: Set<string>,
   vacios: Set<string>,
+  tipos: ReadonlyMap<string, string> | undefined,
 ): string {
   return texto.replace(CAMPO_RE, (original: string, moduloCampo: string, campo: string) => {
     const clave = campo.trim();
-    if (moduloCampo !== modulo || !(clave in registro)) {
+    const tipo = tipos?.get(clave);
+    const tipoAdmitido = !tipos || (tipo !== undefined && TIPOS_DE_CAMPO_ADMITIDOS.includes(tipo));
+    if (moduloCampo !== modulo || !(clave in registro) || !tipoAdmitido) {
       sinResolver.add(original);
       return comoHtml
         ? `<span style="background:#fde2e2;color:#9B3B3B;padding:0 2px">${escaparHtml(original)}</span>`
@@ -66,17 +88,33 @@ function sustituir(
   });
 }
 
+/**
+ * La plantilla con los campos combinados de un registro.
+ *
+ * Con `tipos` (nombre API → tipo de campo en Zoho) solo se resuelven los campos
+ * de un tipo admitido; es como se llama para ENVIAR. Sin `tipos` se resuelve
+ * todo lo que traiga el registro, que es el comportamiento antiguo de la vista
+ * previa.
+ *
+ * Cualquier expresión `${…}` que no tenga la forma `${!Módulo.Campo}` (la firma
+ * del usuario, campos de otro módulo) se queda como está y cuenta como sin
+ * resolver.
+ */
 export function renderizarPlantilla(
   plantilla: { asunto: string | null; html: string },
   modulo: string,
   registro: Record<string, unknown>,
+  tipos?: ReadonlyMap<string, string>,
 ): VistaPrevia {
   const sinResolver = new Set<string>();
   const vacios = new Set<string>();
-  return {
-    asunto: sustituir(plantilla.asunto ?? "", modulo, registro, false, sinResolver, vacios),
-    html: sustituir(plantilla.html, modulo, registro, true, sinResolver, vacios),
-    sinResolver: [...sinResolver],
-    vacios: [...vacios],
-  };
+  const asunto = sustituir(plantilla.asunto ?? "", modulo, registro, false, sinResolver, vacios, tipos);
+  const html = sustituir(plantilla.html, modulo, registro, true, sinResolver, vacios, tipos);
+  // Lo que quede con forma de campo combinado y no haya pasado por arriba.
+  for (const resto of `${asunto}\n${html.replace(/<span style="background:#fde2e2[^>]*>[^<]*<\/span>/g, "")}`.match(
+    /\$\{[^}]*\}/g,
+  ) ?? []) {
+    sinResolver.add(resto);
+  }
+  return { asunto, html, sinResolver: [...sinResolver], vacios: [...vacios] };
 }

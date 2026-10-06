@@ -4,6 +4,10 @@ import { isMissingTableError } from "@/lib/db/pgErrors";
 import { getComunicacionesSupabase } from "@/modules/comunicaciones/data/readClient";
 import {
   ESTADOS_EDITABLES,
+  LIMITE_DIARIO_ZOHO,
+  type FiltroDeReenvio,
+  type ImagenApertura,
+  type ResumenDeEnsayo,
   type Audiencia,
   type ComAjustesRow,
   type ComComunicacionRow,
@@ -37,21 +41,31 @@ const AJUSTES_POR_DEFECTO: ComAjustesRow = {
   cuenta_pruebas_zoho_id: null,
   remitentes_permitidos: [],
   dominios_internos: ["imparcapital.com"],
+  limite_diario: LIMITE_DIARIO_ZOHO,
 };
+
+const COLUMNAS_DE_AJUSTES =
+  "envios_activados, modo, cuenta_pruebas_zoho_id, remitentes_permitidos, dominios_internos";
 
 /** Los interruptores del módulo. Sin migración, todo cerrado. */
 export async function leerAjustes(ctx: UserContext): Promise<ComAjustesRow> {
   const supabase = getComunicacionesSupabase(ctx);
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("com_ajustes")
-    .select("envios_activados, modo, cuenta_pruebas_zoho_id, remitentes_permitidos, dominios_internos")
+    .select(`${COLUMNAS_DE_AJUSTES}, limite_diario`)
     .maybeSingle();
+  // Sin la 049 no existe `limite_diario`: se lee lo demás y vale el límite de Zoho.
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    ({ data, error } = await supabase.from("com_ajustes").select(COLUMNAS_DE_AJUSTES).maybeSingle());
+  }
 
   if (error) {
     if (isMissingTableError(error)) return AJUSTES_POR_DEFECTO;
     throw new Error(`com_ajustes: ${error.message}`);
   }
-  return (data as ComAjustesRow | null) ?? AJUSTES_POR_DEFECTO;
+  const ajustes = data as ComAjustesRow | null;
+  if (!ajustes) return AJUSTES_POR_DEFECTO;
+  return { ...ajustes, limite_diario: ajustes.limite_diario ?? LIMITE_DIARIO_ZOHO };
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +75,10 @@ export async function leerAjustes(ctx: UserContext): Promise<ComAjustesRow> {
 export interface ListaComunicaciones {
   comunicaciones: ComComunicacionRow[];
   /** Solo lo que hace falta para los totales del historial. */
-  destinatarios: Pick<ComDestinatarioRow, "comunicacion_id" | "para" | "excluido">[];
+  destinatarios: Pick<
+    ComDestinatarioRow,
+    "comunicacion_id" | "para" | "excluido" | "estado_envio" | "aperturas" | "clics"
+  >[];
   sinMigracion: boolean;
 }
 
@@ -86,7 +103,7 @@ export async function listarComunicaciones(ctx: UserContext, limite = 100): Prom
   for (let desde = 0; ; desde += 1000) {
     const { data: lote, error: errorDest } = await supabase
       .from("com_destinatario")
-      .select("comunicacion_id, para, excluido")
+      .select("comunicacion_id, para, excluido, estado_envio, aperturas, clics")
       .in("comunicacion_id", ids)
       .range(desde, desde + 999);
     if (errorDest) throw new Error(`com_destinatario: ${errorDest.message}`);
@@ -145,6 +162,12 @@ export interface NuevaComunicacion {
   rolesPara: RolContacto[];
   rolesCopia: RolContacto[];
   datosZohoAt: string | null;
+  /** Solo en un reenvío: de qué comunicación sale, con qué filtro y con qué plantilla. */
+  reenvio?: {
+    origenComunicacionId: string;
+    filtro: FiltroDeReenvio;
+    plantilla: { id: string; nombre: string | null; modulo: string | null } | null;
+  };
 }
 
 /**
@@ -186,6 +209,15 @@ export async function crearComunicacion(
           datos_zoho_at: nueva.datosZohoAt,
           creada_por: ctx.id,
           creada_por_email: ctx.email,
+          ...(nueva.reenvio
+            ? {
+                origen_comunicacion_id: nueva.reenvio.origenComunicacionId,
+                reenvio_filtro: nueva.reenvio.filtro,
+                plantilla_id: nueva.reenvio.plantilla?.id ?? null,
+                plantilla_nombre: nueva.reenvio.plantilla?.nombre ?? null,
+                plantilla_modulo: nueva.reenvio.plantilla?.modulo ?? null,
+              }
+            : {}),
         })
         .select("id")
         .single();
@@ -281,6 +313,9 @@ export async function cambiarExclusion(
           revisada_por_email: null,
           revisada_at: null,
           revisada_n: null,
+          // Lo ensayado ya no es lo que se enviaría.
+          ensayo_at: null,
+          ensayo_resumen: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", comunicacionId);
@@ -320,6 +355,8 @@ export async function guardarPlantilla(
           probada_por_email: null,
           probada_at: null,
           probada_plantilla_id: null,
+          ensayo_at: null,
+          ensayo_resumen: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", comunicacionId);
@@ -362,9 +399,10 @@ export interface CambiosDeAjustes {
   modo: ModoEnvio;
   cuenta_pruebas_zoho_id: string | null;
   remitentes_permitidos: string[];
+  limite_diario: number;
 }
 
-/** El interruptor general, el modo, la cuenta de pruebas y los remitentes. */
+/** El interruptor general, el modo, la cuenta de pruebas, los remitentes y el tope diario. */
 export async function guardarAjustes(
   ctx: UserContext,
   cambios: CambiosDeAjustes,
@@ -469,6 +507,9 @@ export interface PruebaEnviada {
   pasarela: NombrePasarela;
   remitente: string;
   para: string[];
+  /** El seguimiento de la prueba, que no cuenta en las cifras. */
+  token: string;
+  enlaces: string[];
 }
 
 /**
@@ -485,7 +526,12 @@ export async function registrarPruebaEnviada(
   return withAudit(
     ctx,
     "comunicaciones.comunicacion.prueba_enviada",
-    { resourceType: "com_comunicacion", resourceId: comunicacionId, payload: prueba },
+    {
+      resourceType: "com_comunicacion",
+      resourceId: comunicacionId,
+      // El identificador de seguimiento no va al registro de auditoría.
+      payload: { ...prueba, token: undefined, enlaces: prueba.enlaces.length },
+    },
     () =>
       transicion(ctx, comunicacionId, ["revisada", "probada"], {
         estado: "revisada",
@@ -494,10 +540,15 @@ export async function registrarPruebaEnviada(
         prueba_enviada_por_email: ctx.email,
         prueba_enviada_plantilla_id: prueba.plantillaId,
         prueba_message_id: prueba.messageId,
+        prueba_token: prueba.token,
+        prueba_enlaces: prueba.enlaces,
         pasarela: prueba.pasarela,
         probada_por_email: null,
         probada_at: null,
         probada_plantilla_id: null,
+        // Cambió el remitente o la prueba: lo ensayado ya no vale.
+        ensayo_at: null,
+        ensayo_resumen: null,
       }),
   );
 }
@@ -526,7 +577,7 @@ export async function marcarProbada(
 export async function confirmarEnvio(
   ctx: UserContext,
   comunicacionId: string,
-  confirmacion: { numero: number; pasarela: NombrePasarela; modo: ModoEnvio },
+  confirmacion: { numero: number; pasarela: NombrePasarela; modo: ModoEnvio; asunto: string | null },
 ): Promise<Resultado<object>> {
   return withAudit(
     ctx,
@@ -539,8 +590,146 @@ export async function confirmarEnvio(
         confirmada_at: new Date().toISOString(),
         confirmada_n: confirmacion.numero,
         pasarela: confirmacion.pasarela,
+        // Fijado aquí: de esto depende que las aperturas sirvan para medir algo.
+        modo_envio: confirmacion.modo,
+        asunto_enviado: confirmacion.asunto,
       }),
   );
+}
+
+// ---------------------------------------------------------------------------
+// El ensayo general
+// ---------------------------------------------------------------------------
+
+export interface Ensayo {
+  resumen: ResumenDeEnsayo;
+  imagen: ImagenApertura;
+  /** Los enlaces de la plantilla, para agrupar los clics. */
+  enlacesDePlantilla: { posicion: number; url: string; texto: string }[];
+  /** De cada correo ensayado: su seguimiento, sus destinos y su huella. */
+  correos: { destinatarioId: string; token: string; enlaces: string[]; huella: string }[];
+}
+
+/**
+ * Guarda el resultado del ensayo general: todos los correos montados y
+ * validados, sin haber enviado ninguno.
+ *
+ * A partir de aquí cada destinatario tiene su identificador de seguimiento y la
+ * huella del correo que le saldría. Al enviar se vuelve a montar y se compara
+ * con esa huella.
+ */
+export async function guardarEnsayo(
+  ctx: UserContext,
+  comunicacionId: string,
+  ensayo: Ensayo,
+): Promise<Resultado<object>> {
+  return withAudit(
+    ctx,
+    "comunicaciones.comunicacion.ensayar",
+    { resourceType: "com_comunicacion", resourceId: comunicacionId, payload: ensayo.resumen },
+    async (): Promise<Resultado<object>> => {
+      const supabase = getComunicacionesSupabase(ctx);
+
+      for (const correo of ensayo.correos) {
+        const { data, error } = await supabase
+          .from("com_destinatario")
+          .update({ seguimiento_token: correo.token, enlaces: correo.enlaces, huella: correo.huella })
+          .eq("id", correo.destinatarioId)
+          .eq("comunicacion_id", comunicacionId)
+          .eq("estado_envio", "pendiente")
+          .select("id");
+        if (error) return { ok: false, error: `com_destinatario: ${error.message}` };
+        if ((data ?? []).length === 0) return { ok: false, error: HA_CAMBIADO };
+      }
+
+      const { error: errorBorrar } = await supabase.from("com_enlace").delete().eq("comunicacion_id", comunicacionId);
+      if (errorBorrar) return { ok: false, error: `com_enlace: ${errorBorrar.message}` };
+      if (ensayo.enlacesDePlantilla.length > 0) {
+        const { error: errorEnlaces } = await supabase.from("com_enlace").insert(
+          ensayo.enlacesDePlantilla.map((e) => ({
+            comunicacion_id: comunicacionId,
+            posicion: e.posicion,
+            url: e.url,
+            texto: e.texto || null,
+          })),
+        );
+        if (errorEnlaces) return { ok: false, error: `com_enlace: ${errorEnlaces.message}` };
+      }
+
+      return transicion(ctx, comunicacionId, ["probada"], {
+        ensayo_at: new Date().toISOString(),
+        ensayo_por_email: ctx.email,
+        ensayo_resumen: ensayo.resumen,
+        imagen_apertura: ensayo.imagen,
+      });
+    },
+  );
+}
+
+/** Cuándo empieza hoy en Madrid, como instante. */
+function inicioDeHoyEnMadrid(ahora: Date = new Date()): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(ahora);
+  const n = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value ?? "0");
+  // Lo que ha pasado desde la medianoche de Madrid, restado al instante actual.
+  const transcurrido = ((n("hour") % 24) * 3600 + n("minute") * 60 + n("second")) * 1000 + ahora.getMilliseconds();
+  return new Date(ahora.getTime() - transcurrido).toISOString();
+}
+
+/**
+ * Correos REALES que el módulo ha enviado hoy: los de los envíos y las pruebas
+ * que salieron por Zoho. Es lo que se compara con el tope diario.
+ */
+export async function contarEnviadosHoy(ctx: UserContext): Promise<number> {
+  const supabase = getComunicacionesSupabase(ctx);
+  const desde = inicioDeHoyEnMadrid();
+  const [destinatarios, pruebas] = await Promise.all([
+    supabase
+      .from("com_destinatario")
+      .select("id", { count: "exact", head: true })
+      .eq("estado_envio", "enviado")
+      .eq("pasarela", "zoho")
+      .gte("enviado_at", desde),
+    supabase
+      .from("com_comunicacion")
+      .select("id", { count: "exact", head: true })
+      .eq("pasarela", "zoho")
+      .gte("prueba_enviada_at", desde),
+  ]);
+  if (destinatarios.error) throw new Error(`com_destinatario: ${destinatarios.error.message}`);
+  if (pruebas.error) throw new Error(`com_comunicacion: ${pruebas.error.message}`);
+  return (destinatarios.count ?? 0) + (pruebas.count ?? 0);
+}
+
+/** Lo que dice Zoho de un correo ya enviado: si coincide a quién fue, y si ha rebotado. */
+export async function anotarLoQueDiceZoho(
+  ctx: UserContext,
+  destinatarioId: string,
+  dato: {
+    verificado?: "coincide" | "no_coincide" | "sin_dato";
+    entrega?: "entregado" | "rebotado" | "sin_dato";
+    motivo?: string | null;
+  },
+): Promise<void> {
+  const cambios: Record<string, unknown> = {};
+  if (dato.verificado) cambios.verificado_zoho = dato.verificado;
+  if (dato.entrega) {
+    cambios.entrega_estado = dato.entrega;
+    cambios.rebote_motivo = dato.motivo ?? null;
+    cambios.entrega_consultada_at = new Date().toISOString();
+  }
+  if (Object.keys(cambios).length === 0) return;
+  const supabase = getComunicacionesSupabase(ctx);
+  const { error } = await supabase.from("com_destinatario").update(cambios).eq("id", destinatarioId);
+  if (error) throw new Error(`com_destinatario: ${error.message}`);
 }
 
 export async function pausarEnvio(ctx: UserContext, comunicacionId: string): Promise<Resultado<object>> {

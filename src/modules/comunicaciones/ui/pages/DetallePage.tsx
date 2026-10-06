@@ -5,7 +5,12 @@ import { checkWriteAccess, getUserRole } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import { calcularProgreso, simularCandado } from "@/modules/comunicaciones/logic/envio";
 import { loadDatosDeEnvios, loadDetalle } from "@/modules/comunicaciones/logic/loadComunicaciones";
-import { COMUNICACIONES_PATH, ZONA_COMUNICACIONES } from "@/modules/comunicaciones/logic/paths";
+import { esFiltro, ETIQUETA_FILTRO } from "@/modules/comunicaciones/logic/analitica";
+import {
+  comunicacionAnaliticaPath,
+  COMUNICACIONES_PATH,
+  ZONA_COMUNICACIONES,
+} from "@/modules/comunicaciones/logic/paths";
 import { CancelarButton } from "@/modules/comunicaciones/ui/components/CancelarButton";
 import { DestinatariosPanel } from "@/modules/comunicaciones/ui/components/DestinatariosPanel";
 import { EnvioPanel } from "@/modules/comunicaciones/ui/components/EnvioPanel";
@@ -123,8 +128,45 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
             los datos de Zoho del {fmtFechaHora(comunicacion.datos_zoho_at)}.
           </p>
         </div>
-        {editable ? <CancelarButton comunicacionId={comunicacion.id} /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {["enviando", "pausada", "enviada"].includes(comunicacion.estado) ? (
+            <Link
+              href={comunicacionAnaliticaPath(comunicacion.id)}
+              className="min-h-9 rounded-md bg-icam-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              Ver la analítica
+            </Link>
+          ) : null}
+          {editable ? <CancelarButton comunicacionId={comunicacion.id} /> : null}
+        </div>
       </header>
+
+      {comunicacion.audiencia === "reenvio" ? (
+        <div className="space-y-1 rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
+          <p>
+            <strong className="text-text-primary">Es un reenvío.</strong> Sale de{" "}
+            {comunicacion.origen_comunicacion_id ? (
+              <Link
+                href={comunicacionAnaliticaPath(comunicacion.origen_comunicacion_id)}
+                className="text-icam-900 underline underline-offset-2"
+              >
+                otra comunicación
+              </Link>
+            ) : (
+              "otra comunicación"
+            )}
+            , con el filtro «
+            {esFiltro(comunicacion.reenvio_filtro?.filtro)
+              ? ETIQUETA_FILTRO[comunicacion.reenvio_filtro.filtro]
+              : "desconocido"}
+            ». Solo puede incluir cuentas que estuvieran en aquel envío, con las direcciones de hoy.
+          </p>
+          <p className="text-text-muted">
+            Una cuenta con una dirección que no estaba en el envío original nace excluida, con el aviso «Dirección
+            nueva»: mírala y vuelve a incluirla solo si es correcta.
+          </p>
+        </div>
+      ) : null}
 
       <EstadoDeEnvios datos={envios} />
 
