@@ -3,6 +3,9 @@
 Zona propia (`comunicaciones`) en `/dashboard/comunicaciones`. Prepara correos a inversores
 enseñando **a quién irían y con qué plantilla antes de que salga nada**.
 
+Dónde vive cada pieza del proyecto, el estado, la puesta en marcha, la especificación del envío y
+la guía de uso están en [`docs/comunicaciones/`](../../../docs/comunicaciones/README.md).
+
 ## Por qué existe
 
 Los correos a inversores salían del kiosk «Emails a Fondos/Promos» de Zoho CRM, que no enseña a
