@@ -44,9 +44,10 @@ asistencia a eventos, listas propias y aprobación por una segunda persona.
 |---|---|
 | Código (`feat/comunicaciones-lectura`) | Hecho. No contiene ninguna llamada de envío |
 | PR #64 a `main` | Abierta, sin conflictos, CI y previsualización en verde |
-| Migración 047 | Escrita y simulada. **Sin aplicar** |
-| Zona `comunicaciones` | **Nadie la tiene concedida** |
-| Recorrido en el navegador | Sin hacer: necesita las dos anteriores |
+| Migración 047 | Aplicada el 2026-10-06 |
+| Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin (2026-10-06) |
+| «Actualizar datos de Zoho» tras la migración | **Sin hacer**: hasta entonces «Inversores directos» sale vacía |
+| Recorrido en el navegador | **Sin hacer** |
 
 Los pasos para cerrarla están en [`01-puesta-en-marcha.md`](01-puesta-en-marcha.md).
 
@@ -85,8 +86,7 @@ desarrolladores > Conexiones.
 | Tarea | Quién |
 |---|---|
 | Borrar los cuatro módulos y la conexión del CRM (§4) | Javier |
-| Autorizar la migración 047 y la concesión de la zona | Javier |
-| Ver las tres pantallas con datos reales | Javier |
+| Actualizar los datos de Zoho y ver las tres pantallas con datos reales | Javier |
 | Mergear la PR #64 (`main` es producción) | Javier |
 | Dar el visto bueno para empezar la fase 2 | Javier |
 | Generar el token de envío y guardarlo en Vercel, solo en Producción | Javier, en la fase 2 |
