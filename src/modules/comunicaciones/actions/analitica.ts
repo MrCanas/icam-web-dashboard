@@ -10,13 +10,19 @@ import {
   leerAjustes,
   leerComunicacion,
 } from "@/modules/comunicaciones/data/comunicacionesRepository";
-import { dominiosSinCorreo } from "@/modules/comunicaciones/data/dns";
+import { resolverDestinatariosConDns } from "@/modules/comunicaciones/actions/resolver";
 import { leerEventos } from "@/modules/comunicaciones/data/seguimientoRepository";
 import { leerCorreoEnviado } from "@/modules/comunicaciones/data/zohoCorreos";
-import { enlacesPulsados, esFiltro, esMedible, porQueNoEsMedible } from "@/modules/comunicaciones/logic/analitica";
+import { leerPlantilla } from "@/modules/comunicaciones/data/zohoPlantillas";
+import {
+  enlacesPulsados,
+  esFiltro,
+  esMedible,
+  ETIQUETA_FILTRO,
+  necesitaSeguimiento,
+  porQueNoEsMedible,
+} from "@/modules/comunicaciones/logic/analitica";
 import { mismoDia } from "@/modules/comunicaciones/logic/controles";
-import { resolverDestinatarios } from "@/modules/comunicaciones/logic/destinatarios";
-import { dominioDe } from "@/modules/comunicaciones/logic/direcciones";
 import { moduloDePlantilla } from "@/modules/comunicaciones/logic/envio";
 import {
   COMUNICACIONES_PATH,
@@ -29,7 +35,7 @@ import {
   esFiltroDeReenvio,
   type DiferenciasConElOriginal,
 } from "@/modules/comunicaciones/logic/reenvio";
-import { ETIQUETA_FILTRO } from "@/modules/comunicaciones/logic/analitica";
+import type { EstadoComunicacion } from "@/modules/comunicaciones/types";
 import {
   cargarEspejosDeContacto,
   ultimoSyncOk,
@@ -49,6 +55,9 @@ function fallo(err: unknown, porDefecto: string): { ok: false; mensaje: string }
 }
 
 const CONSULTAS_A_LA_VEZ = 4;
+
+/** Estados en los que una comunicación ya ha salido, entera o en parte. */
+const ESTADOS_ENVIADOS: readonly EstadoComunicacion[] = ["enviando", "pausada", "enviada"];
 
 /**
  * Le pregunta a Zoho, correo a correo, si lo entregó o rebotó.
@@ -122,12 +131,14 @@ export async function prepararReenvioAction(
   comunicacionId: string,
   filtro: string,
   enlace: number | null,
+  /** Otra plantilla para el seguimiento. Sin ella, la del original. */
+  plantillaId?: string | null,
 ): Promise<ResultadoAccion<{ id: string; path: string; diferencias: DiferenciasConElOriginal }>> {
   const user = await usuarioConEscritura(HISTORIAL_ROUTE_KEY);
   if (typeof user === "string") return { ok: false, mensaje: user };
 
   if (!esFiltro(filtro) || !esFiltroDeReenvio(filtro)) {
-    return { ok: false, mensaje: "Ese filtro no sirve para preparar un reenvío." };
+    return { ok: false, mensaje: "Ese filtro no sirve para preparar un seguimiento." };
   }
   const posicion = filtro === "pulso_enlace" ? enlace : null;
   if (filtro === "pulso_enlace" && (posicion === null || !Number.isInteger(posicion) || posicion < 0)) {
@@ -143,18 +154,36 @@ export async function prepararReenvioAction(
       leerAjustes(user),
     ]);
     if (!original) return { ok: false, mensaje: "La comunicación no existe." };
-    if (!esMedible(original.comunicacion)) {
+    if (!ESTADOS_ENVIADOS.includes(original.comunicacion.estado)) {
+      return { ok: false, mensaje: "Solo se hace seguimiento de una comunicación que ya se ha enviado." };
+    }
+    // Un filtro de aperturas o clics solo tiene sentido si las hubo de verdad.
+    if (necesitaSeguimiento(filtro) && !esMedible(original.comunicacion)) {
       return {
         ok: false,
-        mensaje: `No se puede reenviar a partir de esta comunicación. ${porQueNoEsMedible(original.comunicacion) ?? ""}`.trim(),
+        mensaje: `Ese filtro no sirve en esta comunicación. ${porQueNoEsMedible(original.comunicacion) ?? ""}`.trim(),
       };
     }
     if (espejos.sinMigracion) return { ok: false, mensaje: "Faltan las tablas de Inversores (migración 040)." };
     if (!mismoDia(datosZohoAt, new Date())) {
       return {
         ok: false,
-        mensaje: "Los datos de Zoho no son de hoy. Actualízalos en «Nueva» antes de preparar el reenvío.",
+        mensaje: "Los datos de Zoho no son de hoy. Actualízalos en «Nueva» antes de preparar el seguimiento.",
       };
+    }
+
+    // La plantilla: la elegida, releída de Zoho (el nombre y el módulo no se
+    // aceptan del navegador), o la del original.
+    let plantilla = original.comunicacion.plantilla_id
+      ? {
+          id: original.comunicacion.plantilla_id,
+          nombre: original.comunicacion.plantilla_nombre,
+          modulo: original.comunicacion.plantilla_modulo,
+        }
+      : null;
+    if (plantillaId && plantillaId !== plantilla?.id) {
+      const leida = await leerPlantilla(plantillaId);
+      plantilla = { id: leida.id, nombre: leida.nombre, modulo: leida.modulo };
     }
 
     const cuentasFiltradas = cuentasParaReenvio(
@@ -170,14 +199,10 @@ export async function prepararReenvioAction(
     // Los datos de hoy, solo de las cuentas filtradas, con los mismos papeles.
     const filtradas = new Set(cuentasFiltradas);
     const cuentasDeHoy = espejos.cuentas.filter((c) => filtradas.has(c.zoho_id));
-    const sinCorreo = await dominiosSinCorreo(
-      espejos.contactos.map((c) => dominioDe(c.email ?? "")).filter(Boolean),
-    ).catch(() => new Set<string>());
-    const calculados = resolverDestinatarios(cuentasDeHoy, espejos, {
+    const calculados = await resolverDestinatariosConDns(cuentasDeHoy, espejos, {
       rolesPara: original.comunicacion.roles_para,
       rolesCopia: original.comunicacion.roles_copia,
       dominiosInternos: ajustes.dominios_internos,
-      dominiosSinCorreo: sinCorreo,
     });
     const { destinatarios, diferencias } = ajustarAlOriginal(calculados, original.destinatarios, cuentasFiltradas);
     if (destinatarios.length === 0) {
@@ -188,8 +213,8 @@ export async function prepararReenvioAction(
     const creada = await crearComunicacion(
       user,
       {
-        // El nombre del original ya lleva su fecha: la del reenvío va delante.
-        nombre: `Reenvío del ${hoy} (${ETIQUETA_FILTRO[filtro].toLowerCase()}) · ${original.comunicacion.nombre}`.slice(0, 300),
+        // El nombre del original ya lleva su fecha: la del seguimiento va delante.
+        nombre: `Seguimiento del ${hoy} (${ETIQUETA_FILTRO[filtro].toLowerCase()}) · ${original.comunicacion.nombre}`.slice(0, 300),
         tipo: original.comunicacion.tipo,
         audiencia: "reenvio",
         promocionZohoId: original.comunicacion.promocion_zoho_id,
@@ -199,14 +224,9 @@ export async function prepararReenvioAction(
         datosZohoAt,
         reenvio: {
           origenComunicacionId: original.comunicacion.id,
-          filtro: { filtro, enlace: posicion },
-          plantilla: original.comunicacion.plantilla_id
-            ? {
-                id: original.comunicacion.plantilla_id,
-                nombre: original.comunicacion.plantilla_nombre,
-                modulo: original.comunicacion.plantilla_modulo,
-              }
-            : null,
+          // Las diferencias se guardan con el borrador: se enseñan en su página.
+          filtro: { filtro, enlace: posicion, diferencias },
+          plantilla,
         },
       },
       destinatarios,
@@ -216,6 +236,6 @@ export async function prepararReenvioAction(
     revalidatePath(COMUNICACIONES_PATH);
     return { ok: true, id: creada.id, path: comunicacionPath(creada.id), diferencias };
   } catch (err) {
-    return fallo(err, "No se pudo preparar el reenvío.");
+    return fallo(err, "No se pudo preparar el seguimiento.");
   }
 }

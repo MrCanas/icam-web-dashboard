@@ -47,6 +47,9 @@ Todo en la PR #64 (`feat/comunicaciones-lectura`).
 | Panel de analítica, por correo y agregado, y reenvío por filtro | Hecho |
 | Migración 049 (seguimiento y analítica) | Aplicada el 2026-10-06 |
 | Dominio `go.imparcapital.com` | Añadido al proyecto de Vercel. **Falta el registro DNS en Cloudflare** (§5) |
+| Seguimiento desde la comunicación (todos los que lo recibieron, o un filtro) con elección de plantilla | Hecho el 2026-10-07. Ver [`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 7 |
+| «Nueva» dice qué falta en vez de apagar el botón; DNS solo de la audiencia | Hecho el 2026-10-07 |
+| Rediseño: cabeceras con chips, stepper, pestañas, tarjetas KPI, ayuda en ⓘ y desplegables, piezas compartidas en `src/components/ui/` | Hecho el 2026-10-07. Revisado en local con la pasarela simulada; pendiente de que Javier lo vea |
 | Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin |
 | Ajustes | Envíos **desactivados** y modo **pruebas**. Cuenta de pruebas: TEST CUENTA JCV_Updated. Remitente permitido: `javiercanas@imparcapital.com`. Tope diario: 100 |
 | Token de envíos | Generado el 2026-10-06 con el usuario de Javier Canas. Solo en el `.env.local` de su copia de trabajo; **falta ponerlo en Vercel (Production)** |
@@ -98,6 +101,16 @@ comprobación técnica previa, todos a esa misma dirección).
 Qué se vio, y los tres fallos que destapó y quedaron corregidos, en
 [`04-analitica-y-reenvio.md`](04-analitica-y-reenvio.md) § 9. Lo que **no** se ha podido comprobar
 todavía son las aperturas con el correo de verdad: hace falta que la PR esté en producción.
+
+### Revisión de Javier del 2026-10-07
+
+Vio el módulo en local y pidió tres cosas, hechas ese día: poder enviar un **seguimiento desde la
+propia comunicación** a todos los destinatarios o a un filtro (no abrieron, no hicieron clic…);
+arreglar «Nueva», donde el botón se quedaba gris al elegir una promoción sin decir por qué (faltaba
+el tipo de comunicación, o los datos de hoy); y un **rediseño a fondo** del aspecto, que tenía
+demasiado texto explicativo y no seguía el sistema del portal. El servidor local se le paraba solo:
+no era el portal, sino Claude Code matando el proceso por falta de memoria en el equipo
+([`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) § 5).
 
 Fuera de alcance por ahora: recordatorios automáticos, confirmación de asistencia a eventos, listas
 propias y aprobación por una segunda persona.

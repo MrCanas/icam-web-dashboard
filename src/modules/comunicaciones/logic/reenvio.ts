@@ -22,10 +22,16 @@ import type { Aviso, ComDestinatarioRow, DestinatarioCalculado } from "@/modules
  * Puro.
  */
 
-/** Filtros sobre los que tiene sentido reenviar. «Todos» y «rebotado» no. */
+/**
+ * Filtros sobre los que tiene sentido un seguimiento. «Todos» no: incluiría
+ * excluidos y omitidos («todos los que lo recibieron» es `enviados`).
+ * «Rebotado» tampoco: a una dirección que rebota no se le vuelve a escribir.
+ */
 export const FILTROS_DE_REENVIO: readonly FiltroAnalitica[] = [
+  "enviados",
   "no_consta_apertura",
   "abrio",
+  "no_hizo_clic",
   "hizo_clic",
   "abrio_sin_clic",
   "pulso_enlace",

@@ -88,7 +88,7 @@ sale.
 
 | Cuándo | Qué |
 |---|---|
-| Al preparar | Sintaxis estricta de cada dirección (una mal formada no entra en «Para»); que el dominio reciba correo (consulta DNS, una vez por dominio; si no, la cuenta nace excluida); aviso de posible errata (`gmial.com`…) |
+| Al preparar | Sintaxis estricta de cada dirección (una mal formada no entra en «Para»); que el dominio reciba correo (consulta DNS **solo de los dominios de la audiencia**, con caché de 24 h en memoria; si no, la cuenta nace excluida); aviso de posible errata (`gmial.com`…). La pantalla dice qué falta en vez de apagar el botón, y «hoy» lo decide el servidor con la fecha de Madrid |
 | En cada correo (`logic/validarCorreo.ts`) | Ningún campo sin resolver ni resto de `${…}`; asunto y cuerpo no vacíos y dentro de tamaño; tantos enlaces rastreados como tenía la plantilla, todos `http(s)`; exactamente una imagen de apertura; el identificador es el de ese destinatario y el registro el de su cuenta; tantos adjuntos como la plantilla |
 | Al confirmar | Ensayo general vigente y sin problemas; que el envío quepa en el tope diario |
 | En cada tanda | Huella igual a la ensayada; interruptor, estado y tope antes de cada correo; que el modo no haya cambiado desde el ensayo |
@@ -117,18 +117,28 @@ Cómo leerlo, y lo dice la propia pantalla:
 - **Entrega y rebotes, parcial**: «Consultar entrega en Zoho» pregunta por cada correo, y Zoho solo
   contesta para unas 62 de las 164 cuentas. El resto queda «sin dato».
 
-## 7. El reenvío
+## 7. El seguimiento (reenvío por filtro)
 
-En la analítica de una comunicación enviada en modo real, con un filtro aplicado: **«Preparar
-reenvío a estas N cuentas»**.
+Desde cualquier comunicación enviada (cabecera, final del paso «Envío» y analítica): botón
+**«Seguimiento»**, que abre un diálogo (`ui/components/SeguimientoModal.tsx`) con el filtro, el
+recuento, las direcciones exactas del envío original y la plantilla.
 
+- Filtros: `enviados` («Todos los que lo recibieron»: `fueEnviado`), `no_consta_apertura`,
+  `no_hizo_clic`, `abrio_sin_clic`, `pulso_enlace` y `error` (`FILTROS_DE_REENVIO` en
+  `logic/reenvio.ts`). «Todos» no sirve: incluiría excluidos y omitidos.
+- En una comunicación **no medible** (modo pruebas, pasarela simulada, anterior al seguimiento)
+  solo valen `enviados` y `error` (`FILTROS_SIN_SEGUIMIENTO`); el servidor lo exige igual
+  (`necesitaSeguimiento`).
 - Crea una **comunicación nueva, en borrador**, ligada a la original (`origen_comunicacion_id`,
-  `reenvio_filtro`). No envía nada.
+  `reenvio_filtro` con el filtro y las **diferencias** respecto al original). No envía nada. En la
+  base la audiencia sigue siendo `reenvio`; en pantalla se llama «Seguimiento».
 - El servidor recalcula quién cumple el filtro; no se fía de lo que tenga el navegador.
 - Los destinatarios se vuelven a resolver con los datos de Zoho de hoy (bajas, direcciones
-  cambiadas), limitados a las cuentas filtradas y con los mismos papeles.
+  cambiadas), limitados a las cuentas filtradas y con los mismos papeles. El DNS se consulta solo
+  para los dominios de esas cuentas.
+- La plantilla se elige en el diálogo (por defecto la original); el servidor la relee de Zoho.
 - Pasa por **todos** los controles —revisión, prueba, ensayo, confirmación tecleada, tandas— y por
-  el candado. La plantilla nace siendo la original y se puede cambiar.
+  el candado.
 
 ## 8. Datos
 

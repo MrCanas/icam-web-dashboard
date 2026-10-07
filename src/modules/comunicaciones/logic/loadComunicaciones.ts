@@ -230,6 +230,9 @@ export interface DatosDetalle {
   destinatarios: ComDestinatarioRow[];
   resumen: ResumenDestinatarios;
   ajustes: ComAjustesRow | null;
+  /** Solo si ya se ha enviado: para el seguimiento por enlace pulsado. */
+  eventos: ComEventoRow[];
+  enlaces: ComEnlaceRow[];
   error: string | null;
 }
 
@@ -238,13 +241,17 @@ export async function loadDetalle(ctx: UserContext, id: string): Promise<DatosDe
   try {
     const [completa, ajustes] = await Promise.all([leerComunicacion(ctx, id), leerAjustes(ctx)]);
     if (!completa) {
-      return { comunicacion: null, destinatarios: [], resumen: vacio, ajustes, error: null };
+      return { comunicacion: null, destinatarios: [], resumen: vacio, ajustes, eventos: [], enlaces: [], error: null };
     }
+    const enviada = ["enviando", "pausada", "enviada"].includes(completa.comunicacion.estado);
+    const [eventos, enlaces] = enviada ? await Promise.all([leerEventos(ctx, id), leerEnlaces(ctx, id)]) : [[], []];
     return {
       comunicacion: completa.comunicacion,
       destinatarios: completa.destinatarios,
       resumen: resumirDestinatarios(completa.destinatarios, ajustes.dominios_internos),
       ajustes,
+      eventos,
+      enlaces,
       error: null,
     };
   } catch (err) {
@@ -253,6 +260,8 @@ export async function loadDetalle(ctx: UserContext, id: string): Promise<DatosDe
       destinatarios: [],
       resumen: vacio,
       ajustes: null,
+      eventos: [],
+      enlaces: [],
       error: mensaje(err, "No se pudo leer la comunicación."),
     };
   }

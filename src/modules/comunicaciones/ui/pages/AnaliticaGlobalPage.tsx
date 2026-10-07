@@ -1,5 +1,13 @@
 import Link from "next/link";
 
+import { Aviso } from "@/components/ui/Aviso";
+import { Ayuda } from "@/components/ui/Ayuda";
+import { Chip } from "@/components/ui/Chip";
+import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
+import { EstadoVacio } from "@/components/ui/EstadoVacio";
+import { KPICard } from "@/components/ui/KPICard";
+import { Tarjeta } from "@/components/ui/Tarjeta";
+import { TABLA } from "@/components/ui/tabla";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import {
@@ -17,18 +25,26 @@ import {
   COMUNICACIONES_PATH,
   comunicacionAnaliticaPath,
 } from "@/modules/comunicaciones/logic/paths";
-import { AvisoDeAnalitica, Cifra, pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
+import { AvisoDeAnalitica, pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
 
 const PERIODOS = [
-  { clave: "30", etiqueta: "Últimos 30 días", dias: 30 },
-  { clave: "90", etiqueta: "Últimos 90 días", dias: 90 },
-  { clave: "365", etiqueta: "Último año", dias: 365 },
+  { clave: "30", etiqueta: "30 días", dias: 30 },
+  { clave: "90", etiqueta: "90 días", dias: 90 },
+  { clave: "365", etiqueta: "1 año", dias: 365 },
   { clave: "todo", etiqueta: "Todo", dias: null },
 ] as const;
 
 /** El periodo se cuenta desde ahora mismo: es una página que se pide, no una que se cachea. */
 function inicioDelPeriodo(dias: number): string {
   return new Date(Date.now() - dias * 86_400_000).toISOString();
+}
+
+function Tasa({ parte, total }: { parte: number; total: number }) {
+  return (
+    <>
+      {fmtInt(parte)} <span className="text-text-muted">· {pct(tasa(parte, total))}</span>
+    </>
+  );
 }
 
 /**
@@ -59,170 +75,155 @@ export default async function AnaliticaGlobalPage({ periodo }: { periodo: string
   const cuentas = filasPorCuenta(destinatarios);
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href={COMUNICACIONES_PATH} className="underline-offset-2 hover:underline">
-              Comunicaciones
-            </Link>{" "}
-            / Analítica
-          </p>
-          <h1 className="mt-1 text-xl font-semibold text-text-primary sm:text-2xl">Analítica de los correos</h1>
-          <p className="mt-0.5 text-sm text-text-muted">
-            El conjunto de lo enviado. La analítica de cada correo está en su propia página.
-          </p>
-        </div>
-        <nav aria-label="Periodo" className="flex flex-wrap gap-2">
-          {PERIODOS.map((p) => (
-            <Link
-              key={p.clave}
-              href={`${COMUNICACIONES_ANALITICA_PATH}?periodo=${p.clave}`}
-              aria-current={p.clave === elegido.clave ? "page" : undefined}
-              className={`min-h-9 rounded-md border px-3 py-1.5 text-sm ${
-                p.clave === elegido.clave
-                  ? "border-icam-900 bg-icam-900 text-white"
-                  : "border-subtle text-text-body hover:border-icam-900"
-              }`}
-            >
-              {p.etiqueta}
-            </Link>
-          ))}
-        </nav>
-      </header>
+    <div className="min-w-0 space-y-3 sm:space-y-4">
+      <EncabezadoDePagina
+        ruta={[{ etiqueta: "Comunicaciones", href: COMUNICACIONES_PATH }, { etiqueta: "Analítica" }]}
+        titulo="Analítica de los correos"
+        meta="El conjunto de lo enviado en modo real. La analítica de cada correo está en su propia página."
+        acciones={
+          <nav aria-label="Periodo" className="flex gap-1 rounded-md border border-subtle bg-card p-0.5">
+            {PERIODOS.map((p) => (
+              <Link
+                key={p.clave}
+                href={`${COMUNICACIONES_ANALITICA_PATH}?periodo=${p.clave}`}
+                aria-current={p.clave === elegido.clave ? "page" : undefined}
+                className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                  p.clave === elegido.clave ? "bg-icam-900 text-white" : "text-text-body hover:bg-page"
+                }`}
+              >
+                {p.etiqueta}
+              </Link>
+            ))}
+          </nav>
+        }
+      />
 
-      {error ? (
-        <p className="rounded-lg border border-[#9B3B3B]/40 bg-card p-4 text-sm text-[#9B3B3B]">
-          No se pudo leer la analítica: {error}
-        </p>
-      ) : null}
+      {error ? <Aviso tipo="error">No se pudo leer la analítica: {error}</Aviso> : null}
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KPICard title="Comunicaciones" value={fmtInt(medibles.length)} subtitle={elegido.dias ? `últimos ${elegido.etiqueta}` : "desde el principio"} />
+        <KPICard title="Correos enviados" value={fmtInt(total.enviados)} />
+        <KPICard title="Abiertos" value={fmtInt(total.abiertos)} subtitle={`${pct(total.tasaApertura)} de los enviados`} highlight />
+        <KPICard title="Con clic" value={fmtInt(total.conClic)} subtitle={`${pct(total.tasaClic)} de los enviados`} />
+      </div>
 
       <AvisoDeAnalitica />
 
-      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Cifra etiqueta="Comunicaciones" valor={fmtInt(medibles.length)} nota={elegido.etiqueta.toLowerCase()} />
-        <Cifra etiqueta="Correos enviados" valor={fmtInt(total.enviados)} />
-        <Cifra etiqueta="Abiertos" valor={fmtInt(total.abiertos)} nota={`${pct(total.tasaApertura)} de los enviados`} />
-        <Cifra etiqueta="Con clic" valor={fmtInt(total.conClic)} nota={`${pct(total.tasaClic)} de los enviados`} />
-      </dl>
-
       {!error && medibles.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-subtle p-6 text-center text-sm text-text-muted">
-          En este periodo no hay ninguna comunicación enviada en modo real.
-        </p>
+        <EstadoVacio
+          icono="grafica"
+          titulo="Nada que medir en este periodo"
+          descripcion="Solo entran las comunicaciones enviadas de verdad, por Zoho y en modo real."
+          compacto
+        />
       ) : null}
 
       {medibles.length > 0 ? (
         <>
-          <section className="space-y-2" aria-labelledby="ag-comunicaciones">
-            <h2 id="ag-comunicaciones" className="text-base font-semibold text-text-primary">
-              Por comunicación
-            </h2>
-            <div className="overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-              <table className="w-full min-w-[860px] text-sm">
+          <Tarjeta id="ag-comunicaciones" titulo="Por comunicación" subtitulo="Cada envío con sus propias cifras." sinRelleno>
+            <div className={TABLA.marco}>
+              <table className={`${TABLA.tabla} min-w-[860px]`}>
                 <caption className="sr-only">Cada comunicación enviada, con sus aperturas y sus clics.</caption>
-                <thead>
-                  <tr className="border-b border-subtle text-left text-text-muted">
-                    <th scope="col" className="px-3 py-2 font-medium">Comunicación</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Plantilla</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Enviada</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Enviados</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Abrieron</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Clic</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Errores</th>
+                <thead className={TABLA.thead}>
+                  <tr>
+                    <th scope="col" className={TABLA.th}>Comunicación</th>
+                    <th scope="col" className={TABLA.th}>Enviada</th>
+                    <th scope="col" className={TABLA.thNum}>Enviados</th>
+                    <th scope="col" className={TABLA.thNum}>Abrieron</th>
+                    <th scope="col" className={TABLA.thNum}>Clic</th>
+                    <th scope="col" className={TABLA.thNum}>Errores</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filas.map(({ comunicacion: c, cifras, esReenvio }) => (
-                    <tr key={c.id} className="border-b border-subtle/60 text-text-body last:border-b-0">
-                      <th scope="row" className="px-3 py-2 text-left font-normal">
-                        <Link
-                          href={comunicacionAnaliticaPath(c.id)}
-                          className="font-medium text-icam-900 underline-offset-2 hover:underline"
-                        >
-                          {c.nombre}
-                        </Link>
-                        {esReenvio ? <span className="ml-1 text-xs text-text-muted">· reenvío</span> : null}
+                    <tr key={c.id} className={TABLA.trPulsable}>
+                      <th scope="row" className={`${TABLA.td} max-w-[460px] text-left font-normal`}>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <Link href={comunicacionAnaliticaPath(c.id)} className="font-medium text-icam-900 underline-offset-2 hover:underline">
+                            {c.nombre}
+                          </Link>
+                          {esReenvio ? <Chip tono="neutro">seguimiento</Chip> : null}
+                        </span>
+                        <span className={TABLA.sub}>{c.plantilla_nombre ?? "—"}</span>
                       </th>
-                      <td className="px-3 py-2">{c.plantilla_nombre ?? "—"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-text-muted">
-                        {fmtFechaHora(c.confirmada_at ?? c.created_at)}
+                      <td className={`${TABLA.td} whitespace-nowrap text-text-muted`}>{fmtFechaHora(c.confirmada_at ?? c.created_at)}</td>
+                      <td className={TABLA.tdNum}>{fmtInt(cifras.enviados)}</td>
+                      <td className={TABLA.tdNum}>
+                        <Tasa parte={cifras.abiertos} total={cifras.enviados} />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(cifras.enviados)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(cifras.abiertos)} <span className="text-text-muted">· {pct(cifras.tasaApertura)}</span>
+                      <td className={TABLA.tdNum}>
+                        <Tasa parte={cifras.conClic} total={cifras.enviados} />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(cifras.conClic)} <span className="text-text-muted">· {pct(cifras.tasaClic)}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(cifras.errores)}</td>
+                      <td className={TABLA.tdNum}>{fmtInt(cifras.errores)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </section>
+          </Tarjeta>
 
-          <section className="space-y-2" aria-labelledby="ag-plantillas">
-            <h2 id="ag-plantillas" className="text-base font-semibold text-text-primary">
-              Por plantilla
-            </h2>
-            <p className="text-sm text-text-muted">
-              Cuando una plantilla se envía más de una vez —otra comunicación, o un reenvío—, cada envío lleva su
-              propio seguimiento y se cuenta por separado. «Personas» son direcciones distintas: quien recibió dos
-              envíos cuenta una vez.
-            </p>
-            <div className="overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-              <table className="w-full min-w-[860px] text-sm">
+          <Tarjeta
+            id="ag-plantillas"
+            titulo={
+              <span className="inline-flex items-center gap-1.5">
+                Por plantilla
+                <Ayuda>
+                  Cuando una plantilla se envía más de una vez —otra comunicación, o un seguimiento—, cada envío lleva
+                  su propio seguimiento y se cuenta por separado. «Personas» son direcciones distintas: quien recibió
+                  dos envíos cuenta una vez.
+                </Ayuda>
+              </span>
+            }
+            subtitulo="Los envíos de una misma plantilla, juntos, y las personas distintas alcanzadas."
+            sinRelleno
+          >
+            <div className={TABLA.marco}>
+              <table className={`${TABLA.tabla} min-w-[860px]`}>
                 <caption className="sr-only">Los envíos de cada plantilla, juntos, y las personas alcanzadas.</caption>
-                <thead>
-                  <tr className="border-b border-subtle text-left text-text-muted">
-                    <th scope="col" className="px-3 py-2 font-medium">Plantilla y sus envíos</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Enviados</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Abrieron</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Clic</th>
+                <thead className={TABLA.thead}>
+                  <tr>
+                    <th scope="col" className={TABLA.th}>Plantilla y sus envíos</th>
+                    <th scope="col" className={TABLA.thNum}>Enviados</th>
+                    <th scope="col" className={TABLA.thNum}>Abrieron</th>
+                    <th scope="col" className={TABLA.thNum}>Clic</th>
                   </tr>
                 </thead>
                 {grupos.map((g) => (
-                  <tbody key={g.plantillaId} className="border-b border-subtle last:border-b-0">
-                    <tr className="bg-black/[0.02] text-text-body">
-                      <th scope="rowgroup" className="px-3 py-2 text-left font-medium text-text-primary">
+                  <tbody key={g.plantillaId}>
+                    <tr className="border-t border-subtle bg-page/70">
+                      <th scope="rowgroup" className={`${TABLA.td} text-left font-semibold text-text-primary`}>
                         {g.plantillaNombre}
-                        <span className="ml-2 font-normal text-text-muted">
+                        <Chip tono="neutro" className="ml-2">
                           {g.envios.length === 1 ? "1 envío" : `${fmtInt(g.envios.length)} envíos`}
-                        </span>
+                        </Chip>
                       </th>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(g.personas)} {g.personas === 1 ? "persona" : "personas"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(g.personasQueAbrieron)}{" "}
-                        <span className="text-text-muted">· {pct(tasa(g.personasQueAbrieron, g.personas))}</span>
+                      <td className={`${TABLA.tdNum} font-semibold`}>
+                        {fmtInt(g.personas)} {g.personas === 1 ? "persona" : "personas"}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(g.personasConClic)}{" "}
-                        <span className="text-text-muted">· {pct(tasa(g.personasConClic, g.personas))}</span>
+                      <td className={`${TABLA.tdNum} font-semibold`}>
+                        <Tasa parte={g.personasQueAbrieron} total={g.personas} />
+                      </td>
+                      <td className={`${TABLA.tdNum} font-semibold`}>
+                        <Tasa parte={g.personasConClic} total={g.personas} />
                       </td>
                     </tr>
                     {g.envios.map(({ comunicacion: c, cifras, esReenvio }) => (
-                      <tr key={c.id} className="border-t border-subtle/60 text-text-body">
-                        <th scope="row" className="py-2 pl-8 pr-3 text-left font-normal">
-                          <Link
-                            href={comunicacionAnaliticaPath(c.id)}
-                            className="text-icam-900 underline-offset-2 hover:underline"
-                          >
+                      <tr key={c.id} className={TABLA.tr}>
+                        <th scope="row" className="py-2.5 pl-8 pr-3 text-left font-normal">
+                          <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
                             {c.nombre}
                           </Link>
-                          <span className="ml-2 text-xs text-text-muted">
+                          <span className={TABLA.sub}>
                             {fmtFechaHora(c.confirmada_at ?? c.created_at)}
-                            {esReenvio ? " · reenvío" : ""}
+                            {esReenvio ? " · seguimiento" : ""}
                           </span>
                         </th>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtInt(cifras.enviados)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {fmtInt(cifras.abiertos)}{" "}
-                          <span className="text-text-muted">· {pct(cifras.tasaApertura)}</span>
+                        <td className={TABLA.tdNum}>{fmtInt(cifras.enviados)}</td>
+                        <td className={TABLA.tdNum}>
+                          <Tasa parte={cifras.abiertos} total={cifras.enviados} />
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {fmtInt(cifras.conClic)} <span className="text-text-muted">· {pct(cifras.tasaClic)}</span>
+                        <td className={TABLA.tdNum}>
+                          <Tasa parte={cifras.conClic} total={cifras.enviados} />
                         </td>
                       </tr>
                     ))}
@@ -230,71 +231,78 @@ export default async function AnaliticaGlobalPage({ periodo }: { periodo: string
                 ))}
               </table>
             </div>
-          </section>
+          </Tarjeta>
 
-          <section className="space-y-2" aria-labelledby="ag-cuentas">
-            <h2 id="ag-cuentas" className="text-base font-semibold text-text-primary">
-              Por cuenta
-            </h2>
-            <p className="text-sm text-text-muted">
-              Cada cuenta a través de todas las comunicaciones del periodo: cuántas recibió, cuántas abrió y en
-              cuántas pulsó algún enlace.
-            </p>
-            <div className="max-h-[640px] overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-              <table className="w-full min-w-[860px] text-sm">
+          <Tarjeta
+            id="ag-cuentas"
+            titulo="Por cuenta"
+            subtitulo="Cada cuenta a través de todas las comunicaciones del periodo: quién sigue los correos y quién no."
+            sinRelleno
+          >
+            <div className={TABLA.marcoFijo}>
+              <table className={`${TABLA.tabla} min-w-[860px]`}>
                 <caption className="sr-only">Cada cuenta de inversión, con lo que ha recibido, abierto y pulsado.</caption>
-                <thead className="sticky top-0 z-10 bg-card">
-                  <tr className="border-b border-subtle text-left text-text-muted">
-                    <th scope="col" className="px-3 py-2 font-medium">Cuenta de inversión</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Direcciones</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Recibidas</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Abiertas</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Con clic</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Última actividad</th>
+                <thead className={TABLA.theadFija}>
+                  <tr>
+                    <th scope="col" className={TABLA.th}>Cuenta de inversión</th>
+                    <th scope="col" className={TABLA.th}>Direcciones</th>
+                    <th scope="col" className={TABLA.thNum}>Recibidas</th>
+                    <th scope="col" className={TABLA.thNum}>Abiertas</th>
+                    <th scope="col" className={TABLA.thNum}>Con clic</th>
+                    <th scope="col" className={TABLA.th}>Última actividad</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cuentas.map((c) => (
-                    <tr key={c.cuentaZohoId} className="border-b border-subtle/60 align-top text-text-body last:border-b-0">
-                      <th scope="row" className="px-3 py-2 text-left font-medium text-text-primary">
+                    <tr key={c.cuentaZohoId} className={TABLA.tr}>
+                      <th scope="row" className={`${TABLA.td} text-left font-medium text-text-primary`}>
                         {c.cuentaNombre}
                       </th>
-                      <td className="px-3 py-2 break-all text-text-muted">{c.direcciones.join(", ")}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(c.recibidas)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(c.abiertas)} <span className="text-text-muted">· {pct(tasa(c.abiertas, c.recibidas))}</span>
+                      <td className={`${TABLA.td} break-all font-mono text-xs text-text-muted`}>{c.direcciones.join(", ")}</td>
+                      <td className={TABLA.tdNum}>{fmtInt(c.recibidas)}</td>
+                      <td className={TABLA.tdNum}>
+                        <Tasa parte={c.abiertas} total={c.recibidas} />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtInt(c.conClic)} <span className="text-text-muted">· {pct(tasa(c.conClic, c.recibidas))}</span>
+                      <td className={TABLA.tdNum}>
+                        <Tasa parte={c.conClic} total={c.recibidas} />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {c.ultimaActividad ? fmtFechaHora(c.ultimaActividad) : "No consta"}
+                      <td className={`${TABLA.td} whitespace-nowrap`}>
+                        {c.ultimaActividad ? fmtFechaHora(c.ultimaActividad) : <span className="text-text-muted">No consta</span>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </section>
+          </Tarjeta>
         </>
       ) : null}
 
       {noMedibles.length > 0 ? (
-        <section className="space-y-2" aria-labelledby="ag-fuera">
-          <h2 id="ag-fuera" className="text-base font-semibold text-text-primary">
-            Fuera de las cifras
-          </h2>
-          <ul className="space-y-1 rounded-lg border border-subtle/50 bg-card p-3 text-sm text-text-body">
-            {noMedibles.map((c) => (
-              <li key={c.id}>
-                <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
-                  {c.nombre}
-                </Link>
-                <span className="text-text-muted"> — {porQueNoEsMedible(c)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Tarjeta
+          id="ag-fuera"
+          titulo="Fuera de las cifras"
+          subtitulo="Enviadas en modo pruebas, por la pasarela simulada o antes de existir el seguimiento: no miden a los destinatarios."
+          sinRelleno
+        >
+          <div className={TABLA.marco}>
+            <table className={TABLA.tabla}>
+              <caption className="sr-only">Comunicaciones que no entran en las cifras, y por qué.</caption>
+              <tbody>
+                {noMedibles.map((c) => (
+                  <tr key={c.id} className={TABLA.tr}>
+                    <th scope="row" className={`${TABLA.td} text-left font-normal`}>
+                      <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
+                        {c.nombre}
+                      </Link>
+                    </th>
+                    <td className={`${TABLA.td} text-text-muted`}>{porQueNoEsMedible(c)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Tarjeta>
       ) : null}
     </div>
   );

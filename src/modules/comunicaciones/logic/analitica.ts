@@ -44,8 +44,10 @@ export type DestinatarioAnalitica = Pick<
 
 export const FILTROS_ANALITICA = [
   "todos",
+  "enviados",
   "no_consta_apertura",
   "abrio",
+  "no_hizo_clic",
   "hizo_clic",
   "abrio_sin_clic",
   "pulso_enlace",
@@ -56,14 +58,26 @@ export type FiltroAnalitica = (typeof FILTROS_ANALITICA)[number];
 
 export const ETIQUETA_FILTRO: Record<FiltroAnalitica, string> = {
   todos: "Todos",
+  enviados: "Todos los que lo recibieron",
   no_consta_apertura: "No consta apertura",
   abrio: "Abrió",
+  no_hizo_clic: "No hizo clic",
   hizo_clic: "Hizo clic",
   abrio_sin_clic: "Abrió y no hizo clic",
   pulso_enlace: "Pulsó un enlace concreto",
   error: "Error al enviar",
   rebotado: "Rebotado",
 };
+
+/**
+ * Los filtros que no necesitan aperturas ni clics: valen también para una
+ * comunicación que salió en modo pruebas o por la pasarela simulada.
+ */
+export const FILTROS_SIN_SEGUIMIENTO: readonly FiltroAnalitica[] = ["todos", "enviados", "error"];
+
+export function necesitaSeguimiento(filtro: FiltroAnalitica): boolean {
+  return !FILTROS_SIN_SEGUIMIENTO.includes(filtro);
+}
 
 export function esFiltro(valor: unknown): valor is FiltroAnalitica {
   return typeof valor === "string" && (FILTROS_ANALITICA as readonly string[]).includes(valor);
@@ -109,6 +123,8 @@ export function cumpleFiltro(
   switch (filtro) {
     case "todos":
       return true;
+    case "enviados":
+      return fueEnviado(d);
     case "error":
       return !d.excluido && d.estado_envio === "error";
     case "rebotado":
@@ -117,6 +133,8 @@ export function cumpleFiltro(
       return fueEnviado(d) && !abrio(d);
     case "abrio":
       return fueEnviado(d) && abrio(d);
+    case "no_hizo_clic":
+      return fueEnviado(d) && !hizoClic(d);
     case "hizo_clic":
       return fueEnviado(d) && hizoClic(d);
     case "abrio_sin_clic":

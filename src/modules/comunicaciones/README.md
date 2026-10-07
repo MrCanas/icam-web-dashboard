@@ -117,7 +117,26 @@ npm run comunicaciones:zoho-envio-verificar            # el token de envíos y s
 | `actions/envio.ts` | Server Actions del envío. Todas repiten permisos y controles en el servidor |
 | `actions/analitica.ts` | Consultar la entrega en Zoho y preparar un reenvío |
 | `src/app/api/s/` | Las dos rutas públicas de seguimiento. Solo anotan y responden |
-| `ui/pages/` | Historial, Nueva, Detalle, Ajustes y las dos de Analítica |
+| `actions/resolver.ts` | Resuelve destinatarios consultando el DNS solo de los dominios que van a recibir algo |
+| `ui/pages/` | Historial, Nueva, Detalle (pestañas Destinatarios · Plantilla · Envío), Ajustes y las dos de Analítica |
+| `ui/components/envio/` | El envío: `EnvioPanel` orquesta (estado, tandas) y `Paso*.tsx` solo pintan |
+| `ui/components/SeguimientoModal.tsx` | El diálogo de seguimiento: filtro, direcciones exactas, plantilla → `prepararReenvioAction` |
+| `ui/components/ui/` | Piezas del módulo: chips de estado, la tira del candado, lista de direcciones, barra de filtros, tarjeta de paso |
+
+## Cómo se ve
+
+Usa las piezas compartidas de `src/components/ui/` (`Boton`, `Chip`, `Aviso`, `Tarjeta`, `Campo`,
+`Icono`, `Stepper`, `Tabs`, `Ayuda`/`Desplegable`, `EncabezadoDePagina`, `EstadoVacio`, `tabla.ts`)
+y `KPICard`, `Modal` y `BloqueGrafica`. Reglas del área:
+
+- **El estado se lee en chips**: navy = acción primaria y paso actual; oro = hito; verde = hecho;
+  ámbar = atención sin bloquear; rojo = bloquea o es delicado (modo real, envíos apagados, error).
+- **Ayuda en tres niveles**: una línea de subtítulo; ⓘ (`Ayuda`) para un término; `Desplegable`
+  para lo largo. Los motivos de `logic/controles.ts` van junto al botón porque son accionables.
+- **Lo sensible no se pliega**: la tira del candado y las direcciones exactas que recibirían algo
+  (`ListaDeDirecciones`) están siempre a la vista, nunca dentro de un desplegable.
+- El shell de cada página es `min-w-0 space-y-3 sm:space-y-4`: el `main` del dashboard ya pone el
+  padding.
 
 ## Convenciones del área
 

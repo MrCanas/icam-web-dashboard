@@ -1,38 +1,42 @@
 import Link from "next/link";
 
+import { Aviso } from "@/components/ui/Aviso";
+import { Ayuda } from "@/components/ui/Ayuda";
+import { BotonEnlace } from "@/components/ui/Boton";
+import { Chip } from "@/components/ui/Chip";
+import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
+import { Icono } from "@/components/ui/Icono";
+import { KPICard } from "@/components/ui/KPICard";
+import { Stepper, type PasoDeStepper } from "@/components/ui/Stepper";
+import { Tabs } from "@/components/ui/Tabs";
 import type { UserContext } from "@/lib/auth/currentUser";
 import { checkWriteAccess, getUserRole } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import { calcularProgreso, simularCandado } from "@/modules/comunicaciones/logic/envio";
 import { loadDatosDeEnvios, loadDetalle } from "@/modules/comunicaciones/logic/loadComunicaciones";
-import { esFiltro, ETIQUETA_FILTRO } from "@/modules/comunicaciones/logic/analitica";
+import { esFiltro, esMedible, ETIQUETA_FILTRO, porQueNoEsMedible } from "@/modules/comunicaciones/logic/analitica";
 import {
   comunicacionAnaliticaPath,
+  comunicacionPath,
   COMUNICACIONES_PATH,
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
 import { CancelarButton } from "@/modules/comunicaciones/ui/components/CancelarButton";
 import { DestinatariosPanel } from "@/modules/comunicaciones/ui/components/DestinatariosPanel";
-import { EnvioPanel } from "@/modules/comunicaciones/ui/components/EnvioPanel";
-import { EstadoDeEnvios } from "@/modules/comunicaciones/ui/components/EstadoDeEnvios";
+import { EnvioPanel } from "@/modules/comunicaciones/ui/components/envio/EnvioPanel";
 import { PlantillaPanel } from "@/modules/comunicaciones/ui/components/PlantillaPanel";
+import { SeguimientoBoton } from "@/modules/comunicaciones/ui/components/SeguimientoModal";
+import { Candado } from "@/modules/comunicaciones/ui/components/ui/Candado";
+import { ChipEstadoComunicacion } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
 import {
   ESTADOS_EDITABLES,
   ETIQUETA_AUDIENCIA,
-  ETIQUETA_ESTADO,
   ETIQUETA_ROL,
   ETIQUETA_TIPO,
+  type EstadoComunicacion,
 } from "@/modules/comunicaciones/types";
 
-function Cifra({ etiqueta, valor, nota }: { etiqueta: string; valor: number; nota?: string }) {
-  return (
-    <div className="rounded-lg border border-subtle/50 bg-card px-3 py-2">
-      <dt className="text-xs text-text-muted">{etiqueta}</dt>
-      <dd className="text-xl font-semibold tabular-nums text-text-primary">{fmtInt(valor)}</dd>
-      {nota ? <dd className="text-xs text-text-muted">{nota}</dd> : null}
-    </div>
-  );
-}
+const ENVIADA: readonly EstadoComunicacion[] = ["enviando", "pausada", "enviada"];
 
 /**
  * Una comunicación: a quién iría, uno por uno, cómo queda la plantilla con los
@@ -42,35 +46,34 @@ function Cifra({ etiqueta, valor, nota }: { etiqueta: string; valor: number; not
  * que se revisa aquí es exactamente lo que después se envía.
  */
 export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: string }) {
-  const [{ comunicacion, destinatarios, resumen, ajustes, error }, envios] = await Promise.all([
+  const [{ comunicacion, destinatarios, resumen, ajustes, eventos, enlaces, error }, envios] = await Promise.all([
     loadDetalle(ctx, id),
     loadDatosDeEnvios(ctx),
   ]);
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6">
-        <p className="rounded-lg border border-[#9B3B3B]/40 bg-card p-4 text-sm text-[#9B3B3B]">
-          No se pudo leer la comunicación: {error}
-        </p>
+      <div className="min-w-0">
+        <Aviso tipo="error">No se pudo leer la comunicación: {error}</Aviso>
       </div>
     );
   }
   if (!comunicacion) {
     return (
-      <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6">
-        <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">
+      <div className="min-w-0">
+        <Aviso tipo="aviso">
           Esta comunicación no existe.{" "}
-          <Link href={COMUNICACIONES_PATH} className="text-icam-900 underline">
+          <Link href={COMUNICACIONES_PATH} className="font-medium underline underline-offset-2">
             Volver al historial
           </Link>
-        </p>
+        </Aviso>
       </div>
     );
   }
 
   const puedeEscribir = checkWriteAccess(ctx, ZONA_COMUNICACIONES) === null;
   const editable = puedeEscribir && ESTADOS_EDITABLES.includes(comunicacion.estado);
+  const enviada = ENVIADA.includes(comunicacion.estado);
   const roles = (lista: readonly (keyof typeof ETIQUETA_ROL)[]) =>
     lista.length > 0 ? lista.map((r) => ETIQUETA_ROL[r]).join(", ") : "nadie";
   const aEnviar = destinatarios.filter((d) => !d.excluido && d.para.length > 0);
@@ -104,113 +107,210 @@ export default async function DetallePage({ ctx, id }: { ctx: UserContext; id: s
         ].sort(),
       }
     : null;
+  const bloqueadaPorCandado = !enviada && candado !== null && candado.rechazados > 0;
+
+  // El stepper: dónde está el envío.
+  const idx: Record<EstadoComunicacion, number> = {
+    borrador: 0,
+    revisada: 1,
+    probada: 2,
+    enviando: 3,
+    pausada: 3,
+    enviada: 4,
+    cancelada: -1,
+  };
+  const actual = idx[comunicacion.estado];
+  const ruta = (vista: string) => `${comunicacionPath(comunicacion.id)}?vista=${vista}`;
+  const pasoDe = (n: number, etiqueta: string, vista: string, nota?: string): PasoDeStepper => ({
+    clave: etiqueta,
+    etiqueta,
+    estado: actual < 0 ? "pendiente" : bloqueadaPorCandado && n >= actual ? "bloqueado" : n < actual ? "hecho" : n === actual ? "actual" : "pendiente",
+    href: ruta(vista),
+    nota,
+  });
+  const pasos: PasoDeStepper[] = [
+    pasoDe(0, "Revisar", "destinatarios", comunicacion.revisada_at ? fmtFechaHora(comunicacion.revisada_at) : undefined),
+    pasoDe(1, "Prueba", "envio", comunicacion.probada_at ? fmtFechaHora(comunicacion.probada_at) : undefined),
+    pasoDe(2, "Ensayo y confirmación", "envio", comunicacion.confirmada_at ? fmtFechaHora(comunicacion.confirmada_at) : undefined),
+    pasoDe(3, "Envío", "envio", comunicacion.enviada_at ? fmtFechaHora(comunicacion.enviada_at) : undefined),
+  ];
+
+  const audiencia =
+    comunicacion.audiencia === "promocion" && comunicacion.promocion_nombre
+      ? comunicacion.promocion_nombre
+      : ETIQUETA_AUDIENCIA[comunicacion.audiencia];
+  const filtroReenvio = comunicacion.reenvio_filtro;
+  const diferencias = filtroReenvio?.diferencias;
+
+  const seguimiento =
+    enviada && puedeEscribir ? (
+      <SeguimientoBoton
+        comunicacionId={comunicacion.id}
+        destinatarios={destinatarios}
+        enlaces={enlaces}
+        eventos={eventos}
+        medible={esMedible(comunicacion)}
+        porQueNoEsMedible={porQueNoEsMedible(comunicacion)}
+        plantilla={comunicacion.plantilla_id ? { id: comunicacion.plantilla_id, nombre: comunicacion.plantilla_nombre } : null}
+        variante={comunicacion.estado === "enviada" ? "primario" : "secundario"}
+      />
+    ) : null;
+
+  const plantillaExtra = comunicacion.plantilla_id ? (
+    <Chip tono="ok">elegida</Chip>
+  ) : (
+    <Chip tono="aviso">sin elegir</Chip>
+  );
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href={COMUNICACIONES_PATH} className="underline-offset-2 hover:underline">
-              Comunicaciones
-            </Link>{" "}
-            / {ETIQUETA_ESTADO[comunicacion.estado]}
-          </p>
-          <h1 className="mt-1 text-xl font-semibold text-text-primary sm:text-2xl">{comunicacion.nombre}</h1>
-          <p className="mt-0.5 text-sm text-text-muted">
-            {ETIQUETA_TIPO[comunicacion.tipo]} ·{" "}
-            {comunicacion.audiencia === "promocion" && comunicacion.promocion_nombre
-              ? comunicacion.promocion_nombre
-              : ETIQUETA_AUDIENCIA[comunicacion.audiencia]}{" "}
-            · Para: {roles(comunicacion.roles_para)} · Copia: {roles(comunicacion.roles_copia)}
-          </p>
-          <p className="text-sm text-text-muted">
-            Preparada el {fmtFechaHora(comunicacion.created_at)} por {comunicacion.creada_por_email} con
-            los datos de Zoho del {fmtFechaHora(comunicacion.datos_zoho_at)}.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {["enviando", "pausada", "enviada"].includes(comunicacion.estado) ? (
-            <Link
-              href={comunicacionAnaliticaPath(comunicacion.id)}
-              className="min-h-9 rounded-md bg-icam-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-            >
-              Ver la analítica
-            </Link>
-          ) : null}
-          {editable ? <CancelarButton comunicacionId={comunicacion.id} /> : null}
-        </div>
-      </header>
+    <div className="min-w-0 space-y-3 sm:space-y-4">
+      <EncabezadoDePagina
+        ruta={[{ etiqueta: "Comunicaciones", href: COMUNICACIONES_PATH }, { etiqueta: comunicacion.nombre }]}
+        titulo={comunicacion.nombre}
+        chips={
+          <>
+            <ChipEstadoComunicacion estado={comunicacion.estado} pasarela={comunicacion.pasarela} />
+            <Chip tono="neutro">{ETIQUETA_TIPO[comunicacion.tipo]}</Chip>
+            <Chip tono="neutro">{audiencia}</Chip>
+          </>
+        }
+        meta={
+          <>
+            Para: {roles(comunicacion.roles_para)} · Copia: {roles(comunicacion.roles_copia)} · Preparada el{" "}
+            {fmtFechaHora(comunicacion.created_at)} por {comunicacion.creada_por_email} con datos de Zoho del{" "}
+            {fmtFechaHora(comunicacion.datos_zoho_at)}
+          </>
+        }
+        acciones={
+          <>
+            {seguimiento}
+            {enviada ? (
+              <BotonEnlace
+                href={comunicacionAnaliticaPath(comunicacion.id)}
+                variante={comunicacion.estado === "enviada" ? "secundario" : "primario"}
+                icono={<Icono nombre="grafica" />}
+              >
+                Ver analítica
+              </BotonEnlace>
+            ) : null}
+            {editable ? <CancelarButton comunicacionId={comunicacion.id} /> : null}
+          </>
+        }
+      />
 
       {comunicacion.audiencia === "reenvio" ? (
-        <div className="space-y-1 rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
-          <p>
-            <strong className="text-text-primary">Es un reenvío.</strong> Sale de{" "}
-            {comunicacion.origen_comunicacion_id ? (
-              <Link
-                href={comunicacionAnaliticaPath(comunicacion.origen_comunicacion_id)}
-                className="text-icam-900 underline underline-offset-2"
-              >
-                otra comunicación
-              </Link>
-            ) : (
-              "otra comunicación"
-            )}
-            , con el filtro «
-            {esFiltro(comunicacion.reenvio_filtro?.filtro)
-              ? ETIQUETA_FILTRO[comunicacion.reenvio_filtro.filtro]
-              : "desconocido"}
-            ». Solo puede incluir cuentas que estuvieran en aquel envío, con las direcciones de hoy.
-          </p>
-          <p className="text-text-muted">
-            Una cuenta con una dirección que no estaba en el envío original nace excluida, con el aviso «Dirección
+        <Aviso tipo="info" titulo="Es un seguimiento">
+          Sale de{" "}
+          {comunicacion.origen_comunicacion_id ? (
+            <Link href={comunicacionAnaliticaPath(comunicacion.origen_comunicacion_id)} className="font-medium underline underline-offset-2">
+              otra comunicación
+            </Link>
+          ) : (
+            "otra comunicación"
+          )}
+          , con el filtro «{esFiltro(filtroReenvio?.filtro) ? ETIQUETA_FILTRO[filtroReenvio.filtro] : "desconocido"}».
+          {diferencias && (diferencias.seCaen.length > 0 || diferencias.nuevas.length > 0) ? (
+            <>
+              {" "}
+              Respecto a aquel envío:{" "}
+              {diferencias.seCaen.length > 0 ? `${fmtInt(diferencias.seCaen.length)} ${diferencias.seCaen.length === 1 ? "cuenta se cae" : "cuentas se caen"}` : ""}
+              {diferencias.seCaen.length > 0 && diferencias.nuevas.length > 0 ? " y " : ""}
+              {diferencias.nuevas.length > 0 ? `${fmtInt(diferencias.nuevas.length)} ${diferencias.nuevas.length === 1 ? "dirección es nueva" : "direcciones son nuevas"}` : ""}
+              .
+            </>
+          ) : null}
+          <Ayuda className="ml-1">
+            Un seguimiento solo puede incluir cuentas que estuvieran en el envío original, con las direcciones de
+            hoy. Una cuenta con una dirección que no estaba en aquel envío nace excluida, con el aviso «Dirección
             nueva»: mírala y vuelve a incluirla solo si es correcta.
-          </p>
-        </div>
+            {diferencias && diferencias.seCaen.length > 0 ? (
+              <>
+                <br />
+                <br />
+                Se caen: {diferencias.seCaen.map((s) => `${s.cuenta} (${s.motivo})`).join("; ")}.
+              </>
+            ) : null}
+            {diferencias && diferencias.nuevas.length > 0 ? (
+              <>
+                <br />
+                Direcciones nuevas: {diferencias.nuevas.map((n) => `${n.cuenta}: ${n.email}`).join("; ")}.
+              </>
+            ) : null}
+          </Ayuda>
+        </Aviso>
       ) : null}
 
-      <EstadoDeEnvios datos={envios} />
+      <Candado datos={envios} />
 
-      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <Cifra etiqueta="Correos que saldrían" valor={resumen.aEnviar} nota="uno por cuenta" />
-        <Cifra
-          etiqueta="Direcciones en Para"
-          valor={resumen.direcciones}
-          nota={`${fmtInt(resumen.direccionesExternas)} externas`}
-        />
-        <Cifra etiqueta="Excluidos" valor={resumen.excluidos} />
-        <Cifra etiqueta="Sin destinatario" valor={resumen.sinDestinatario} nota="no recibirían nada" />
-        <Cifra etiqueta="Cuentas en la lista" valor={resumen.total} />
-      </dl>
+      {comunicacion.estado !== "cancelada" ? <Stepper pasos={pasos} etiqueta="Pasos del envío" /> : null}
 
-      <DestinatariosPanel
-        comunicacionId={comunicacion.id}
-        nombre={comunicacion.nombre}
-        destinatarios={destinatarios}
-        dominiosInternos={ajustes?.dominios_internos ?? []}
-        editable={editable}
-      />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KPICard title="Correos que saldrían" value={fmtInt(resumen.aEnviar)} subtitle="uno por cuenta" highlight />
+        <KPICard title="Direcciones en Para" value={fmtInt(resumen.direcciones)} subtitle={`${fmtInt(resumen.direccionesExternas)} externas`} />
+        <KPICard title="Excluidos" value={fmtInt(resumen.excluidos)} subtitle={`de ${fmtInt(resumen.total)} cuentas en la lista`} />
+        <KPICard title="Sin destinatario" value={fmtInt(resumen.sinDestinatario)} subtitle="no recibirían nada" />
+      </div>
 
-      <PlantillaPanel
-        comunicacionId={comunicacion.id}
-        plantillaId={comunicacion.plantilla_id}
-        plantillaNombre={comunicacion.plantilla_nombre}
-        destinatarios={aEnviar.map((d) => ({ id: d.id, nombre: d.cuenta_nombre }))}
-        editable={editable}
-      />
-
-      {ajustes ? (
-        <EnvioPanel
-          comunicacion={comunicacion}
-          resumen={resumen}
-          ajustes={ajustes}
-          rol={getUserRole(ctx, ZONA_COMUNICACIONES)}
-          usuarioEmail={ctx.email}
-          pasarela={envios.pasarela}
-          progreso={calcularProgreso(destinatarios)}
-          lineas={aEnviar.map((d) => `${d.cuenta_nombre} — ${d.para.map((p) => p.email).join(", ")}`)}
-          candado={candado}
-        />
-      ) : null}
+      <Tabs
+        pestanas={[
+          { clave: "destinatarios", etiqueta: "Destinatarios", extra: fmtInt(resumen.total) },
+          { clave: "plantilla", etiqueta: "Plantilla", extra: plantillaExtra },
+          { clave: "envio", etiqueta: "Envío", extra: comunicacion.estado === "cancelada" ? undefined : `paso ${Math.min(actual + 1, 4)} de 4` },
+        ]}
+        porDefecto={comunicacion.estado === "borrador" || comunicacion.estado === "cancelada" ? "destinatarios" : "envio"}
+      >
+        {{
+          destinatarios: (
+            <DestinatariosPanel
+              comunicacionId={comunicacion.id}
+              nombre={comunicacion.nombre}
+              destinatarios={destinatarios}
+              dominiosInternos={ajustes?.dominios_internos ?? []}
+              editable={editable}
+            />
+          ),
+          plantilla: (
+            <PlantillaPanel
+              comunicacionId={comunicacion.id}
+              plantillaId={comunicacion.plantilla_id}
+              plantillaNombre={comunicacion.plantilla_nombre}
+              destinatarios={aEnviar.map((d) => ({ id: d.id, nombre: d.cuenta_nombre }))}
+              editable={editable}
+            />
+          ),
+          envio: ajustes ? (
+            <EnvioPanel
+              comunicacion={comunicacion}
+              resumen={resumen}
+              ajustes={ajustes}
+              rol={getUserRole(ctx, ZONA_COMUNICACIONES)}
+              usuarioEmail={ctx.email}
+              pasarela={envios.pasarela}
+              progreso={calcularProgreso(destinatarios)}
+              lineas={aEnviar.map((d) => `${d.cuenta_nombre} — ${d.para.map((p) => p.email).join(", ")}`)}
+              candado={candado}
+              seguimiento={
+                enviada && puedeEscribir ? (
+                  <SeguimientoBoton
+                    comunicacionId={comunicacion.id}
+                    destinatarios={destinatarios}
+                    enlaces={enlaces}
+                    eventos={eventos}
+                    medible={esMedible(comunicacion)}
+                    porQueNoEsMedible={porQueNoEsMedible(comunicacion)}
+                    plantilla={comunicacion.plantilla_id ? { id: comunicacion.plantilla_id, nombre: comunicacion.plantilla_nombre } : null}
+                    etiqueta="Preparar seguimiento"
+                    variante="primario"
+                    pequeno
+                  />
+                ) : null
+              }
+            />
+          ) : (
+            <Aviso tipo="aviso">No se pudieron leer los ajustes de envío.</Aviso>
+          ),
+        }}
+      </Tabs>
     </div>
   );
 }

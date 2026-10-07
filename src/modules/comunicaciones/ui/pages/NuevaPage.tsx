@@ -1,7 +1,8 @@
-import Link from "next/link";
-
+import { Aviso } from "@/components/ui/Aviso";
+import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
+import { mismoDia } from "@/modules/comunicaciones/logic/controles";
 import { loadNueva } from "@/modules/comunicaciones/logic/loadComunicaciones";
 import { COMUNICACIONES_PATH, ZONA_COMUNICACIONES } from "@/modules/comunicaciones/logic/paths";
 import { NuevaForm } from "@/modules/comunicaciones/ui/components/NuevaForm";
@@ -21,42 +22,25 @@ export default async function NuevaPage() {
   const { recuento, datosZohoAt, sinMigracion, error } = await loadNueva(user);
 
   return (
-    <div className="mx-auto w-full max-w-[900px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-      <header>
-        <p className="text-sm text-text-muted">
-          <Link href={COMUNICACIONES_PATH} className="underline-offset-2 hover:underline">
-            Comunicaciones
-          </Link>{" "}
-          / Nueva
-        </p>
-        <h1 className="mt-1 text-xl font-semibold text-text-primary sm:text-2xl">Nueva comunicación</h1>
-      </header>
-
-      <p className="rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
-        <strong>Preparar no envía nada.</strong> Calcula y guarda a quién iría. Después vienen la revisión
-        de la lista, la prueba y la confirmación, en la página de la comunicación.
-      </p>
+    <div className="min-w-0 space-y-3 sm:space-y-4">
+      <EncabezadoDePagina
+        ruta={[{ etiqueta: "Comunicaciones", href: COMUNICACIONES_PATH }, { etiqueta: "Nueva" }]}
+        titulo="Nueva comunicación"
+        meta="Preparar no envía nada: calcula a quién iría y después se revisa la lista, se prueba y se confirma."
+      />
 
       {sinMigracion ? (
-        <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">
-          Las tablas de Inversores no existen todavía en la base de datos (migración{" "}
-          <code>040_inversores</code>).
-        </p>
+        <Aviso tipo="aviso">
+          Las tablas de Inversores no existen todavía en la base de datos (migración <code>040_inversores</code>).
+        </Aviso>
       ) : null}
-
-      {error ? (
-        <p className="rounded-lg border border-[#9B3B3B]/40 bg-card p-4 text-sm text-[#9B3B3B]">
-          No se pudieron leer los datos: {error}
-        </p>
-      ) : null}
+      {error ? <Aviso tipo="error">No se pudieron leer los datos: {error}</Aviso> : null}
 
       {sinEscritura ? (
-        <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">
-          Tu rol en Comunicaciones es de lectura: puedes ver el historial, pero no preparar
-          comunicaciones.
-        </p>
+        <Aviso tipo="info">Tu rol en Comunicaciones es de lectura: puedes ver el historial, pero no preparar comunicaciones.</Aviso>
       ) : !sinMigracion && !error ? (
-        <NuevaForm recuento={recuento} datosZohoAt={datosZohoAt} />
+        // «Hoy» lo decide el servidor, con la fecha de Madrid: el mismo corte que aplica al preparar.
+        <NuevaForm recuento={recuento} datosZohoAt={datosZohoAt} datosDeHoy={mismoDia(datosZohoAt, new Date())} />
       ) : null}
     </div>
   );

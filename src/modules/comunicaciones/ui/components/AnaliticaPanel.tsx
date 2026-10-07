@@ -4,25 +4,33 @@ import { useRouter } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { BloqueGrafica, SinDatos } from "@/components/charts/BloqueGrafica";
+import { EJE, GRID, SERIE } from "@/components/charts/tokens";
+import { Aviso } from "@/components/ui/Aviso";
+import { Boton } from "@/components/ui/Boton";
+import { Chip, type TonoChip } from "@/components/ui/Chip";
+import { claseCampo } from "@/components/ui/Campo";
+import { Icono } from "@/components/ui/Icono";
+import { Tarjeta } from "@/components/ui/Tarjeta";
+import { TABLA } from "@/components/ui/tabla";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
-import { consultarEntregaAction, prepararReenvioAction } from "@/modules/comunicaciones/actions/analitica";
+import { consultarEntregaAction } from "@/modules/comunicaciones/actions/analitica";
 import {
   abrio,
   cumpleFiltro,
   enlacesPulsados,
   ETIQUETA_FILTRO,
-  FILTROS_ANALITICA,
   hizoClic,
+  necesitaSeguimiento,
   type ClicsDeEnlace,
   type FiltroAnalitica,
   type PuntoDeSerie,
 } from "@/modules/comunicaciones/logic/analitica";
 import { esFiltroDeReenvio } from "@/modules/comunicaciones/logic/reenvio";
-import {
-  ETIQUETA_ESTADO_ENVIO,
-  type ComDestinatarioRow,
-  type ComEventoRow,
-} from "@/modules/comunicaciones/types";
+import type { ComDestinatarioRow, ComEnlaceRow, ComEventoRow } from "@/modules/comunicaciones/types";
+import { SeguimientoBoton } from "@/modules/comunicaciones/ui/components/SeguimientoModal";
+import { BarraDeFiltros } from "@/modules/comunicaciones/ui/components/ui/BarraDeFiltros";
+import { ChipEstadoEnvio } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
 
 interface Props {
   comunicacionId: string;
@@ -30,28 +38,38 @@ interface Props {
   destinatarios: ComDestinatarioRow[];
   eventos: ComEventoRow[];
   enlaces: ClicsDeEnlace[];
+  enlacesDePlantilla: ComEnlaceRow[];
   serie: PuntoDeSerie[];
   /** Si las aperturas de esta comunicación sirven para medir algo. */
   medible: boolean;
+  porQueNoEsMedible: string | null;
+  plantilla: { id: string; nombre: string | null } | null;
   puedeEscribir: boolean;
   salioPorZoho: boolean;
 }
 
-const BOTON =
-  "min-h-9 rounded-md border border-subtle px-3 py-1.5 text-sm text-text-body hover:border-icam-900 disabled:opacity-60";
-const BOTON_PRINCIPAL =
-  "min-h-9 rounded-md bg-icam-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60";
+/** Los filtros de la tabla, en el orden en que se leen. */
+const FILTROS_TABLA: FiltroAnalitica[] = [
+  "todos",
+  "no_consta_apertura",
+  "abrio",
+  "hizo_clic",
+  "abrio_sin_clic",
+  "pulso_enlace",
+  "error",
+  "rebotado",
+];
 
 function celda(valor: string): string {
   return /[";\n]/.test(valor) ? `"${valor.replace(/"/g, '""')}"` : valor;
 }
 
-function situacion(d: ComDestinatarioRow): string {
-  if (d.excluido) return "Excluido";
-  if (d.estado_envio !== "enviado") return ETIQUETA_ESTADO_ENVIO[d.estado_envio];
-  if (hizoClic(d)) return "Hizo clic";
-  if (abrio(d)) return "Abrió";
-  return "No consta apertura";
+function situacion(d: ComDestinatarioRow): { texto: string; tono: TonoChip } {
+  if (d.excluido) return { texto: "Excluido", tono: "neutro" };
+  if (d.estado_envio !== "enviado") return { texto: "", tono: "neutro" };
+  if (hizoClic(d)) return { texto: "Hizo clic", tono: "ok" };
+  if (abrio(d)) return { texto: "Abrió", tono: "marca" };
+  return { texto: "No consta apertura", tono: "neutro" };
 }
 
 function entrega(d: ComDestinatarioRow): string {
@@ -65,12 +83,27 @@ function aQuien(d: ComDestinatarioRow): string {
   return (d.enviado_para?.para ?? d.para.map((p) => p.email)).join(", ");
 }
 
+function TooltipSerie({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: number }) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-md border border-subtle bg-card px-3 py-2 text-xs shadow-lg">
+      <p className="mb-1 font-semibold text-text-primary">Hora {label} tras el envío</p>
+      {payload.map((p) => (
+        <p key={p.name} className="flex items-center gap-1.5 text-text-body">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: p.color }} />
+          {p.name}: <strong className="tabular-nums">{fmtInt(p.value)}</strong>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /**
  * La analítica de un correo: la evolución, los enlaces y, destinatario a
  * destinatario, quién abrió y quién pulsó qué. Sobre el filtro que esté puesto
- * se puede preparar un reenvío.
+ * se puede preparar un seguimiento.
  *
- * Aquí no se envía nada. «Preparar reenvío» crea un borrador nuevo.
+ * Aquí no se envía nada. «Preparar seguimiento» crea un borrador nuevo.
  */
 export function AnaliticaPanel({
   comunicacionId,
@@ -78,8 +111,11 @@ export function AnaliticaPanel({
   destinatarios,
   eventos,
   enlaces,
+  enlacesDePlantilla,
   serie,
   medible,
+  porQueNoEsMedible,
+  plantilla,
   puedeEscribir,
   salioPorZoho,
 }: Props) {
@@ -104,8 +140,7 @@ export function AnaliticaPanel({
     return mapa;
   }, [eventos]);
 
-  const cumplen = (f: FiltroAnalitica) =>
-    destinatarios.filter((d) => cumpleFiltro(d, f, enlace, pulsados));
+  const cumplen = (f: FiltroAnalitica) => destinatarios.filter((d) => cumpleFiltro(d, f, enlace, pulsados));
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return destinatarios.filter((d) => {
@@ -125,7 +160,7 @@ export function AnaliticaPanel({
     const filas = filtrados.map((d) => [
       d.cuenta_nombre,
       aQuien(d),
-      situacion(d),
+      situacion(d).texto || d.estado_envio,
       String(d.aperturas ?? 0),
       d.primera_apertura_at ? fmtFechaHora(d.primera_apertura_at) : "",
       d.ultima_apertura_at ? fmtFechaHora(d.ultima_apertura_at) : "",
@@ -150,9 +185,7 @@ export function AnaliticaPanel({
     setAviso(null);
     const r = await consultarEntregaAction(comunicacionId);
     if (r.ok) {
-      setAviso(
-        `Consultados ${fmtInt(r.consultados)} correos en Zoho: ${fmtInt(r.rebotados)} rebotados y ${fmtInt(r.sinDato)} sin dato.`,
-      );
+      setAviso(`Consultados ${fmtInt(r.consultados)} correos en Zoho: ${fmtInt(r.rebotados)} rebotados y ${fmtInt(r.sinDato)} sin dato.`);
       router.refresh();
     } else {
       setError(r.mensaje);
@@ -160,135 +193,132 @@ export function AnaliticaPanel({
     setOcupado(false);
   };
 
-  const prepararReenvio = async () => {
-    setOcupado(true);
-    setError(null);
-    setAviso(null);
-    const r = await prepararReenvioAction(comunicacionId, filtro, filtro === "pulso_enlace" ? enlace : null);
-    setOcupado(false);
-    if (!r.ok) {
-      setError(r.mensaje);
-      return;
-    }
-    router.push(r.path);
-  };
-
   const hayActividad = serie.some((p) => p.aperturas > 0 || p.clics > 0);
   // Hasta la última hora con algo, para no pintar tres días de barras vacías.
   const ultimaHora = serie.reduce((max, p) => (p.aperturas > 0 || p.clics > 0 ? p.hora : max), 0);
   const serieVisible = serie.slice(0, Math.max(12, ultimaHora + 2));
-  const puedeReenviar = puedeEscribir && medible && esFiltroDeReenvio(filtro) && filtrados.length > 0;
+  const filtroParaSeguimiento = esFiltroDeReenvio(filtro) && (medible || !necesitaSeguimiento(filtro)) ? filtro : undefined;
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <section className="min-w-0 rounded-lg border border-subtle/50 bg-card p-3 sm:p-4" aria-labelledby="ana-evolucion">
-        <h2 id="ana-evolucion" className="text-base font-semibold text-text-primary">
-          Aperturas y clics desde el envío
-        </h2>
-        <p className="mb-2 text-xs text-text-muted">
-          Por horas, las primeras 72. No cuenta lo que abren los filtros de correo ni la prueba.
-        </p>
-        {hayActividad ? (
-          <div className="h-[240px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={serieVisible} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#EAEBEE" />
-                <XAxis dataKey="hora" stroke="#8A8A8A" tick={{ fontSize: 10 }} tickFormatter={(h) => `${h} h`} />
-                <YAxis stroke="#8A8A8A" tick={{ fontSize: 10 }} width={36} allowDecimals={false} />
-                <Tooltip labelFormatter={(h) => `Hora ${h} tras el envío`} />
-                <Legend wrapperStyle={{ fontSize: "12px" }} />
-                <Bar dataKey="aperturas" name="Aperturas" fill="#1E2A56" />
-                <Bar dataKey="clics" name="Clics" fill="#B89660" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p className="rounded-md border border-dashed border-subtle p-4 text-center text-sm text-text-muted">
-            Todavía no consta ninguna apertura ni ningún clic.
-          </p>
-        )}
-      </section>
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[3fr_2fr]">
+        <BloqueGrafica
+          titulo="Aperturas y clics desde el envío"
+          subtitulo="Por horas, las primeras 72. No cuenta lo que abren los filtros de correo ni la prueba."
+        >
+          {hayActividad ? (
+            <div className="h-[240px] w-full min-w-0 sm:h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={serieVisible} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                  <XAxis dataKey="hora" stroke={EJE} tick={{ fontSize: 10 }} tickFormatter={(h) => `${h} h`} />
+                  <YAxis stroke={EJE} tick={{ fontSize: 10 }} width={36} allowDecimals={false} />
+                  <Tooltip content={<TooltipSerie />} cursor={{ fill: GRID, opacity: 0.5 }} />
+                  <Legend wrapperStyle={{ fontSize: "12px" }} />
+                  <Bar dataKey="aperturas" name="Aperturas" fill={SERIE.uno} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="clics" name="Clics" fill={SERIE.dos} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <SinDatos mensaje="Todavía no consta ninguna apertura ni ningún clic." alto={240} />
+          )}
+        </BloqueGrafica>
 
-      <section className="space-y-2" aria-labelledby="ana-enlaces">
-        <h2 id="ana-enlaces" className="text-base font-semibold text-text-primary">
-          Enlaces
-        </h2>
-        {enlaces.length === 0 ? (
-          <p className="rounded-lg border border-subtle/50 bg-card p-3 text-sm text-text-muted">
-            Este correo no lleva ningún enlace.
-          </p>
-        ) : (
-          <div className="overflow-auto rounded-lg border border-subtle/50 bg-card">
-            <table className="w-full min-w-[640px] text-sm">
-              <caption className="sr-only">Enlaces del correo y cuántas veces se ha pulsado cada uno.</caption>
-              <thead>
-                <tr className="border-b border-subtle text-left text-text-muted">
-                  <th scope="col" className="px-3 py-2 font-medium">Enlace</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Personas</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Clics</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enlaces.map((en) => (
-                  <tr key={en.posicion} className="border-b border-subtle/60 text-text-body last:border-b-0">
-                    <th scope="row" className="px-3 py-2 text-left font-normal">
-                      <span className="block font-medium text-text-primary">{en.texto || "(sin texto)"}</span>
-                      <span className="block break-all text-xs text-text-muted">{en.url}</span>
-                    </th>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtInt(en.personas)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtInt(en.clics)}</td>
+        <Tarjeta titulo="Enlaces" subtitulo="Cuántas personas han pulsado cada uno, y cuántas veces." sinRelleno>
+          {enlaces.length === 0 ? (
+            <p className="px-4 pb-4 text-sm text-text-muted sm:px-5">Este correo no lleva ningún enlace.</p>
+          ) : (
+            <div className={TABLA.marco}>
+              <table className={TABLA.tabla}>
+                <caption className="sr-only">Enlaces del correo y cuántas veces se ha pulsado cada uno.</caption>
+                <thead className={TABLA.thead}>
+                  <tr>
+                    <th scope="col" className={TABLA.th}>Enlace</th>
+                    <th scope="col" className={TABLA.thNum}>Personas</th>
+                    <th scope="col" className={TABLA.thNum}>Clics</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {enlaces.map((en) => (
+                    <tr key={en.posicion} className={TABLA.tr}>
+                      <th scope="row" className={`${TABLA.td} max-w-[320px] text-left font-normal`}>
+                        <span className="block truncate font-medium text-text-primary">{en.texto || "(sin texto)"}</span>
+                        <span className="block truncate text-xs text-text-muted" title={en.url}>
+                          {en.url}
+                        </span>
+                      </th>
+                      <td className={TABLA.tdNum}>{fmtInt(en.personas)}</td>
+                      <td className={TABLA.tdNum}>{fmtInt(en.clics)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Tarjeta>
+      </div>
 
-      <section className="space-y-2" aria-labelledby="ana-destinatarios">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 id="ana-destinatarios" className="text-base font-semibold text-text-primary">
-            Destinatarios
-          </h2>
-          <div className="flex flex-wrap gap-2">
+      <Tarjeta
+        id="ana-destinatarios"
+        titulo="Destinatarios"
+        subtitulo="Quién abrió y quién pulsó qué. Con un filtro puesto se puede preparar un seguimiento a esas cuentas."
+        acciones={
+          <>
             {salioPorZoho && puedeEscribir ? (
-              <button type="button" disabled={ocupado} onClick={consultarEntrega} className={BOTON}>
+              <Boton variante="secundario" pequeno cargando={ocupado} onClick={consultarEntrega} icono={<Icono nombre="actualizar" />}>
                 Consultar entrega en Zoho
-              </button>
+              </Boton>
             ) : null}
-            <button type="button" onClick={descargar} className={BOTON}>
+            <Boton variante="secundario" pequeno icono={<Icono nombre="descargar" />} onClick={descargar}>
               Descargar CSV
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {FILTROS_ANALITICA.map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={filtro === f}
-              onClick={() => setFiltro(f)}
-              className={`min-h-9 rounded-md border px-3 py-1.5 text-sm ${
-                filtro === f
-                  ? "border-icam-900 bg-icam-900 text-white"
-                  : "border-subtle text-text-body hover:border-icam-900"
-              }`}
-            >
-              {ETIQUETA_FILTRO[f]}
-              {f === "pulso_enlace" ? "" : ` (${fmtInt(cumplen(f).length)})`}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+            </Boton>
+          </>
+        }
+        sinRelleno
+      >
+        <div className="space-y-3 px-4 pb-3 sm:px-5">
+          <BarraDeFiltros
+            opciones={FILTROS_TABLA.map((f) => ({
+              clave: f,
+              etiqueta: ETIQUETA_FILTRO[f],
+              n: f === "pulso_enlace" ? undefined : cumplen(f).length,
+            }))}
+            valor={filtro}
+            onChange={setFiltro}
+            busqueda={busqueda}
+            onBusqueda={setBusqueda}
+            placeholder="Buscar cuenta o correo"
+            extra={
+              puedeEscribir ? (
+                <SeguimientoBoton
+                  comunicacionId={comunicacionId}
+                  destinatarios={destinatarios}
+                  enlaces={enlacesDePlantilla}
+                  eventos={eventos}
+                  medible={medible}
+                  porQueNoEsMedible={porQueNoEsMedible}
+                  plantilla={plantilla}
+                  filtroInicial={filtroParaSeguimiento}
+                  enlaceInicial={enlace}
+                  etiqueta={
+                    filtroParaSeguimiento && filtro !== "todos"
+                      ? `Seguimiento a ${filtrados.length === 1 ? "esta cuenta" : `estas ${fmtInt(filtrados.length)}`}`
+                      : "Seguimiento"
+                  }
+                  variante="primario"
+                  pequeno
+                />
+              ) : null
+            }
+          />
           {filtro === "pulso_enlace" ? (
-            <label className="text-sm text-text-body">
+            <label className="block max-w-md text-sm">
               <span className="sr-only">Enlace</span>
               <select
                 value={enlace ?? ""}
                 onChange={(e) => setEnlace(e.target.value === "" ? null : Number(e.target.value))}
-                className="min-h-9 max-w-[420px] rounded-md border border-subtle bg-card px-3 py-1.5 text-sm text-text-body"
+                className={claseCampo}
               >
                 {enlaces.length === 0 ? <option value="">(no hay enlaces)</option> : null}
                 {enlaces.map((en) => (
@@ -299,62 +329,25 @@ export function AnaliticaPanel({
               </select>
             </label>
           ) : null}
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar cuenta o correo"
-            aria-label="Buscar en los destinatarios"
-            className="min-h-9 min-w-[220px] flex-1 rounded-md border border-subtle bg-card px-3 py-1.5 text-sm text-text-body"
-          />
+          {aviso ? <Aviso tipo="ok">{aviso}</Aviso> : null}
+          {error ? <Aviso tipo="error">{error}</Aviso> : null}
         </div>
 
-        {esFiltroDeReenvio(filtro) ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-subtle bg-card p-3 text-sm text-text-body">
-            <span className="min-w-0 flex-1">
-              <strong>Reenviar a este filtro.</strong> Se prepara una comunicación nueva, en borrador, con{" "}
-              {filtrados.length === 1 ? "la cuenta" : `las ${fmtInt(filtrados.length)} cuentas`} que{" "}
-              {filtrados.length === 1 ? "cumple" : "cumplen"} «{ETIQUETA_FILTRO[filtro]}». No se envía nada: pasa por la
-              revisión, la prueba, el ensayo y la confirmación, como cualquier otra.
-              {filtro === "no_consta_apertura"
-                ? " Recuerda que «no consta apertura» no significa que no lo hayan leído."
-                : ""}
-              {!medible ? " Solo se puede sobre una comunicación enviada de verdad y en modo real." : ""}
-            </span>
-            {puedeEscribir ? (
-              <button type="button" disabled={ocupado || !puedeReenviar} onClick={prepararReenvio} className={BOTON_PRINCIPAL}>
-                {ocupado ? "Preparando…" : `Preparar reenvío a ${filtrados.length === 1 ? "esta cuenta" : `estas ${fmtInt(filtrados.length)}`}`}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {aviso ? (
-          <p role="status" className="text-sm text-text-body">
-            {aviso}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-sm text-[#9B3B3B]">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="max-h-[640px] overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-          <table className="w-full min-w-[980px] text-sm">
+        <div className={`${TABLA.marcoFijo} border-t border-subtle/60`}>
+          <table className={`${TABLA.tabla} min-w-[980px]`}>
             <caption className="sr-only">
               Destinatarios del correo, con sus aperturas y sus clics. Cada fila se puede abrir para ver el detalle.
             </caption>
-            <thead className="sticky top-0 z-10 bg-card">
-              <tr className="border-b border-subtle text-left text-text-muted">
-                <th scope="col" className="px-3 py-2 font-medium">Cuenta de inversión</th>
-                <th scope="col" className="px-3 py-2 font-medium">Enviado a</th>
-                <th scope="col" className="px-3 py-2 font-medium">Situación</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Aperturas</th>
-                <th scope="col" className="px-3 py-2 font-medium">Última apertura</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Clics</th>
-                <th scope="col" className="px-3 py-2 font-medium">Entrega</th>
-                <th scope="col" className="px-3 py-2 font-medium">
+            <thead className={TABLA.theadFija}>
+              <tr>
+                <th scope="col" className={TABLA.th}>Cuenta de inversión</th>
+                <th scope="col" className={TABLA.th}>Enviado a</th>
+                <th scope="col" className={TABLA.th}>Situación</th>
+                <th scope="col" className={TABLA.thNum}>Aperturas</th>
+                <th scope="col" className={TABLA.th}>Última apertura</th>
+                <th scope="col" className={TABLA.thNum}>Clics</th>
+                <th scope="col" className={TABLA.th}>Entrega</th>
+                <th scope="col" className={TABLA.th}>
                   <span className="sr-only">Detalle</span>
                 </th>
               </tr>
@@ -362,50 +355,55 @@ export function AnaliticaPanel({
             <tbody>
               {filtrados.map((d) => {
                 const suyos = (eventosPorDestinatario.get(d.id) ?? []).filter((e) => !e.es_prueba);
+                const sit = situacion(d);
                 return (
                   <Fragment key={d.id}>
-                    <tr className="border-b border-subtle/60 align-top text-text-body">
-                      <th scope="row" className="px-3 py-2 text-left font-medium text-text-primary">
+                    <tr className={d.excluido || d.estado_envio !== "enviado" ? TABLA.trApagada : TABLA.tr}>
+                      <th scope="row" className={`${TABLA.td} text-left font-medium text-text-primary`}>
                         {d.cuenta_nombre}
                       </th>
-                      <td className="px-3 py-2 break-all">{d.estado_envio === "enviado" ? aQuien(d) : "—"}</td>
-                      <td className="px-3 py-2">
-                        {situacion(d)}
-                        {d.estado_envio === "error" && d.error ? (
-                          <span className="block text-xs text-[#9B3B3B]">{d.error}</span>
-                        ) : null}
+                      <td className={`${TABLA.td} break-all font-mono text-xs`}>{d.estado_envio === "enviado" ? aQuien(d) : "—"}</td>
+                      <td className={TABLA.td}>
+                        {sit.texto ? <Chip tono={sit.tono}>{sit.texto}</Chip> : <ChipEstadoEnvio estado={d.estado_envio} />}
+                        {d.estado_envio === "error" && d.error ? <span className="block text-xs text-red-700">{d.error}</span> : null}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(d.aperturas ?? 0)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {d.ultima_apertura_at ? fmtFechaHora(d.ultima_apertura_at) : "—"}
+                      <td className={TABLA.tdNum}>{fmtInt(d.aperturas ?? 0)}</td>
+                      <td className={`${TABLA.td} whitespace-nowrap`}>{d.ultima_apertura_at ? fmtFechaHora(d.ultima_apertura_at) : "—"}</td>
+                      <td className={TABLA.tdNum}>{fmtInt(d.clics ?? 0)}</td>
+                      <td className={TABLA.td}>
+                        {d.estado_envio !== "enviado" ? (
+                          "—"
+                        ) : d.entrega_estado === "rebotado" ? (
+                          <Chip tono="error" title={d.rebote_motivo ?? undefined}>
+                            Rebotado
+                          </Chip>
+                        ) : d.entrega_estado === "entregado" ? (
+                          <Chip tono="ok">Entregado</Chip>
+                        ) : (
+                          <span className="text-text-muted">{entrega(d)}</span>
+                        )}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtInt(d.clics ?? 0)}</td>
-                      <td className={`px-3 py-2 ${d.entrega_estado === "rebotado" ? "text-[#9B3B3B]" : ""}`}>
-                        {d.estado_envio === "enviado" ? entrega(d) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className={`${TABLA.td} text-right`}>
                         {suyos.length > 0 ? (
-                          <button
-                            type="button"
-                            aria-expanded={abierta === d.id}
-                            onClick={() => setAbierta(abierta === d.id ? null : d.id)}
-                            className="min-h-8 rounded-md border border-subtle px-2 py-1 text-xs text-text-body hover:border-icam-900"
-                          >
+                          <Boton variante="texto" pequeno aria-expanded={abierta === d.id} onClick={() => setAbierta(abierta === d.id ? null : d.id)}>
                             {abierta === d.id ? "Ocultar" : `Ver ${fmtInt(suyos.length)}`}
-                          </button>
+                          </Boton>
                         ) : null}
                       </td>
                     </tr>
                     {abierta === d.id ? (
-                      <tr className="border-b border-subtle/60 bg-black/[0.02]">
-                        <td colSpan={8} className="px-3 py-2">
+                      <tr className="border-t border-subtle/60 bg-page/60">
+                        <td colSpan={8} className="px-4 py-2">
                           <ul className="space-y-0.5 text-xs text-text-body">
                             {suyos.map((e) => (
-                              <li key={e.id}>
-                                <span className="tabular-nums">{fmtFechaHora(e.ocurrido_at)}</span> ·{" "}
-                                {e.tipo === "apertura" ? "Abrió el correo" : `Pulsó «${etiquetaEnlace(e.enlace)}»`}
+                              <li key={e.id} className="flex flex-wrap items-center gap-1.5">
+                                <span className="tabular-nums text-text-muted">{fmtFechaHora(e.ocurrido_at)}</span>
+                                <span>·</span>
+                                <span>{e.tipo === "apertura" ? "Abrió el correo" : `Pulsó «${etiquetaEnlace(e.enlace)}»`}</span>
                                 {e.automatico ? (
-                                  <span className="text-text-muted"> · automático (un filtro de correo): no cuenta</span>
+                                  <Chip tono="neutro" title="Lo hizo un filtro de correo al recibirlo: no cuenta">
+                                    automático
+                                  </Chip>
                                 ) : null}
                               </li>
                             ))}
@@ -418,7 +416,7 @@ export function AnaliticaPanel({
               })}
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-text-muted">
+                  <td colSpan={8} className={TABLA.vacio}>
                     Ningún destinatario con ese filtro.
                   </td>
                 </tr>
@@ -426,7 +424,7 @@ export function AnaliticaPanel({
             </tbody>
           </table>
         </div>
-      </section>
+      </Tarjeta>
     </div>
   );
 }

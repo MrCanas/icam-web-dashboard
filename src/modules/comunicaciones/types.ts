@@ -31,7 +31,7 @@ export const ETIQUETA_AUDIENCIA: Record<Audiencia, string> = {
   promocion: "Promoción o fondo",
   toda_la_base: "Toda la base",
   inversores_directos: "Inversores directos",
-  reenvio: "Reenvío",
+  reenvio: "Seguimiento",
 };
 
 /** Las cinco casillas de papel del CRM (`inv_cuenta_contacto.es_*`). */
@@ -177,6 +177,11 @@ export interface FiltroDeReenvio {
   filtro: string;
   /** Posición del enlace, cuando el filtro es «pulsó un enlace concreto». */
   enlace: number | null;
+  /** Qué cambió respecto al original al preparar: quién se cae y qué direcciones son nuevas. */
+  diferencias?: {
+    seCaen: { cuenta: string; motivo: string }[];
+    nuevas: { cuenta: string; email: string }[];
+  };
 }
 
 export interface ComComunicacionRow {

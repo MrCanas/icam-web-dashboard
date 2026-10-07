@@ -1,5 +1,13 @@
 import Link from "next/link";
 
+import { Aviso } from "@/components/ui/Aviso";
+import { BotonEnlace } from "@/components/ui/Boton";
+import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
+import { EstadoVacio } from "@/components/ui/EstadoVacio";
+import { Icono } from "@/components/ui/Icono";
+import { KPICard } from "@/components/ui/KPICard";
+import { Tarjeta } from "@/components/ui/Tarjeta";
+import { TABLA } from "@/components/ui/tabla";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 import { checkWriteAccess } from "@/lib/auth/permissions";
 import { fmtFechaHora, fmtInt } from "@/lib/formatters";
@@ -12,8 +20,16 @@ import {
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
 import { pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
-import { EstadoDeEnvios } from "@/modules/comunicaciones/ui/components/EstadoDeEnvios";
-import { ETIQUETA_AUDIENCIA, ETIQUETA_ESTADO } from "@/modules/comunicaciones/types";
+import { Candado } from "@/modules/comunicaciones/ui/components/ui/Candado";
+import { ChipEstadoComunicacion } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
+import { ETIQUETA_AUDIENCIA } from "@/modules/comunicaciones/types";
+
+const TREINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Desde cuándo cuentan los «últimos 30 días». Es una página que se pide, no una que se cachea. */
+function hace30Dias(): number {
+  return Date.now() - TREINTA_DIAS_MS;
+}
 
 /**
  * Historial: las comunicaciones preparadas y en qué punto está cada una.
@@ -31,118 +47,132 @@ export default async function HistorialPage() {
   ]);
   const puedePreparar = checkWriteAccess(user, ZONA_COMUNICACIONES) === null;
 
-  return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Comunicaciones</h1>
-          <p className="mt-0.5 text-sm text-text-muted">
-            Correos a inversores: a quién van y con qué plantilla, antes de que salga nada, y el envío con
-            sus controles.
-          </p>
-        </div>
-        {puedePreparar ? (
-          <Link
-            href={COMUNICACIONES_NUEVA_PATH}
-            className="min-h-9 rounded-md bg-icam-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            Nueva comunicación
-          </Link>
-        ) : null}
-      </header>
+  const desde = hace30Dias();
+  const enPreparacion = comunicaciones.filter((c) => ["borrador", "revisada", "probada"].includes(c.comunicacion.estado)).length;
+  const enCurso = comunicaciones.filter((c) => ["enviando", "pausada"].includes(c.comunicacion.estado)).length;
+  const enviadas = comunicaciones.filter((c) => c.comunicacion.estado === "enviada").length;
+  const correos30 = comunicaciones
+    .filter((c) => esMedible(c.comunicacion) && new Date(c.comunicacion.created_at).getTime() >= desde)
+    .reduce((n, c) => n + c.seguimiento.enviados, 0);
 
-      <EstadoDeEnvios datos={envios} />
+  return (
+    <div className="min-w-0 space-y-3 sm:space-y-4">
+      <EncabezadoDePagina
+        titulo="Comunicaciones"
+        meta="Correos a inversores: la lista y la plantilla se ven antes de que salga nada."
+        acciones={
+          puedePreparar ? (
+            <BotonEnlace href={COMUNICACIONES_NUEVA_PATH} variante="primario" icono={<Icono nombre="mas" />}>
+              Nueva comunicación
+            </BotonEnlace>
+          ) : null
+        }
+      />
+
+      <Candado datos={envios} />
 
       {sinMigracion ? (
-        <p className="rounded-lg border border-subtle bg-card p-4 text-sm text-text-body">
-          Las tablas de Comunicaciones no existen todavía en la base de datos. Falta aplicar la
-          migración <code>047_comunicaciones</code>.
-        </p>
+        <Aviso tipo="aviso" titulo="Faltan las tablas de Comunicaciones">
+          Falta aplicar la migración <code>047_comunicaciones</code>.
+        </Aviso>
       ) : null}
+      {error ? <Aviso tipo="error">No se pudo leer el historial: {error}</Aviso> : null}
 
-      {error ? (
-        <p className="rounded-lg border border-[#9B3B3B]/40 bg-card p-4 text-sm text-[#9B3B3B]">
-          No se pudo leer el historial: {error}
-        </p>
+      {!sinMigracion && !error ? (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <KPICard title="En preparación" value={fmtInt(enPreparacion)} subtitle="borrador, revisada o probada" />
+          <KPICard title="Enviando" value={fmtInt(enCurso)} subtitle="en curso o detenidas" />
+          <KPICard title="Enviadas" value={fmtInt(enviadas)} />
+          <KPICard title="Correos reales" value={fmtInt(correos30)} subtitle="últimos 30 días" highlight />
+        </div>
       ) : null}
 
       {!sinMigracion && !error && comunicaciones.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-subtle p-6 text-center text-sm text-text-muted">
-          Todavía no se ha preparado ninguna comunicación.
-        </p>
+        <EstadoVacio
+          titulo="Todavía no hay comunicaciones"
+          descripcion="Preparar una no envía nada: calcula a quién iría y con qué plantilla."
+          accion={
+            puedePreparar ? (
+              <BotonEnlace href={COMUNICACIONES_NUEVA_PATH} variante="primario">
+                Preparar la primera
+              </BotonEnlace>
+            ) : null
+          }
+        />
       ) : null}
 
       {comunicaciones.length > 0 ? (
-        <div className="overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-          <table className="w-full min-w-[1040px] text-sm">
-            <caption className="sr-only">Comunicaciones preparadas, de la más reciente a la más antigua.</caption>
-            <thead>
-              <tr className="border-b border-subtle text-left text-text-muted">
-                <th scope="col" className="px-3 py-2 font-medium">Comunicación</th>
-                <th scope="col" className="px-3 py-2 font-medium">Audiencia</th>
-                <th scope="col" className="px-3 py-2 font-medium">Estado</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Correos</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Excluidos</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Sin destinatario</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Abrieron</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Clic</th>
-                <th scope="col" className="px-3 py-2 font-medium">Plantilla</th>
-                <th scope="col" className="px-3 py-2 font-medium">Preparada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {comunicaciones.map(({ comunicacion: c, resumen, seguimiento }) => (
-                <tr key={c.id} className="border-b border-subtle/60 text-text-body last:border-b-0">
-                  <th scope="row" className="px-3 py-2 text-left font-normal">
-                    <Link
-                      href={comunicacionPath(c.id)}
-                      className="font-medium text-icam-900 underline-offset-2 hover:underline"
-                    >
-                      {c.nombre}
-                    </Link>
-                  </th>
-                  <td className="px-3 py-2">
-                    {c.audiencia === "promocion" && c.promocion_nombre
-                      ? c.promocion_nombre
-                      : ETIQUETA_AUDIENCIA[c.audiencia]}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {ETIQUETA_ESTADO[c.estado]}
-                    {/* Una comunicación «enviada» por la pasarela simulada no ha escrito a nadie. */}
-                    {c.pasarela === "simulada" && ["enviando", "pausada", "enviada"].includes(c.estado)
-                      ? " (simulada)"
-                      : ""}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.aEnviar)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.excluidos)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtInt(resumen.sinDestinatario)}</td>
-                  {/* Solo de lo que salió de verdad y a sus destinatarios: lo demás no mide nada. */}
-                  {esMedible(c) && seguimiento.enviados > 0 ? (
-                    <>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
-                          {pct(tasa(seguimiento.abiertos, seguimiento.enviados))}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {pct(tasa(seguimiento.conClic, seguimiento.enviados))}
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-3 py-2 text-right text-text-muted">—</td>
-                      <td className="px-3 py-2 text-right text-text-muted">—</td>
-                    </>
-                  )}
-                  <td className="px-3 py-2">{c.plantilla_nombre ?? "—"}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-text-muted">
-                    {fmtFechaHora(c.created_at)} · {c.creada_por_email}
-                  </td>
+        <Tarjeta sinRelleno>
+          <div className={TABLA.marco}>
+            <table className={`${TABLA.tabla} min-w-[760px]`}>
+              <caption className="sr-only">Comunicaciones preparadas, de la más reciente a la más antigua.</caption>
+              <thead className={TABLA.thead}>
+                <tr>
+                  <th scope="col" className={TABLA.th}>Comunicación</th>
+                  <th scope="col" className={TABLA.th}>Estado</th>
+                  <th scope="col" className={TABLA.thNum}>Correos</th>
+                  <th scope="col" className={TABLA.thNum}>Abrieron</th>
+                  <th scope="col" className={TABLA.thNum}>Clic</th>
+                  <th scope="col" className={TABLA.th}>Preparada</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {comunicaciones.map(({ comunicacion: c, resumen, seguimiento }) => {
+                  const medible = esMedible(c) && seguimiento.enviados > 0;
+                  const audiencia =
+                    c.audiencia === "promocion" && c.promocion_nombre ? c.promocion_nombre : ETIQUETA_AUDIENCIA[c.audiencia];
+                  return (
+                    <tr key={c.id} className={TABLA.trPulsable}>
+                      <th scope="row" className={`${TABLA.td} max-w-[420px] text-left font-normal`}>
+                        <Link href={comunicacionPath(c.id)} className="font-medium text-icam-900 underline-offset-2 hover:underline">
+                          {c.nombre}
+                        </Link>
+                        <span className={TABLA.sub}>
+                          {audiencia}
+                          {c.plantilla_nombre ? ` · ${c.plantilla_nombre}` : " · sin plantilla"}
+                        </span>
+                      </th>
+                      <td className={TABLA.td}>
+                        <span className="inline-flex flex-wrap gap-1">
+                          <ChipEstadoComunicacion estado={c.estado} pasarela={c.pasarela} />
+                        </span>
+                      </td>
+                      <td className={TABLA.tdNum}>
+                        {fmtInt(resumen.aEnviar)}
+                        {resumen.excluidos > 0 || resumen.sinDestinatario > 0 ? (
+                          <span className={TABLA.sub}>
+                            {resumen.excluidos > 0 ? `${fmtInt(resumen.excluidos)} excl.` : ""}
+                            {resumen.excluidos > 0 && resumen.sinDestinatario > 0 ? " · " : ""}
+                            {resumen.sinDestinatario > 0 ? `${fmtInt(resumen.sinDestinatario)} sin dest.` : ""}
+                          </span>
+                        ) : null}
+                      </td>
+                      {medible ? (
+                        <>
+                          <td className={TABLA.tdNum}>
+                            <Link href={comunicacionAnaliticaPath(c.id)} className="text-icam-900 underline-offset-2 hover:underline">
+                              {pct(tasa(seguimiento.abiertos, seguimiento.enviados))}
+                            </Link>
+                          </td>
+                          <td className={TABLA.tdNum}>{pct(tasa(seguimiento.conClic, seguimiento.enviados))}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={`${TABLA.tdNum} text-text-muted`}>—</td>
+                          <td className={`${TABLA.tdNum} text-text-muted`}>—</td>
+                        </>
+                      )}
+                      <td className={`${TABLA.td} whitespace-nowrap`}>
+                        {fmtFechaHora(c.created_at)}
+                        <span className={TABLA.sub}>{c.creada_por_email}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Tarjeta>
       ) : null}
     </div>
   );

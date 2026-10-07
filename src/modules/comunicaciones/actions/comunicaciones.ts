@@ -18,14 +18,11 @@ import {
   MODULOS_DE_PLANTILLA,
 } from "@/modules/comunicaciones/data/zohoPlantillas";
 import { leerRegistro } from "@/modules/comunicaciones/data/zohoRegistros";
-import { dominiosSinCorreo } from "@/modules/comunicaciones/data/dns";
+import { resolverDestinatariosConDns } from "@/modules/comunicaciones/actions/resolver";
 import { adjuntosDePlantilla } from "@/modules/comunicaciones/logic/composicion";
-import { dominioDe } from "@/modules/comunicaciones/logic/direcciones";
+import { mismoDia } from "@/modules/comunicaciones/logic/controles";
 import { instrumentarParaVistaPrevia } from "@/modules/comunicaciones/logic/seguimiento";
-import {
-  cuentasDeAudiencia,
-  resolverDestinatarios,
-} from "@/modules/comunicaciones/logic/destinatarios";
+import { cuentasDeAudiencia } from "@/modules/comunicaciones/logic/destinatarios";
 import {
   COMUNICACIONES_NUEVA_PATH,
   COMUNICACIONES_PATH,
@@ -86,14 +83,6 @@ export interface PrepararEntrada {
   rolesCopia: string[];
 }
 
-/** Los datos de Zoho con los que se prepara tienen que ser de hoy. */
-function esDeHoy(iso: string | null): boolean {
-  if (!iso) return false;
-  const dia = (d: Date) =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(d);
-  return dia(new Date(iso)) === dia(new Date());
-}
-
 /**
  * Calcula los destinatarios de una audiencia y los guarda como foto fija.
  *
@@ -133,7 +122,7 @@ export async function prepararComunicacionAction(
     if (espejos.sinMigracion) {
       return { ok: false, mensaje: "Faltan las tablas de Inversores (migración 040)." };
     }
-    if (!esDeHoy(datosZohoAt)) {
+    if (!mismoDia(datosZohoAt, new Date())) {
       return {
         ok: false,
         mensaje: "Los datos de Zoho no son de hoy. Pulsa «Actualizar datos de Zoho» antes de preparar.",
@@ -150,15 +139,12 @@ export async function prepararComunicacionAction(
     if (cuentas.length === 0) {
       return { ok: false, mensaje: "Esa audiencia no tiene ninguna cuenta de inversión." };
     }
-    const destinatarios = resolverDestinatarios(cuentas, espejos, {
+    // Se le pregunta al DNS si cada dominio de la audiencia recibe correo. Si
+    // no contesta, no se excluye a nadie por ello.
+    const destinatarios = await resolverDestinatariosConDns(cuentas, espejos, {
       rolesPara,
       rolesCopia,
       dominiosInternos: ajustes.dominios_internos,
-      // Se le pregunta al DNS si cada dominio recibe correo. Si no contesta, no
-      // se excluye a nadie por ello.
-      dominiosSinCorreo: await dominiosSinCorreo(
-        espejos.contactos.map((c) => dominioDe(c.email ?? "")).filter(Boolean),
-      ).catch(() => new Set<string>()),
     });
 
     const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());

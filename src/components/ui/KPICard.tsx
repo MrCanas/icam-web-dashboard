@@ -1,7 +1,7 @@
 interface KPICardProps {
   title: string;
   value: string;
-  subtitle: string;
+  subtitle?: string;
   highlight?: boolean;
   /**
    * Convierte la tarjeta en un botón que abre el detalle de la cifra.
@@ -33,7 +33,7 @@ export function KPICard({
         <p className="mt-2 text-xl sm:text-2xl lg:text-3xl font-semibold text-text-primary break-words leading-tight hyphens-auto">
           {value}
         </p>
-        <p className="mt-1 text-sm text-text-muted leading-snug">{subtitle}</p>
+        {subtitle ? <p className="mt-1 text-sm text-text-muted leading-snug">{subtitle}</p> : null}
       </div>
     </>
   );

@@ -11,6 +11,7 @@ import type {
 import {
   contarAudiencias,
   cuentasDeAudiencia,
+  dominiosDeLosDestinatarios,
   resolverDestinatarios,
   resumirDestinatarios,
   type EspejosDeContacto,
@@ -261,6 +262,27 @@ test("el mismo correo dos veces en una cuenta sale una sola vez", () => {
   });
   const [d] = resolverDestinatarios(cuentas, e, SOLO_PRINCIPAL);
   assert.deepEqual(d!.para.map((x) => x.email), ["mismo@ejemplo.com"]);
+});
+
+test("al DNS solo se le pregunta por los dominios de quienes van a recibir algo", () => {
+  const cuentas = [cuenta({ zoho_id: "a", nombre: "A" }), cuenta({ zoho_id: "b", nombre: "B" })];
+  const e = espejos({
+    contactos: [
+      contacto("p1", "uno@Alfa.com"),
+      contacto("p2", "dos@beta.org"),
+      contacto("p3", "tres@gamma.net"), // secundario: con SOLO_PRINCIPAL no recibe nada
+      contacto("p4", "cuatro@delta.es"), // de una cuenta que no está en la audiencia
+    ],
+    cuentaContacto: [
+      enlace("a", "p1", { es_principal: true }),
+      enlace("b", "p2", { es_principal: true }),
+      enlace("b", "p3", { es_secundario: true }),
+      enlace("z", "p4", { es_principal: true }),
+    ],
+  });
+  const calculados = resolverDestinatarios(cuentas, e, SOLO_PRINCIPAL);
+  assert.deepEqual(dominiosDeLosDestinatarios(calculados), ["alfa.com", "beta.org"]);
+  assert.deepEqual(dominiosDeLosDestinatarios([]), []);
 });
 
 // ---------------------------------------------------------------------------

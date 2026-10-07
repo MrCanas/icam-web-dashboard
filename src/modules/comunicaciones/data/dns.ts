@@ -13,12 +13,15 @@ import { resolve4, resolve6, resolveMx } from "node:dns/promises";
 
 const ESPERA_MS = 4000;
 const A_LA_VEZ = 8;
+/** Cuánto vale lo que contestó el DNS. Un dominio no cambia de un día para otro. */
+const CACHE_MS = 24 * 60 * 60 * 1000;
 
 function conEspera<T>(promesa: Promise<T>): Promise<T> {
-  return Promise.race([
-    promesa,
-    new Promise<never>((_, rechazar) => setTimeout(() => rechazar(new Error("ETIMEOUT")), ESPERA_MS)),
-  ]);
+  let temporizador: ReturnType<typeof setTimeout> | undefined;
+  const espera = new Promise<never>((_, rechazar) => {
+    temporizador = setTimeout(() => rechazar(new Error("ETIMEOUT")), ESPERA_MS);
+  });
+  return Promise.race([promesa, espera]).finally(() => clearTimeout(temporizador));
 }
 
 function codigo(err: unknown): string {
@@ -49,7 +52,24 @@ async function comprobar(dominio: string): Promise<Veredicto> {
   return "no_recibe";
 }
 
-/** De una lista de dominios, los que con seguridad no reciben correo. */
+// Lo contestado, por dominio, mientras viva el proceso. Solo se guardan las
+// respuestas seguras: un «no se sabe» se vuelve a preguntar la próxima vez.
+const cache = new Map<string, { veredicto: Veredicto; hasta: number }>();
+
+async function comprobarConCache(dominio: string): Promise<Veredicto> {
+  const guardado = cache.get(dominio);
+  if (guardado && guardado.hasta > Date.now()) return guardado.veredicto;
+  const veredicto = await comprobar(dominio);
+  if (veredicto !== "no_se_sabe") cache.set(dominio, { veredicto, hasta: Date.now() + CACHE_MS });
+  return veredicto;
+}
+
+/**
+ * De una lista de dominios, los que con seguridad no reciben correo.
+ *
+ * Pásale solo los dominios de quienes van a recibir el correo: cada dominio
+ * nuevo son hasta tres consultas, y la base entera tarda minutos.
+ */
 export async function dominiosSinCorreo(dominios: Iterable<string>): Promise<Set<string>> {
   const pendientes = [...new Set([...dominios].map((d) => d.trim().toLowerCase()).filter(Boolean))];
   const malos = new Set<string>();
@@ -57,7 +77,7 @@ export async function dominiosSinCorreo(dominios: Iterable<string>): Promise<Set
     for (;;) {
       const dominio = pendientes.shift();
       if (!dominio) return;
-      if ((await comprobar(dominio)) === "no_recibe") malos.add(dominio);
+      if ((await comprobarConCache(dominio)) === "no_recibe") malos.add(dominio);
     }
   };
   await Promise.all(Array.from({ length: A_LA_VEZ }, obrero));

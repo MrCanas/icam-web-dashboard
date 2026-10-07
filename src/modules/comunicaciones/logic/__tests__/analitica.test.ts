@@ -14,6 +14,7 @@ import {
   filasPorCuenta,
   porQueNoEsMedible,
   serieTemporal,
+  necesitaSeguimiento,
   type ComunicacionAnalitica,
   type DestinatarioAnalitica,
 } from "../analitica";
@@ -101,8 +102,11 @@ test("cada filtro elige a quien tiene que elegir", () => {
   const ids = (filtro: Parameters<typeof cumpleFiltro>[1], enlace: number | null = null) =>
     LISTA.filter((d) => cumpleFiltro(d, filtro, enlace, pulsados)).map((d) => d.id);
   assert.equal(ids("todos").length, LISTA.length);
+  // «Todos los que lo recibieron»: ni el error, ni el omitido, ni el excluido.
+  assert.deepEqual(ids("enviados"), ["nada", "abre", "clic", "clic-sin-imagen", "rebotado"]);
   assert.deepEqual(ids("no_consta_apertura"), ["nada", "rebotado"]);
   assert.deepEqual(ids("abrio"), ["abre", "clic", "clic-sin-imagen"]);
+  assert.deepEqual(ids("no_hizo_clic"), ["nada", "abre", "rebotado"]);
   assert.deepEqual(ids("hizo_clic"), ["clic", "clic-sin-imagen"]);
   assert.deepEqual(ids("abrio_sin_clic"), ["abre"]);
   assert.deepEqual(ids("pulso_enlace", 0), ["clic"]);
@@ -233,7 +237,23 @@ test("no se reenvía sobre «todos» ni sobre «rebotado»", () => {
   assert.deepEqual(cuentasParaReenvio(LISTA, "rebotado", null, new Map()), []);
 });
 
+test("qué filtros valen sin aperturas ni clics (modo pruebas, pasarela simulada)", () => {
+  assert.equal(necesitaSeguimiento("enviados"), false);
+  assert.equal(necesitaSeguimiento("error"), false);
+  assert.equal(necesitaSeguimiento("no_consta_apertura"), true);
+  assert.equal(necesitaSeguimiento("no_hizo_clic"), true);
+  assert.equal(necesitaSeguimiento("pulso_enlace"), true);
+});
+
 test("el reenvío elige solo las cuentas del original que cumplen el filtro", () => {
+  assert.deepEqual(cuentasParaReenvio(LISTA, "enviados", null, new Map()), [
+    "cuenta-nada",
+    "cuenta-abre",
+    "cuenta-clic",
+    "cuenta-clic-sin-imagen",
+    "cuenta-rebotado",
+  ]);
+  assert.deepEqual(cuentasParaReenvio(LISTA, "no_hizo_clic", null, new Map()), ["cuenta-nada", "cuenta-abre", "cuenta-rebotado"]);
   assert.deepEqual(cuentasParaReenvio(LISTA, "no_consta_apertura", null, new Map()), ["cuenta-nada", "cuenta-rebotado"]);
   assert.deepEqual(cuentasParaReenvio(LISTA, "abrio_sin_clic", null, new Map()), ["cuenta-abre"]);
   assert.deepEqual(cuentasParaReenvio(LISTA, "error", null, new Map()), ["cuenta-error"]);

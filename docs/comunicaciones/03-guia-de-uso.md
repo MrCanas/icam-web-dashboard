@@ -15,8 +15,8 @@ Si no ves la pestaña **Comunicaciones**, pide el acceso: se concede persona a p
 
 En **Comunicaciones > Nueva**:
 
-1. **Mira la hora de los datos de Zoho.** Si no son de hoy, pulsa «Actualizar datos de Zoho» y
-   espera alrededor de un minuto. Sin datos de hoy no se puede preparar.
+1. **Mira el chip de los datos de Zoho.** Si dice «No son de hoy», pulsa «Actualizar datos de Zoho»
+   y espera alrededor de un minuto. Sin datos de hoy no se puede preparar.
 2. **Elige a quién va dirigida:**
    - *Promoción o fondo*: las cuentas con suscripción a esa promoción o ese fondo.
    - *Toda la base*: todas las cuentas de inversión.
@@ -25,9 +25,17 @@ En **Comunicaciones > Nueva**:
    Cada opción enseña cuántas cuentas tiene.
 3. **Elige qué contactos de cada cuenta lo reciben**, en «Para» y en copia, según su papel:
    contacto principal, secundario, representante legal, abogado o intermediario.
-4. Pulsa **«Preparar y revisar destinatarios»**.
+4. Pulsa **«Preparar y revisar destinatarios»**. Si falta algo (el tipo, la promoción, los datos de
+   hoy), el botón no se queda gris: te dice qué falta y marca el campo.
 
 Sale **un correo por cuenta**, no uno por persona.
+
+## La página de una comunicación
+
+Arriba, el nombre con su estado, el **candado** (a quién puede escribir el módulo ahora mismo, si los
+envíos están encendidos, en qué modo y por dónde saldrían) y los **cuatro pasos** del envío, con el
+actual marcado. Debajo, las cifras y tres pestañas: **Destinatarios**, **Plantilla** y **Envío**.
+Los ⓘ explican cada término sin salir de la pantalla.
 
 ## 2. Mirar la lista
 
@@ -79,7 +87,8 @@ ves en la vista previa.
 
 ## 4. Enviar
 
-Al final de la página, cuatro pasos. No se puede saltar ninguno.
+En la pestaña **Envío**, cuatro pasos. No se puede saltar ninguno; el actual va abierto y los hechos
+quedan en una línea con quién y cuándo.
 
 1. **Revisar los destinatarios.** Pulsa «He revisado los N destinatarios». Si después excluyes o
    incluyes a alguien, tendrás que revisarla otra vez.
@@ -137,20 +146,31 @@ Cómo leerla:
 
 En la tabla de destinatarios puedes filtrar (no consta apertura, abrió, hizo clic, abrió y no hizo
 clic, pulsó un enlace concreto, error, rebotado), buscar, descargar el CSV y abrir cada fila para
-ver cuándo abrió y qué pulsó.
+ver cuándo abrió y qué pulsó. Con un filtro puesto, el botón «Seguimiento» de la barra ya lleva ese
+filtro elegido.
 
-## 7. Reenviar a una parte
+## 7. Enviar un seguimiento
 
-En la analítica de una comunicación, aplica un filtro —por ejemplo «No consta apertura»— y pulsa
-**«Preparar reenvío»**.
+Desde una comunicación ya enviada, el botón **«Seguimiento»** (en la cabecera, al final del paso
+«Envío» y en la analítica) abre un diálogo:
 
-- **No envía nada.** Crea una comunicación nueva, en borrador, con solo esas cuentas.
+1. **A quién**: *Todos los que lo recibieron*, *No consta apertura*, *No hizo clic*, *Abrió y no
+   hizo clic*, *Pulsó un enlace concreto* o *Error al enviar*, cada uno con su recuento. Debajo
+   ves las direcciones exactas que cumplen.
+2. **Plantilla**: la original, o «Cambiar» para elegir una de recordatorio.
+3. **«Preparar seguimiento»**. **No envía nada**: crea una comunicación nueva, en borrador, con
+   solo esas cuentas, y te lleva a ella.
+
+Después es una comunicación como cualquier otra: revisar, prueba, ensayo, confirmar, con el
+candado delante.
+
 - Las direcciones se vuelven a leer con los datos de hoy. Una cuenta con una dirección que no
   estaba en el envío original nace excluida, con el aviso «Dirección nueva»: mírala antes de
-  incluirla.
-- A partir de ahí es una comunicación como cualquier otra: revisar, prueba, ensayo, confirmar.
-  Puedes cambiar la plantilla por una de recordatorio.
-- El reenvío tiene sus propias cifras, separadas de las del envío original.
+  incluirla. La página del borrador dice qué cambió respecto al original.
+- Si la comunicación salió en modo pruebas o por la pasarela simulada, solo se ofrecen «Todos los
+  que lo recibieron» y «Error al enviar»: no hay aperturas ni clics de verdad que filtrar.
+- El seguimiento tiene sus propias cifras, separadas de las del envío original. En la analítica
+  de todas, los envíos de una misma plantilla aparecen agrupados.
 
 ## Si algo no cuadra
 

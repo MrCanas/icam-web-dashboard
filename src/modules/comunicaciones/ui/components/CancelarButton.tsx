@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { Boton } from "@/components/ui/Boton";
 import { cancelarComunicacionAction } from "@/modules/comunicaciones/actions/comunicaciones";
 
 /** Descarta la comunicación. No borra nada: queda en el historial como cancelada. */
@@ -14,22 +15,19 @@ export function CancelarButton({ comunicacionId }: { comunicacionId: string }) {
 
   if (!confirmando) {
     return (
-      <button
-        type="button"
-        onClick={() => setConfirmando(true)}
-        className="min-h-9 rounded-md border border-subtle px-3 py-1.5 text-sm text-text-body hover:border-icam-900"
-      >
+      <Boton variante="texto" onClick={() => setConfirmando(true)} className="text-text-muted hover:text-red-700">
         Descartar
-      </button>
+      </Boton>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-text-body">¿Descartar esta comunicación?</span>
-      <button
-        type="button"
-        disabled={pendiente}
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm">
+      <span className="text-red-800">¿Descartar esta comunicación?</span>
+      <Boton
+        variante="peligro"
+        pequeno
+        cargando={pendiente}
         onClick={() =>
           empezar(async () => {
             const r = await cancelarComunicacionAction(comunicacionId);
@@ -37,19 +35,13 @@ export function CancelarButton({ comunicacionId }: { comunicacionId: string }) {
             else setError(r.mensaje);
           })
         }
-        className="min-h-9 rounded-md border border-[#9B3B3B]/60 px-3 py-1.5 text-[#9B3B3B] disabled:opacity-60"
       >
-        {pendiente ? "Descartando…" : "Sí, descartar"}
-      </button>
-      <button
-        type="button"
-        disabled={pendiente}
-        onClick={() => setConfirmando(false)}
-        className="min-h-9 rounded-md border border-subtle px-3 py-1.5 text-text-body"
-      >
+        Sí, descartar
+      </Boton>
+      <Boton variante="secundario" pequeno disabled={pendiente} onClick={() => setConfirmando(false)}>
         No
-      </button>
-      {error ? <span className="text-[#9B3B3B]">{error}</span> : null}
+      </Boton>
+      {error ? <span className="text-red-700">{error}</span> : null}
     </div>
   );
 }

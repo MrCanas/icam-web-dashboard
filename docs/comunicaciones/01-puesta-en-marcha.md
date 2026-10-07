@@ -92,8 +92,14 @@ $env:COMUNICACIONES_PASARELA='simulada'; npx next dev --webpack  # PowerShell
 ```
 
 Arrancar con el token vacío **no basta**: el cargador de `.env.local` rellena las variables vacías.
-Antes de pulsar nada, comprobar que la banda de la página dice **«Pasarela simulada»** y no «Salen
+Antes de pulsar nada, comprobar que la tira del candado dice **«Pasarela simulada»** y no «Salen
 por Zoho».
+
+> **Arráncalo en una terminal propia, no desde Claude Code.** Claude Code mata los procesos en
+> segundo plano cuando el equipo se queda sin memoria, y `next dev` es el primero en caer (pasó dos
+> veces el 2026-10-07 con 31 GB de RAM y VS Code, Chrome, Edge y varias sesiones de Claude Code
+> abiertas). Si tiene que arrancarlo Claude, iniciar Claude Code con
+> `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1` y cerrar antes lo que sobre.
 
 - [ ] **Historial**: carga, con la banda «Candado de destinatarios activo» y las direcciones
       permitidas. La pestaña le aparece a quien tiene la zona y a nadie más.

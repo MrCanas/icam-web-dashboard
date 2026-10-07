@@ -3,14 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { Aviso } from "@/components/ui/Aviso";
+import { Ayuda } from "@/components/ui/Ayuda";
+import { Boton } from "@/components/ui/Boton";
+import { Chip } from "@/components/ui/Chip";
+import { Icono } from "@/components/ui/Icono";
+import { Tarjeta } from "@/components/ui/Tarjeta";
+import { TABLA } from "@/components/ui/tabla";
 import { fmtInt } from "@/lib/formatters";
 import { cambiarExclusionAction } from "@/modules/comunicaciones/actions/comunicaciones";
 import { esDireccionInterna } from "@/modules/comunicaciones/logic/destinatarios";
-import {
-  ETIQUETA_AVISO,
-  type ComDestinatarioRow,
-  type Direccion,
-} from "@/modules/comunicaciones/types";
+import { ETIQUETA_AVISO, type ComDestinatarioRow, type Direccion } from "@/modules/comunicaciones/types";
+import { BarraDeFiltros } from "@/modules/comunicaciones/ui/components/ui/BarraDeFiltros";
+import { ChipAviso, ChipEstadoEnvio } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
 
 interface Props {
   comunicacionId: string;
@@ -88,17 +93,43 @@ function aCsv(destinatarios: readonly ComDestinatarioRow[]): string {
 function Direcciones({ lista, dominiosInternos }: { lista: Direccion[]; dominiosInternos: string[] }) {
   if (lista.length === 0) return <span className="text-text-muted">—</span>;
   return (
-    <ul className="space-y-0.5">
+    <ul className="space-y-1">
       {lista.map((d) => (
-        <li key={d.email}>
-          <span className="text-text-primary">{d.nombre}</span>{" "}
-          <span className={esDireccionInterna(d.email, dominiosInternos) ? "text-[#9B3B3B]" : "text-text-muted"}>
+        <li key={d.email} className="leading-snug">
+          <span className="text-text-primary">{d.nombre}</span>
+          <span className="block font-mono text-xs text-text-muted">
             {d.email}
+            {esDireccionInterna(d.email, dominiosInternos) ? (
+              <Chip tono="neutro" className="ml-1.5 align-middle">
+                interna
+              </Chip>
+            ) : null}
           </span>
-          <span className="block text-xs text-text-muted">{d.rol}</span>
+          <span className="block text-[11px] text-text-muted">{d.rol}</span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** El chip de situación de una fila, y el texto que lo acompaña. */
+function Situacion({ d }: { d: ComDestinatarioRow }) {
+  const texto = situacion(d);
+  if (d.excluido) {
+    return (
+      <>
+        <Chip tono="neutro">Excluido</Chip>
+        <span className={TABLA.sub}>{d.excluido_motivo ?? "a mano"}</span>
+      </>
+    );
+  }
+  if (d.para.length === 0) return <Chip tono="aviso">Sin destinatario</Chip>;
+  if (d.estado_envio === "pendiente") return <Chip tono="marca">Recibiría el correo</Chip>;
+  return (
+    <>
+      <ChipEstadoEnvio estado={d.estado_envio} texto={d.estado_envio === "enviado" && d.pasarela === "simulada" ? "Enviado (simulado)" : undefined} />
+      <span className={TABLA.sub}>{texto.replace(/^(Enviado( \(simulado\))?|Error|Omitido): ?/, "").replace(/^a /, "a ")}</span>
+    </>
   );
 }
 
@@ -150,115 +181,98 @@ export function DestinatariosPanel({ comunicacionId, nombre, destinatarios, domi
   };
 
   return (
-    <section className="space-y-2" aria-labelledby="com-destinatarios">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <h2 id="com-destinatarios" className="text-base font-semibold text-text-primary">
-          Destinatarios
-        </h2>
-        <button
-          type="button"
-          onClick={descargar}
-          className="min-h-9 rounded-md border border-subtle px-3 py-1.5 text-sm text-text-body hover:border-icam-900"
-        >
+    <Tarjeta
+      id="com-destinatarios"
+      titulo="Destinatarios"
+      subtitulo="Una fila por cuenta de inversión. Excluir a alguien no toca el CRM: solo cambia esta comunicación."
+      acciones={
+        <Boton variante="secundario" pequeno icono={<Icono nombre="descargar" />} onClick={descargar}>
           Descargar CSV
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTROS.map((f) => (
-          <button
-            key={f.clave}
-            type="button"
-            aria-pressed={filtro === f.clave}
-            onClick={() => setFiltro(f.clave)}
-            className={`min-h-9 rounded-md border px-3 py-1.5 text-sm ${
-              filtro === f.clave
-                ? "border-icam-900 bg-icam-900 text-white"
-                : "border-subtle text-text-body hover:border-icam-900"
-            }`}
-          >
-            {f.etiqueta} ({fmtInt(destinatarios.filter((d) => pasa(d, f.clave)).length)})
-          </button>
-        ))}
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+        </Boton>
+      }
+      sinRelleno
+    >
+      <div className="space-y-3 px-4 pb-3 sm:px-5">
+        <BarraDeFiltros
+          opciones={FILTROS.map((f) => ({ ...f, n: destinatarios.filter((d) => pasa(d, f.clave)).length }))}
+          valor={filtro}
+          onChange={setFiltro}
+          busqueda={busqueda}
+          onBusqueda={setBusqueda}
           placeholder="Buscar cuenta, nombre o correo"
-          aria-label="Buscar en los destinatarios"
-          className="min-h-9 min-w-[220px] flex-1 rounded-md border border-subtle bg-card px-3 py-1.5 text-sm text-text-body"
         />
+        {error ? <Aviso tipo="error">{error}</Aviso> : null}
       </div>
 
-      {error ? (
-        <p role="alert" className="text-sm text-[#9B3B3B]">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="max-h-[640px] overflow-auto overscroll-x-contain rounded-lg border border-subtle/50 bg-card">
-        <table className="w-full min-w-[900px] text-sm">
+      <div className={`${TABLA.marcoFijo} border-t border-subtle/60`}>
+        <table className={`${TABLA.tabla} min-w-[900px]`}>
           <caption className="sr-only">
-            Destinatarios de la comunicación, una fila por cuenta de inversión, con quién va en Para,
-            quién en copia y los avisos de cada una.
+            Destinatarios de la comunicación, una fila por cuenta de inversión, con quién va en Para, quién en copia y
+            los avisos de cada una.
           </caption>
-          <thead className="sticky top-0 z-10 bg-card">
-            <tr className="border-b border-subtle text-left text-text-muted">
-              <th scope="col" className="px-3 py-2 font-medium">Cuenta de inversión</th>
-              <th scope="col" className="px-3 py-2 font-medium">Para</th>
-              <th scope="col" className="px-3 py-2 font-medium">Copia</th>
-              <th scope="col" className="px-3 py-2 font-medium">Avisos</th>
-              <th scope="col" className="px-3 py-2 font-medium">Situación</th>
+          <thead className={TABLA.theadFija}>
+            <tr>
+              <th scope="col" className={TABLA.th}>Cuenta de inversión</th>
+              <th scope="col" className={TABLA.th}>Para</th>
+              <th scope="col" className={TABLA.th}>Copia</th>
+              <th scope="col" className={TABLA.th}>
+                <span className="inline-flex items-center gap-1">
+                  Avisos
+                  <Ayuda etiqueta="Qué significa cada aviso">
+                    <strong>Cuenta de prueba</strong>: del CRM; nace excluida. <strong>Dirección interna</strong>: de
+                    Impar Capital; si lo son todas, la cuenta nace excluida. <strong>Persona en varias cuentas</strong>:
+                    recibirá un solo correo. <strong>Sin destinatario</strong>: falta el contacto con el papel elegido.{" "}
+                    <strong>Dado de baja</strong> y <strong>sin correo</strong>: no se le escribe.{" "}
+                    <strong>Dirección mal escrita</strong> y <strong>dominio que no recibe correo</strong>: no entra en
+                    «Para». <strong>Posible errata</strong>: míralo. <strong>Dirección nueva</strong>: no estaba en el
+                    envío original de este seguimiento; la cuenta nace excluida.
+                  </Ayuda>
+                </span>
+              </th>
+              <th scope="col" className={TABLA.th}>Situación</th>
+              {editable ? <th scope="col" className={TABLA.th}><span className="sr-only">Acciones</span></th> : null}
             </tr>
           </thead>
           <tbody>
             {visibles.map((d) => (
-              <tr
-                key={d.id}
-                className={`border-b border-subtle/60 align-top text-text-body last:border-b-0 ${
-                  d.excluido || d.para.length === 0 ? "opacity-60" : ""
-                }`}
-              >
-                <th scope="row" className="px-3 py-2 text-left font-medium text-text-primary">
+              <tr key={d.id} className={d.excluido || d.para.length === 0 ? TABLA.trApagada : TABLA.tr}>
+                <th scope="row" className={`${TABLA.td} text-left font-medium text-text-primary`}>
                   {d.cuenta_nombre}
                 </th>
-                <td className="px-3 py-2">
+                <td className={TABLA.td}>
                   <Direcciones lista={d.para} dominiosInternos={dominiosInternos} />
                 </td>
-                <td className="px-3 py-2">
+                <td className={TABLA.td}>
                   <Direcciones lista={d.copia} dominiosInternos={dominiosInternos} />
                 </td>
-                <td className="px-3 py-2">
+                <td className={TABLA.td}>
                   {d.avisos.length === 0 ? (
                     <span className="text-text-muted">—</span>
                   ) : (
-                    <ul className="space-y-0.5">
+                    <span className="flex flex-wrap gap-1">
                       {d.avisos.map((a) => (
-                        <li key={a} className="text-[#9B3B3B]">
-                          {ETIQUETA_AVISO[a]}
-                        </li>
+                        <ChipAviso key={a} aviso={a} />
                       ))}
-                    </ul>
+                    </span>
                   )}
                 </td>
-                <td className="px-3 py-2">
-                  <span className="block">{situacion(d)}</span>
-                  {editable && d.para.length > 0 ? (
-                    <button
-                      type="button"
-                      disabled={enCurso !== null}
-                      onClick={() => alternar(d)}
-                      className="mt-1 min-h-8 rounded-md border border-subtle px-2 py-1 text-xs text-text-body hover:border-icam-900 disabled:opacity-60"
-                    >
-                      {enCurso === d.id ? "Guardando…" : d.excluido ? "Volver a incluir" : "Excluir"}
-                    </button>
-                  ) : null}
+                <td className={`${TABLA.td} max-w-[280px]`}>
+                  <Situacion d={d} />
                 </td>
+                {editable ? (
+                  <td className={`${TABLA.td} whitespace-nowrap text-right`}>
+                    {d.para.length > 0 ? (
+                      <Boton variante="texto" pequeno disabled={enCurso !== null} cargando={enCurso === d.id} onClick={() => alternar(d)}>
+                        {d.excluido ? "Volver a incluir" : "Excluir"}
+                      </Boton>
+                    ) : null}
+                  </td>
+                ) : null}
               </tr>
             ))}
             {visibles.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
+                <td colSpan={editable ? 6 : 5} className={TABLA.vacio}>
                   Ningún destinatario con ese filtro.
                 </td>
               </tr>
@@ -266,6 +280,10 @@ export function DestinatariosPanel({ comunicacionId, nombre, destinatarios, domi
           </tbody>
         </table>
       </div>
-    </section>
+      <p className="px-4 py-2 text-xs text-text-muted sm:px-5">
+        {fmtInt(visibles.length)} de {fmtInt(destinatarios.length)} cuentas · la lista es una foto del momento en que
+        se preparó.
+      </p>
+    </Tarjeta>
   );
 }

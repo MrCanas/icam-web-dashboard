@@ -164,6 +164,23 @@ export function esDireccionInterna(email: string, dominiosInternos: readonly str
  * Una cuenta que se queda sin nadie en «Para» sigue en la lista, con el aviso
  * `sin_destinatario`: que no reciba nada tiene que verse, no deducirse.
  */
+/**
+ * Los dominios a los que iría algo: los de «Para» y copia de los destinatarios
+ * calculados. Son los únicos por los que merece la pena preguntar al DNS.
+ */
+export function dominiosDeLosDestinatarios(
+  destinatarios: readonly Pick<DestinatarioCalculado, "para" | "copia">[],
+): string[] {
+  const dominios = new Set<string>();
+  for (const d of destinatarios) {
+    for (const direccion of [...d.para, ...d.copia]) {
+      const dominio = dominioDe(direccion.email);
+      if (dominio) dominios.add(dominio);
+    }
+  }
+  return [...dominios].sort();
+}
+
 export function resolverDestinatarios(
   cuentas: readonly InvCuentaRow[],
   espejos: Pick<EspejosDeContacto, "contactos" | "cuentaContacto">,
