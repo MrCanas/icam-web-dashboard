@@ -41,6 +41,7 @@ envío montan el correo con las mismas funciones.
 | Apertura | Una imagen servida por `GET /api/s/a/{identificador}`. Si la plantilla ya trae imágenes es un píxel invisible; **si no trae ninguna, se añade al pie el logotipo de Impar Capital**, para que el programa de correo ofrezca cargar imágenes |
 | Clic | Cada enlace `http(s)` pasa a `GET /api/s/e/{identificador}/{n}`. El destino se guarda al ensayar y **sale de la base, nunca de la dirección**: no sirve para redirigir a donde quiera un tercero |
 | Lo que no se toca | `mailto:`, `tel:` y anclas |
+| Enlaces anidados | Los botones de Zoho son un enlace dentro de otro (`buttonOuterLink` con `buttonInnerLink` dentro), los dos al mismo destino. Se cuentan y se rastrean los dos, cada uno con su posición; en el panel salen con el mismo texto. Desde el 2026-10-07: antes el interior quedaba sin rastrear y la validación paraba el envío |
 | Lecturas automáticas | Peticiones `HEAD`, agentes de filtros de correo conocidos y lo que llega en los 10 segundos siguientes al envío. Se guardan, marcadas, y **no suman** |
 | Lo que no se guarda | La IP de nadie |
 | Límite | 30 anotaciones por identificador y minuto |

@@ -72,6 +72,39 @@ test("solo se cuentan y se cambian los enlaces http(s): mailto, tel y anclas no 
   assert.equal(r.html.includes("youtube.com"), false);
 });
 
+test("un botón de Zoho es un enlace dentro de otro: los dos se cuentan y los dos se rastrean", () => {
+  // Así construye Zoho sus botones: `buttonOuterLink` envolviendo una tabla que
+  // lleva dentro `buttonInnerLink`, los dos al mismo destino. La plantilla
+  // ZU5 del 2026-10-07 no pasaba la validación porque el interior quedaba sin
+  // rastrear.
+  const destino = "https://inversion.imparcapital.es/link/validando-invitacion/f8ffa6bf";
+  const boton =
+    `<html><body><img src="x.png">` +
+    `<a class="buttonOuterLink" href="${destino}" style="text-decoration:none;" target="_blank">\n` +
+    `<table><tbody><tr><td><p>\n` +
+    `<a class="buttonInnerLink" href="${destino}" style="color:#fff" target="_blank">Documentación</a>\n` +
+    `</p></td></tr></tbody></table></a>` +
+    `<a href="https://ejemplo.com/otro">Otro</a>` +
+    `</body></html>`;
+  assert.deepEqual(
+    enlacesDe(boton).map((e) => [e.posicion, e.url, e.texto]),
+    [
+      [0, destino, "Documentación"],
+      [1, destino, "Documentación"],
+      [2, "https://ejemplo.com/otro", "Otro"],
+    ],
+  );
+  const r = instrumentar(boton, BASE, TOKEN);
+  assert.deepEqual(r.enlaces, [destino, destino, "https://ejemplo.com/otro"]);
+  assert.ok(r.html.includes(`<a class="buttonOuterLink" href="${BASE}/api/s/e/${TOKEN}/0" style="text-decoration:none;" target="_blank">`));
+  assert.ok(r.html.includes(`<a class="buttonInnerLink" href="${BASE}/api/s/e/${TOKEN}/1" style="color:#fff" target="_blank">Documentación</a>`));
+  assert.ok(r.html.includes(`<a href="${BASE}/api/s/e/${TOKEN}/2">Otro</a>`));
+  // Ni un href sin rastrear: es lo que comprueba después `validarCorreo`.
+  assert.equal(r.html.includes(destino), false);
+  assert.equal((r.html.match(/<a\b/g) ?? []).length, 3);
+  assert.equal((r.html.match(/<\/a\s*>/g) ?? []).length, 3);
+});
+
 test("si el correo ya trae imágenes se añade una invisible, y las suyas no se tocan", () => {
   const r = instrumentar(HTML, BASE, TOKEN);
   assert.equal(r.imagen, "pixel");
