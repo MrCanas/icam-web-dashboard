@@ -78,12 +78,29 @@ export function tieneImagen(html: string): boolean {
   return /<img\b/i.test(html);
 }
 
-const ENLACE_RE = /<a\b([^>]*?)\bhref\s*=\s*(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a\s*>/gi;
+/**
+ * La etiqueta de apertura de un enlace, sola. Se trabaja etiqueta a etiqueta y
+ * no por pares `<a>…</a>` porque los botones de Zoho son un enlace dentro de
+ * otro (`buttonOuterLink` envolviendo una tabla con `buttonInnerLink`): un
+ * patrón por pares se traga el interior sin tocarlo, y ese enlace saldría sin
+ * rastrear. Mismo criterio que la validación de `validarCorreo.ts`, que cuenta
+ * los `href` de cada `<a>`.
+ */
+const APERTURA_DE_ENLACE_RE = /<a\b([^>]*?)\bhref\s*=\s*(["'])(.*?)\2([^>]*)>/gi;
+const FIN_DE_ENLACE_RE = /<\/a\s*>|<a\b/gi;
+const CIERRE_DE_ENLACE_RE = /<\/a\s*>/gi;
 
 export interface EnlaceDePlantilla {
   posicion: number;
   url: string;
   texto: string;
+}
+
+/** Lo que hay desde `desde` hasta la primera coincidencia de `re`, o hasta el final. */
+function hasta(html: string, desde: number, re: RegExp): string {
+  re.lastIndex = desde;
+  const m = re.exec(html);
+  return html.slice(desde, m ? m.index : html.length);
 }
 
 /**
@@ -92,10 +109,15 @@ export interface EnlaceDePlantilla {
  */
 export function enlacesDe(html: string): EnlaceDePlantilla[] {
   const enlaces: EnlaceDePlantilla[] = [];
-  for (const m of html.matchAll(ENLACE_RE)) {
+  for (const m of html.matchAll(APERTURA_DE_ENLACE_RE)) {
     const url = decodificar(m[3] ?? "").trim();
     if (!esEnlaceRastreable(url)) continue;
-    enlaces.push({ posicion: enlaces.length, url, texto: textoDeEnlace(m[5] ?? "") });
+    const desde = (m.index ?? 0) + m[0].length;
+    // Lo propio del enlace llega hasta su cierre o hasta el siguiente enlace. Si
+    // ahí no hay nada que leer (el exterior de un botón de Zoho), se nombra por
+    // lo que envuelve.
+    const texto = textoDeEnlace(hasta(html, desde, FIN_DE_ENLACE_RE)) || textoDeEnlace(hasta(html, desde, CIERRE_DE_ENLACE_RE));
+    enlaces.push({ posicion: enlaces.length, url, texto });
   }
   return enlaces;
 }
@@ -137,13 +159,13 @@ function insertarAlFinal(html: string, trozo: string): string {
 export function instrumentar(html: string, base: string, token: string): Instrumentado {
   const enlaces: string[] = [];
   const conEnlaces = html.replace(
-    ENLACE_RE,
-    (todo: string, antes: string, comilla: string, href: string, despues: string, contenido: string) => {
+    APERTURA_DE_ENLACE_RE,
+    (todo: string, antes: string, comilla: string, href: string, despues: string) => {
       const url = decodificar(href).trim();
       if (!esEnlaceRastreable(url)) return todo;
       const rastreado = urlDeEnlace(base, token, enlaces.length);
       enlaces.push(url);
-      return `<a${antes}href=${comilla}${codificar(rastreado)}${comilla}${despues}>${contenido}</a>`;
+      return `<a${antes}href=${comilla}${codificar(rastreado)}${comilla}${despues}>`;
     },
   );
 
