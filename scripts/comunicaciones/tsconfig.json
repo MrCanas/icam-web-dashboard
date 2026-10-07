@@ -1,0 +1,7 @@
+{
+  "//": "Igual que scripts/pm/tsconfig.json: el tsconfig de la raíz EXCLUYE scripts/, así que sin esto un fallo de tipos aquí solo se descubre ejecutando el script.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

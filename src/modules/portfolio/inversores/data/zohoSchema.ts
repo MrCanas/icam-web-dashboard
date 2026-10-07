@@ -78,6 +78,8 @@ export const ESPEJOS: readonly EspejoZoho[] = [
       { columna: "telefono", tipo: "text", obligatorio: false, pistas: [...RE.telefono] },
       { columna: "capital_comprometido", tipo: "number", obligatorio: false, pistas: [/comprometid|suscrito/i] },
       { columna: "moneda", tipo: "picklist", obligatorio: false, pistas: [/moneda|divisa|currency/i] },
+      // Migración 047. Decide la audiencia «Inversores directos» de Comunicaciones.
+      { columna: "tiene_intermediario", tipo: "bool", obligatorio: false, pistas: [/tiene intermediario/i] },
     ],
   },
   {
@@ -99,6 +101,8 @@ export const ESPEJOS: readonly EspejoZoho[] = [
       { columna: "email", tipo: "email", obligatorio: true, pistas: [/^email$/i] },
       { columna: "email_secundario", tipo: "email", obligatorio: false, pistas: [/secondary|secundario/i] },
       { columna: "telefono", tipo: "text", obligatorio: false, pistas: [...RE.telefono] },
+      // Migración 047. Quien se ha dado de baja no recibe comunicaciones.
+      { columna: "email_opt_out", tipo: "bool", obligatorio: false, pistas: [/opt.?out/i] },
     ],
   },
   {

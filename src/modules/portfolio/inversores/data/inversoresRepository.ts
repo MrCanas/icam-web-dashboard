@@ -95,6 +95,45 @@ export async function cargarEspejos(ctx: UserContext): Promise<Espejos> {
   };
 }
 
+/** Lo que Comunicaciones necesita del espejo para saber a quién escribir. */
+export interface EspejosDeContacto {
+  cuentas: InvCuentaRow[];
+  contactos: InvContactoRow[];
+  cuentaContacto: InvCuentaContactoRow[];
+  promociones: InvPromocionRow[];
+  cuentaPromocion: InvCuentaPromocionRow[];
+  sinMigracion: boolean;
+}
+
+/**
+ * Cuentas, contactos y suscripciones, sin los flujos.
+ *
+ * A diferencia de `cargarEspejos`, aquí las cuentas marcadas como prueba SÍ
+ * llegan: Comunicaciones las enseña en la lista, marcadas y excluidas, para que
+ * quien revisa los destinatarios vea que existen y que no reciben nada. Quien
+ * consuma esto tiene que mirar `excluida`.
+ */
+export async function cargarEspejosDeContacto(ctx: UserContext): Promise<EspejosDeContacto> {
+  const supabase = getInversoresReadSupabase(ctx);
+
+  const [cuentas, contactos, cuentaContacto, promociones, cuentaPromocion] = await Promise.all([
+    leerTodo<InvCuentaRow>(supabase, "inv_cuentas", "*"),
+    leerTodo<InvContactoRow>(supabase, "inv_contactos", "*"),
+    leerTodo<InvCuentaContactoRow>(supabase, "inv_cuenta_contacto", "*"),
+    leerTodo<InvPromocionRow>(supabase, "inv_promociones", "*"),
+    leerTodo<InvCuentaPromocionRow>(supabase, "inv_cuenta_promocion", "*"),
+  ]);
+
+  return {
+    cuentas: cuentas.filas,
+    contactos: contactos.filas,
+    cuentaContacto: cuentaContacto.filas,
+    promociones: promociones.filas,
+    cuentaPromocion: cuentaPromocion.filas,
+    sinMigracion: cuentas.sinTabla,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Catálogo de mapeo
 // ---------------------------------------------------------------------------

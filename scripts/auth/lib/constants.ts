@@ -8,6 +8,7 @@ export const ZONE_KEYS = [
   "corporativo",
   "pm",
   "adquisiciones",
+  "comunicaciones",
   "data",
 ] as const;
 

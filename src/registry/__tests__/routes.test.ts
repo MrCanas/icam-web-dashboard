@@ -33,6 +33,29 @@ test("monday.logs ya tiene su propia key (antes devolvía null)", () => {
   assert.equal(routeKeyForPathname("/dashboard/monday/logs"), "monday.logs");
 });
 
+test("comunicaciones: «nueva» tiene su key y todo lo demás cae en el historial", () => {
+  // El historial excluye «nueva» a propósito (el primer match gana). Si se
+  // rompe, el detalle de una comunicación se gobernaría con el permiso equivocado.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones"), "comunicaciones.historial");
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/nueva"), "comunicaciones.nueva");
+  assert.equal(
+    routeKeyForPathname("/dashboard/comunicaciones/3f0c1a52-9d1e-4a2b-8a43-0d2f6b1c7e55"),
+    "comunicaciones.historial",
+  );
+  assert.equal(zoneForRouteKey("comunicaciones.nueva"), "comunicaciones");
+  // Lo mismo con «ajustes»: ahí están el interruptor de envíos y el modo real.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/ajustes"), "comunicaciones.ajustes");
+  assert.equal(zoneForRouteKey("comunicaciones.ajustes"), "comunicaciones");
+  // La analítica agregada tiene su clave; la de un correo concreto es parte de
+  // su detalle y se gobierna como él.
+  assert.equal(routeKeyForPathname("/dashboard/comunicaciones/analitica"), "comunicaciones.analitica");
+  assert.equal(zoneForRouteKey("comunicaciones.analitica"), "comunicaciones");
+  assert.equal(
+    routeKeyForPathname("/dashboard/comunicaciones/3f0c1a52-9d1e-4a2b-8a43-0d2f6b1c7e55/analitica"),
+    "comunicaciones.historial",
+  );
+});
+
 test("una ruta fuera del registry devuelve null", () => {
   assert.equal(routeKeyForPathname("/dashboard/perfil"), null);
 });
