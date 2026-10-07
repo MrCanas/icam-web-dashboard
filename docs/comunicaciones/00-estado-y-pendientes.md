@@ -31,7 +31,7 @@ defecto, ni sin pantalla de destinatarios, prueba previa y confirmación explíc
 
 ## 3. Qué hay construido
 
-Todo en la PR #64 (`feat/comunicaciones-lectura`).
+Todo llegó a `main` con la PR #64 (`feat/comunicaciones-lectura`), mergeada el 2026-10-07.
 
 | Pieza | Estado |
 |---|---|
@@ -52,7 +52,8 @@ Todo en la PR #64 (`feat/comunicaciones-lectura`).
 | Rediseño: cabeceras con chips, stepper, pestañas, tarjetas KPI, ayuda en ⓘ y desplegables, piezas compartidas en `src/components/ui/` | Hecho el 2026-10-07. Revisado en local con la pasarela simulada; pendiente de que Javier lo vea |
 | Zona `comunicaciones` | Concedida solo a `javiercanas@imparcapital.com`, como admin |
 | Ajustes | Envíos **desactivados** y modo **pruebas**. Cuenta de pruebas: TEST CUENTA JCV_Updated. Remitente permitido: `javiercanas@imparcapital.com`. Tope diario: 100 |
-| Token de envíos | Generado el 2026-10-06 con el usuario de Javier Canas. Solo en el `.env.local` de su copia de trabajo; **falta ponerlo en Vercel (Production)** |
+| PR #64 | **Mergeada el 2026-10-07**. Producción (`main`) tiene el módulo entero con el candado puesto, los envíos desactivados y, mientras falten las variables de abajo, la pasarela simulada |
+| Token de envíos | Generado el 2026-10-06 con el usuario de Javier Canas. Solo en el `.env.local` de su copia de trabajo (`Documents\icam_dashboard`); **falta ponerlo en Vercel (Production)** |
 | `COMUNICACIONES_SEGUIMIENTO_URL` | En local, `http://localhost:3100`. **Falta ponerla en Vercel**: `https://go.imparcapital.com` |
 
 ### Probado el 2026-10-06
@@ -147,16 +148,14 @@ desarrolladores > Conexiones.
 
 ## 5. Pendientes, y quién hace cada uno
 
-Javier Canas pidió el 2026-10-06 dejar los cuatro primeros **para el final del todo**.
+La PR #64 se mergeó el 2026-10-07. En el orden en que tiene sentido:
 
 | Tarea | Quién |
 |---|---|
+| Crear en Cloudflare `CNAME go → 1429ddcbf3c9f778.vercel-dns-017.com` (solo DNS, sin proxy), comprobando antes que no exista ya un registro `go`. El dominio ya está en el proyecto de Vercel | Javier (o Claude con su sesión de Cloudflare) |
+| En Vercel, entorno Production: `COMUNICACIONES_SEGUIMIENTO_URL=https://go.imparcapital.com` y `ZOHO_REFRESH_TOKEN_ENVIOS` (el del `.env.local`; `npx vercel env add ZOHO_REFRESH_TOKEN_ENVIOS production`) | Javier |
+| Comprobar una apertura real: activar envíos, enviarse un correo desde producción (solo a él, bajo el candado), abrirlo cargando las imágenes y verla en la analítica. Al terminar, envíos desactivados | Javier |
 | Borrar los cuatro módulos y la conexión del CRM (§4) | Javier |
-| Mergear la PR #64 (`main` es producción) | Javier |
-| Guardar el token de envíos en Vercel, **solo en Production** | Javier, tras el merge |
-| Quitar el candado, en otra PR | Cuando Javier lo decida |
-| Crear en Cloudflare `CNAME go → 1429ddcbf3c9f778.vercel-dns-017.com` (solo DNS, sin proxy), comprobando antes que no exista ya un registro `go` | Hace falta que Javier inicie sesión en Cloudflare |
-| Poner `COMUNICACIONES_SEGUIMIENTO_URL=https://go.imparcapital.com` en Vercel | Con el DNS ya creado |
-| Comprobar una apertura real: enviarse un correo desde producción y abrirlo cargando las imágenes | Tras el merge, con el candado puesto |
 | Confirmar con protección de datos el registro de aperturas y clics por persona | Antes de quitar el candado |
 | Resolver el límite de 100 correos al día de Zoho | Antes de quitar el candado |
+| Quitar el candado, en otra PR | Cuando Javier lo decida |

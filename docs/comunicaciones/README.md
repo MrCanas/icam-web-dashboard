@@ -65,7 +65,6 @@ Lo que hay en el PC de Javier Canas y no es el proyecto, sino copias o historia:
 | Carpeta | Qué es |
 |---|---|
 | `Documents\icam_dashboard` | Copia de trabajo principal del repo |
-| `Documents\icam_dashboard-comunicaciones` | Copia temporal de la rama de la PR #64. Se retira tras el merge |
 | OneDrive `Documentos\ZohoCRM-Automations\archivo\2026-10-05-kiosk\` | El kiosk de Zoho retirado, como referencia |
 | OneDrive `Documentos\ZohoCRM-Automations\docs\destinatarios-envio-zurbaran5-2026-10-05.md` | A quién llegó el envío erróneo del 2026-10-05 |
 
