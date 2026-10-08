@@ -23,6 +23,8 @@ interface Props {
   destinatarios: ComDestinatarioRow[];
   dominiosInternos: string[];
   editable: boolean;
+  /** Dentro del asistente: sin título ni subtítulo, que ya los pone el paso. */
+  compacta?: boolean;
 }
 
 type Filtro = "todos" | "a_enviar" | "con_avisos" | "excluidos" | "sin_destinatario";
@@ -140,7 +142,7 @@ function Situacion({ d }: { d: ComDestinatarioRow }) {
  * de que exista la posibilidad de escribirle. Excluir a alguien es reversible y
  * no toca el CRM; solo cambia esta comunicación.
  */
-export function DestinatariosPanel({ comunicacionId, nombre, destinatarios, dominiosInternos, editable }: Props) {
+export function DestinatariosPanel({ comunicacionId, nombre, destinatarios, dominiosInternos, editable, compacta }: Props) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [busqueda, setBusqueda] = useState("");
@@ -183,8 +185,8 @@ export function DestinatariosPanel({ comunicacionId, nombre, destinatarios, domi
   return (
     <Tarjeta
       id="com-destinatarios"
-      titulo="Destinatarios"
-      subtitulo="Una fila por cuenta de inversión. Excluir a alguien no toca el CRM: solo cambia esta comunicación."
+      titulo={compacta ? undefined : "Destinatarios"}
+      subtitulo={compacta ? undefined : "Una fila por cuenta de inversión. Excluir a alguien no toca el CRM: solo cambia esta comunicación."}
       acciones={
         <Boton variante="secundario" pequeno icono={<Icono nombre="descargar" />} onClick={descargar}>
           Descargar CSV

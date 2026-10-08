@@ -20,9 +20,14 @@ import {
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
 import { pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
-import { Candado } from "@/modules/comunicaciones/ui/components/ui/Candado";
+import { ETIQUETA_PASO, indiceDe, PASOS, pasoSugerido } from "@/modules/comunicaciones/logic/asistente";
+import { ChipEntorno } from "@/modules/comunicaciones/ui/components/asistente/ChipEntorno";
+import { entornoDe } from "@/modules/comunicaciones/ui/components/asistente/entorno";
 import { ChipEstadoComunicacion } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
 import { ETIQUETA_AUDIENCIA } from "@/modules/comunicaciones/types";
+
+/** Las que todavía no han terminado: se retoman en el asistente. */
+const EN_CURSO = ["borrador", "revisada", "probada", "enviando", "pausada"];
 
 const TREINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -60,6 +65,7 @@ export default async function HistorialPage() {
       <EncabezadoDePagina
         titulo="Comunicaciones"
         meta="Correos a inversores: la lista y la plantilla se ven antes de que salga nada."
+        chips={<ChipEntorno entorno={entornoDe(envios)} />}
         acciones={
           puedePreparar ? (
             <BotonEnlace href={COMUNICACIONES_NUEVA_PATH} variante="primario" icono={<Icono nombre="mas" />}>
@@ -68,8 +74,6 @@ export default async function HistorialPage() {
           ) : null
         }
       />
-
-      <Candado datos={envios} />
 
       {sinMigracion ? (
         <Aviso tipo="aviso" titulo="Faltan las tablas de Comunicaciones">
@@ -114,6 +118,7 @@ export default async function HistorialPage() {
                   <th scope="col" className={TABLA.thNum}>Abrieron</th>
                   <th scope="col" className={TABLA.thNum}>Clic</th>
                   <th scope="col" className={TABLA.th}>Preparada</th>
+                  {puedePreparar ? <th scope="col" className={TABLA.th}><span className="sr-only">Acciones</span></th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -166,6 +171,18 @@ export default async function HistorialPage() {
                         {fmtFechaHora(c.created_at)}
                         <span className={TABLA.sub}>{c.creada_por_email}</span>
                       </td>
+                      {puedePreparar ? (
+                        <td className={`${TABLA.td} whitespace-nowrap text-right`}>
+                          {EN_CURSO.includes(c.estado) ? (
+                            <BotonEnlace href={comunicacionPath(c.id)} variante="secundario" pequeno>
+                              Continuar
+                              <span className="text-text-muted">
+                                · paso {indiceDe(pasoSugerido(c)) + 1} de {PASOS.length}: {ETIQUETA_PASO[pasoSugerido(c)]}
+                              </span>
+                            </BotonEnlace>
+                          ) : null}
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}

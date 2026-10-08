@@ -113,6 +113,17 @@ demasiado texto explicativo y no seguía el sistema del portal. El servidor loca
 no era el portal, sino Claude Code matando el proceso por falta de memoria en el equipo
 ([`01-puesta-en-marcha.md`](01-puesta-en-marcha.md) § 5).
 
+### Asistente de envío (2026-10-08)
+
+Javier pidió rehacer el flujo de envío: más guiado, sabiendo siempre cuál es el siguiente paso, y
+con los avisos al final o detrás de un ⓘ, sin quitar ningún paso. Ahora es un asistente de cinco
+pasos a pantalla completa (Audiencia, Destinatarios, Contenido, Prueba, Revisar y enviar;
+`ui/components/asistente/`, `logic/asistente.ts`). Los controles y el candado no cambian: el
+asistente solo decide qué paso enseñar y usa los mismos motivos de `logic/controles.ts`. Una
+comunicación enviada o descartada se ve en su resumen (`ResumenPage`). **La vista anterior queda
+como rescate** con `?clasica=1` (en el detalle y en «Nueva») hasta que Javier valide el asistente;
+después se retiran `DetalleClasicoPage`, `NuevaForm` y `EnvioPanel` con sus `Paso*`.
+
 Fuera de alcance por ahora: recordatorios automáticos, confirmación de asistencia a eventos, listas
 propias y aprobación por una segunda persona.
 
