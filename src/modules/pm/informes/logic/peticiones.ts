@@ -1,5 +1,6 @@
 import type { SlideJson } from "../slides/tipos";
 import type { TipoPeticionClaude } from "../types";
+import { fuentesNuevas } from "./analisis";
 import {
   bloqueDirigido,
   promptActualizar,
@@ -10,6 +11,8 @@ import {
   promptDirigida,
   promptNueva,
   promptResumen,
+  promptRevisionAnalisis,
+  promptRevisionInforme,
   type BloquePrompt,
   type MaterialInforme,
   type MedidaAjuste,
@@ -22,7 +25,7 @@ import {
  * slide que se ajusta o corrige, las marcas y los adjuntos).
  */
 export type PeticionClaude =
-  | { tipo: "analisis"; informeId: string }
+  | { tipo: "analisis"; informeId: string; modo?: "completo" | "revision" }
   | { tipo: "slide"; informeId: string; slideId: string; modo: "actualizar" | "nueva" }
   // Montar el slide con la información que el equipo ha dirigido a él (logic/dirigidas.ts).
   | { tipo: "slide"; informeId: string; slideId: string; modo: "dirigida"; slide: SlideJson }
@@ -36,9 +39,18 @@ export type PeticionClaude =
       marcas?: string;
       adjuntos?: string;
     }
-  | { tipo: "coherencia"; informeId: string; slides: SlideJson[] };
+  | { tipo: "coherencia"; informeId: string; slides: SlideJson[] }
+  // Instrucción sobre el informe que puede tocar varias slides (desdoblar, fusionar, crear…).
+  | { tipo: "revision"; informeId: string; instruccion: string; slides: SlideJson[]; ambito: string[]; adjuntos?: string };
 
-const TIPOS: TipoPeticionClaude[] = ["analisis", "slide", "ajuste", "resumen", "correccion", "coherencia"];
+export type TipoPeticion = PeticionClaude["tipo"];
+
+const TIPOS: TipoPeticion[] = ["analisis", "slide", "ajuste", "resumen", "correccion", "coherencia", "revision"];
+
+/** Tipo con el que se anota el coste en informe_uso (su CHECK de la 043 no conoce «revision»: cuenta como corrección). */
+export function tipoUso(t: TipoPeticion): TipoPeticionClaude {
+  return t === "revision" ? "correccion" : t;
+}
 
 function esSlide(v: unknown): v is SlideJson {
   return !!v && typeof v === "object" && !Array.isArray(v) && typeof (v as SlideJson).id === "string";
@@ -48,13 +60,13 @@ function esSlide(v: unknown): v is SlideJson {
 export function leerPeticion(raw: unknown): PeticionClaude | string {
   if (!raw || typeof raw !== "object") return "Cuerpo no válido";
   const b = raw as Record<string, unknown>;
-  const tipo = b.tipo as TipoPeticionClaude;
+  const tipo = b.tipo as TipoPeticion;
   if (!TIPOS.includes(tipo)) return "Tipo de petición no válido";
   if (typeof b.informeId !== "string") return "Falta el informe";
   const informeId = b.informeId;
   switch (tipo) {
     case "analisis":
-      return { tipo, informeId };
+      return b.modo === "revision" ? { tipo, informeId, modo: "revision" } : { tipo, informeId };
     case "slide":
       if (typeof b.slideId !== "string" || !b.slideId) return "Falta el slide";
       if (b.modo === "dirigida") {
@@ -81,6 +93,18 @@ export function leerPeticion(raw: unknown): PeticionClaude | string {
         marcas: typeof b.marcas === "string" ? b.marcas.slice(0, 20_000) : undefined,
         adjuntos: typeof b.adjuntos === "string" ? b.adjuntos : undefined,
       };
+    case "revision":
+      if (!Array.isArray(b.slides) || !b.slides.every(esSlide) || typeof b.instruccion !== "string" || !b.instruccion.trim()) {
+        return "Faltan las slides o la instrucción";
+      }
+      return {
+        tipo,
+        informeId,
+        instruccion: b.instruccion.slice(0, 12_000),
+        slides: b.slides as SlideJson[],
+        ambito: Array.isArray(b.ambito) ? b.ambito.filter((x): x is string => typeof x === "string").slice(0, 12) : [],
+        adjuntos: typeof b.adjuntos === "string" ? b.adjuntos : undefined,
+      };
   }
 }
 
@@ -88,6 +112,10 @@ export function leerPeticion(raw: unknown): PeticionClaude | string {
 export function montarPrompt(p: PeticionClaude, m: MaterialInforme): BloquePrompt[] | string {
   switch (p.tipo) {
     case "analisis":
+      if (p.modo === "revision") {
+        if (!m.analisis) return "Todavía no hay análisis que revisar";
+        return promptRevisionAnalisis(m, fuentesNuevas(m.fuentes, m.analisis));
+      }
       return promptAnalisis(m);
     case "slide": {
       if (p.modo === "dirigida") {
@@ -108,5 +136,7 @@ export function montarPrompt(p: PeticionClaude, m: MaterialInforme): BloquePromp
       return promptCorreccion(m, p.slide, p.instruccion, { marcas: p.marcas, adjuntos: p.adjuntos });
     case "coherencia":
       return promptCoherencia(m.informe, p.slides, m.fuentes);
+    case "revision":
+      return promptRevisionInforme(m, p);
   }
 }

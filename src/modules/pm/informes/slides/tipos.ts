@@ -88,6 +88,11 @@ export interface SlideJson {
   fuentes?: string;
   /** Imágenes puestas a mano en un área; las pinta `elemento()` encima de la slide. */
   flotantes?: Flotante[];
+  /**
+   * Cerrada por el equipo: ninguna petición a Claude la reescribe (generación,
+   * revisiones, coherencia). Distinta de `origen: "bloqueada"` (Finanzas).
+   */
+  cerrada?: boolean;
 }
 
 export interface InformeJson {

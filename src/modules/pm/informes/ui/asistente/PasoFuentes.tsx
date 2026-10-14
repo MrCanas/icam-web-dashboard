@@ -16,7 +16,8 @@ import {
 import { dirigirFuente, pendientesDirigidas, seleccionBase, slidesDeFuente } from "../../logic/dirigidas";
 import { fechaEs } from "../../logic/fuentes-actas";
 import { respuestaAuto } from "../../logic/fuentes-auto";
-import { normalizarEstructura, tituloDe } from "../../logic/informe";
+import { normalizarAnalisis } from "../../logic/analisis";
+import { tituloDe } from "../../logic/informe";
 import { rutaActasTrimestre, rutaPlanificacionProyecto, urlFoto } from "../../logic/paths";
 import { parseTrimestre, rangoTrimestre } from "../../logic/trimestre";
 import { CATEGORIAS_FOTO, PARA_FINANZAS, type Analisis, type CategoriaFoto, type Foto, type Fuente, type TipoFuenteAuto } from "../../types";
@@ -264,14 +265,8 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
           onProgreso: () => setAnalizando("Claude está escribiendo el análisis…"),
         },
       );
-      const a = (json && typeof json === "object" ? json : {}) as Record<string, unknown>;
-      for (const k of ["resumen", "objetivosPrevios", "hechos", "estructura", "sugeridas", "faltan", "contradicciones"]) {
-        if (!Array.isArray(a[k])) a[k] = [];
-      }
       // Sin indicaciones de «No reportar» no hay lista: así el paso 3 distingue «nada afectado» de «no se aplicaron».
-      a.omitidos = noReportar.trim() ? (Array.isArray(a.omitidos) ? a.omitidos : []) : undefined;
-      const analisis = a as unknown as Analisis;
-      analisis.estructura = normalizarEstructura(a.estructura, h.previo);
+      const analisis: Analisis = { ...normalizarAnalisis(json, { previo: h.previo, hayNoReportar: !!noReportar.trim() }), ronda: 1, fecha: new Date().toISOString() };
       const ok = await h.guardar(
         { analisis, seleccion: { estructura: analisis.estructura, anadir: [], dirigidas: informe.seleccion?.dirigidas }, estado: "analizado" },
         "Información del trimestre analizada",
@@ -527,7 +522,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
           {sinResponder
             ? "Antes de analizar, indica si quieres incorporar las actas y la planificación."
             : yaGenerado
-              ? "Para usar un documento en unas slides, dirígelo a ellas y vuelve a la revisión: allí Claude las monta. Volver a analizar y generar rehace todo el informe."
+              ? "Para usar un documento en unas slides, dirígelo a ellas y vuelve a la revisión: allí Claude las monta. Volver a analizar empieza el análisis de cero (pierdes lo editado en el paso 3) y generar rehace todo el informe."
               : "Claude lee todo y propone la estructura (1–3 minutos)."}
         </span>
       </div>
