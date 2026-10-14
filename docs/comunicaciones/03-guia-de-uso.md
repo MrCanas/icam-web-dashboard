@@ -30,24 +30,22 @@ Preparar y enviar una comunicación es un **asistente de cinco pasos** a pantall
 
 ## 1. Audiencia
 
-En **Comunicaciones > Nueva comunicación**:
+En **Comunicaciones > Nueva comunicación**, el asistente hace las preguntas **una a una**. Cada
+respuesta se pliega en una línea con «Cambiar» y abre la siguiente; abajo se ve cuántas llevas («2
+de 4») y qué falta. «Continuar» solo se enciende cuando están todas.
 
-1. **Datos de Zoho.** Si no son de hoy, el asistente lo pide lo primero: pulsa «Actualizar datos» y
-   espera alrededor de un minuto.
-2. **Elige a quién va dirigida:**
-   - *Promoción o fondo*: las cuentas con suscripción a esa promoción o ese fondo.
-   - *Toda la base*: todas las cuentas de inversión.
-   - *Inversores directos*: las cuentas sin intermediario.
+1. **Datos de Zoho** (solo si no son de hoy): pulsa «Actualizar ahora» y espera alrededor de un
+   minuto. Hasta entonces no se puede seguir.
+2. **¿A quién quieres escribir?** Promoción o fondo, toda la base o inversores directos, cada una con
+   su número de cuentas.
+3. **¿Qué promoción o fondo?** (solo si eliges promoción): búscala por nombre o código.
+4. **¿Qué tipo de comunicación es?** Reporte, evento, newsletter, oportunidad u otro.
+5. **¿Quién de cada cuenta lo recibe?** Elige una combinación habitual (la recomendada es solo el
+   contacto principal) u «Otra combinación» para marcar los papeles a mano.
 
-   Cada opción enseña cuántas cuentas tiene.
-3. **Elige el tipo** (reporte, evento, newsletter…).
-4. **Quién de cada cuenta lo recibe** viene plegado con el valor habitual (contacto principal en
-   «Para»); ábrelo para cambiar los papeles en «Para» y en copia.
-5. Pulsa **«Continuar a Destinatarios»**. Si falta algo, el botón no se queda gris: dice qué falta
-   y marca el campo. Continuar calcula los destinatarios y guarda el borrador; no envía nada.
-
-Sale **un correo por cuenta**, no uno por persona. La audiencia queda fijada: para otra, empieza
-una comunicación nueva.
+Al terminar, una tarjeta verde resume lo elegido. **«Continuar a Destinatarios»** calcula la lista y
+guarda el borrador; no envía nada. Sale **un correo por cuenta**, no uno por persona. La audiencia
+queda fijada: para otra, empieza una comunicación nueva.
 
 ## 2. Destinatarios
 
@@ -99,13 +97,15 @@ ves en la vista previa.
 
 ## 4. Prueba
 
-Elige el remitente («Desde») y pulsa **«Enviarme la prueba»**. Te llega el correo de verdad, solo
-a ti. Ábrelo y mira el asunto, los datos de la cuenta, los enlaces y los adjuntos; si está bien,
-pulsa **«La he recibido y está bien»**. Si cambias de plantilla, hay que repetir la prueba.
+Dos partes: **① envíate la prueba** (elige el remitente y pulsa «Enviarme la prueba»; te llega el
+correo de verdad, solo a ti) y **② ábrela y revísala**: marca lo que vas comprobando (asunto, datos
+de la cuenta, enlaces y adjuntos) y, si está bien, pulsa **«La he recibido y está bien»**. Si cambias de plantilla, hay que repetir la prueba.
 
 ## 5. Revisar y enviar
 
-1. **El resumen**: para quién (audiencia, cuántos correos, y las cuentas una por una), contenido,
+Tres partes, en orden:
+
+1. **Repasa lo que vas a enviar**: para quién (audiencia, cuántos correos, y las cuentas una por una), contenido,
    remitente, prueba y modo. Cada fila tiene **«Editar»**, que te lleva a su paso.
 2. **La comprobación final** (el ensayo general) **se hace sola al entrar**: el portal monta todos
    los correos sin enviar ninguno y te dice cuántos saldrían, **a qué direcciones exactas** y qué

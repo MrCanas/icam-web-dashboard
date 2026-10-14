@@ -27,6 +27,7 @@ import { useEnvioPorTandas } from "@/modules/comunicaciones/ui/components/envio/
 import { ChipModo, ChipPasarela } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
 import { ListaDeDirecciones } from "@/modules/comunicaciones/ui/components/ui/ListaDeDirecciones";
 
+import { ListaGuiada, PreguntaGuiada, type EstadoPregunta } from "./guiado";
 import { BarraDeAcciones, PasoDelAsistente } from "./marco";
 
 /**
@@ -121,31 +122,45 @@ export function PasoRevisarYEnviar({
   const numeroEscrito = numero.trim() !== "";
   const limite = ajustes.limite_diario ?? LIMITE_DIARIO_ZOHO;
 
+  const comprobacionOk = ensayoHecho && problemas.length === 0 && !errorEnsayo;
+  const estadoComprobacion: EstadoPregunta = bloqueada
+    ? "error"
+    : problemas.length > 0 || errorEnsayo || (!ensayando && motivoEnsayar !== null)
+      ? "error"
+      : comprobacionOk
+        ? "hecha"
+        : "activa";
+  const estadoConfirmar: EstadoPregunta = comprobacionOk && !bloqueada ? "activa" : "bloqueada";
+
   const motivoPie = !puedeEscribir
     ? "Tu rol en Comunicaciones es de lectura: puedes ver en qué punto está, pero no enviar."
     : bloqueada
       ? "El candado no deja enviar esta comunicación."
       : ensayando
-        ? "Haciendo la comprobación final…"
-        : motivoEnsayar ?? (problemas.length > 0 ? "Resuelve los problemas de la comprobación final." : motivoDelEnsayo ?? (numeroEscrito ? motivoConfirmar : null));
+        ? "2 de 3 · haciendo la comprobación final…"
+        : !comprobacionOk
+          ? "2 de 3 · falta la comprobación final"
+          : numeroEscrito && motivoConfirmar
+            ? motivoConfirmar
+            : `3 de 3 · escribe ${fmtInt(resumen.aEnviar)} para confirmar`;
 
   return (
     <PasoDelAsistente
       ancho="normal"
-      titulo={bloqueada ? "Esta comunicación no se puede enviar" : ensayoHecho ? "Todo listo para enviar" : "Revisa y envía"}
+      titulo={bloqueada ? "Esta comunicación no se puede enviar" : comprobacionOk ? "Todo listo para enviar" : "Revisa y envía"}
       subtitulo={
         bloqueada
           ? "El candado de destinatarios rechazaría parte de sus correos, así que no sale ninguno."
-          : "Repasa el resumen. Cuando la comprobación final esté en verde, escribe el número de correos y envía."
+          : "Tres comprobaciones y sale."
       }
       pie={
         <BarraDeAcciones
           atras={atras}
           motivo={motivoPie}
           extra={
-            puedeEscribir && ensayoHecho && !bloqueada ? (
+            puedeEscribir && comprobacionOk && !bloqueada ? (
               <label className="flex items-center gap-2 text-xs text-text-muted">
-                Escribe <strong className="text-text-primary">{fmtInt(resumen.aEnviar)}</strong> para confirmar
+                Escribe <strong className="text-text-primary">{fmtInt(resumen.aEnviar)}</strong>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -164,7 +179,7 @@ export function PasoRevisarYEnviar({
                 variante="primario"
                 icono={<Icono nombre="enviar" />}
                 cargando={envio.ocupado}
-                disabled={!ensayoHecho || motivoConfirmar !== null || envio.ocupado || ensayando || problemas.length > 0}
+                disabled={!comprobacionOk || motivoConfirmar !== null || envio.ocupado || ensayando}
                 onClick={() => void envio.confirmar(Number(numero))}
               >
                 Enviar {cuantos(resumen.aEnviar, "correo", "correos")}
@@ -174,8 +189,16 @@ export function PasoRevisarYEnviar({
         />
       }
     >
-      {/* El resumen, estilo lista de comprobación: cada fila lleva a su paso. */}
-      <ol className="divide-y divide-subtle/60 overflow-hidden rounded-xl border border-subtle/60 bg-card shadow-sm">
+      <ListaGuiada>
+        <PreguntaGuiada
+          numero={1}
+          estado="hecha"
+          abiertaSiHecha
+          titulo="Repasa lo que vas a enviar"
+          respuesta={`${audiencia} · ${cuantos(resumen.aEnviar, "correo", "correos")} · ${comunicacion.plantilla_nombre ?? "—"}`}
+        >
+          {/* Cada fila lleva a su paso para cambiarla. */}
+          <ol className="divide-y divide-subtle/60 overflow-hidden rounded-lg border border-subtle/60">
         <Fila
           estado="ok"
           titulo="Para"
@@ -231,57 +254,61 @@ export function PasoRevisarYEnviar({
           ) : null}
         </Fila>
 
-        {bloqueada && candado ? (
-          <Fila
-            estado="error"
-            titulo="Candado"
-            detalle={
+          </ol>
+        </PreguntaGuiada>
+
+        <PreguntaGuiada
+          numero={2}
+          estado={estadoComprobacion}
+          cargando={ensayando}
+          titulo={bloqueada ? "El candado no la deja salir" : "Comprobación final"}
+          subtitulo={
+            bloqueada
+              ? undefined
+              : ensayando
+                ? "Montando y validando cada correo, sin enviar ninguno…"
+                : "El portal monta todos los correos, los valida y los pasa por el candado, sin enviar ninguno."
+          }
+          respuesta={
+            ensayo ? (
               <>
+                {cuantos(ensayo.correos, "correo correcto", "correos correctos")}
+                <span className="font-normal text-text-muted">
+                  {ensayo.omitidos > 0 ? ` · ${cuantos(ensayo.omitidos, "omitido", "omitidos")} por dirección repetida` : ""} ·{" "}
+                  {cuantos(ensayo.enlaces, "enlace rastreado", "enlaces rastreados")} ·{" "}
+                  {ensayo.adjuntos.length > 0 ? `adjuntos: ${ensayo.adjuntos.join(", ")}` : "sin adjuntos"} · {fmtFechaHora(comunicacion.ensayo_at)}
+                </span>
+              </>
+            ) : null
+          }
+          onCambiar={puedeEscribir ? () => void ensayar() : undefined}
+          abiertaSiHecha
+        >
+          {bloqueada && candado ? (
+            <div className="space-y-1 text-sm text-red-800">
+              <p>
                 Rechazaría {fmtInt(candado.rechazados)} de sus {fmtInt(candado.rechazados + candado.permitidos)} correos, así que no se
                 envía ninguno.
                 {candado.primerRechazo ? ` Por ejemplo, ${candado.primerRechazo.cuenta}: ${candado.primerRechazo.motivo}.` : ""}
-              </>
-            }
-          >
-            <p className="mt-1 text-xs text-text-muted">
-              Mientras el candado exista, este módulo solo puede escribir a las direcciones de la lista cerrada y sobre
-              las cuentas de prueba de la promoción de pruebas. La lista de destinatarios es a quién iría si no hubiera
-              candado: sirve para revisarla, pero a nadie de ella se le escribe.
-            </p>
-          </Fila>
-        ) : (
-          <Fila
-            estado={ensayando ? "cargando" : problemas.length > 0 || errorEnsayo ? "error" : ensayoHecho ? "ok" : "pendiente"}
-            titulo="Comprobación final"
-            detalle={
-              ensayando
-                ? "Montando y validando cada correo, sin enviar ninguno…"
-                : problemas.length > 0
-                  ? `Ha encontrado ${cuantos(problemas.length, "problema", "problemas")}: no se puede enviar hasta resolverlos.`
-                  : ensayoHecho && ensayo
-                    ? (
-                        <>
-                          <strong>{cuantos(ensayo.correos, "correo correcto", "correos correctos")}</strong>
-                          {ensayo.omitidos > 0 ? `, ${cuantos(ensayo.omitidos, "omitido", "omitidos")} por dirección repetida` : ""} ·{" "}
-                          {cuantos(ensayo.enlaces, "enlace rastreado", "enlaces rastreados")} ·{" "}
-                          {ensayo.adjuntos.length > 0 ? `adjuntos: ${ensayo.adjuntos.join(", ")}` : "sin adjuntos"} · hecha a las{" "}
-                          {fmtFechaHora(comunicacion.ensayo_at)}
-                        </>
-                      )
-                    : (errorEnsayo ?? motivoEnsayar ?? motivoDelEnsayo ?? "Pendiente")
-            }
-            accion={
-              puedeEscribir && !ensayando && motivoEnsayar === null && (!ensayoHecho || problemas.length > 0) ? (
-                <Boton variante={ensayoHecho ? "secundario" : "primario"} pequeno icono={<Icono nombre="actualizar" />} onClick={() => void ensayar()}>
-                  {comunicacion.ensayo_at || errorEnsayo || problemas.length > 0 ? "Repetir" : "Comprobar"}
-                </Boton>
-              ) : puedeEscribir && ensayoHecho ? (
-                <Boton variante="texto" pequeno onClick={() => void ensayar()}>
-                  Repetir
-                </Boton>
-              ) : null
-            }
-          >
+              </p>
+              <p className="text-xs text-text-muted">
+                Mientras el candado exista, este módulo solo puede escribir a las direcciones de la lista cerrada y sobre
+                las cuentas de prueba de la promoción de pruebas. La lista de destinatarios es a quién iría si no hubiera
+                candado: sirve para revisarla, pero a nadie de ella se le escribe.
+              </p>
+            </div>
+          ) : (
+            <>
+              {problemas.length > 0 ? (
+                <p className="text-sm font-medium text-red-800">
+                  Ha encontrado {cuantos(problemas.length, "problema", "problemas")}: no se puede enviar hasta resolverlos.
+                </p>
+              ) : null}
+              {!ensayando && problemas.length === 0 && !comprobacionOk ? (
+                <p className={`text-sm ${errorEnsayo || motivoEnsayar ? "text-red-800" : "text-text-muted"}`}>
+                  {errorEnsayo ?? motivoEnsayar ?? motivoDelEnsayo ?? "Pendiente"}
+                </p>
+              ) : null}
             {problemas.length > 0 ? (
               <ul className="mt-2 max-h-56 list-disc overflow-auto pl-5 text-sm text-red-800">
                 {problemas.map((p, i) => (
@@ -313,9 +340,32 @@ export function PasoRevisarYEnviar({
                 ) : null}
               </div>
             ) : null}
-          </Fila>
-        )}
-      </ol>
+              {puedeEscribir && !ensayando && motivoEnsayar === null && !comprobacionOk ? (
+                <Boton variante="primario" pequeno className="mt-3" icono={<Icono nombre="actualizar" />} onClick={() => void ensayar()}>
+                  {comunicacion.ensayo_at || errorEnsayo || problemas.length > 0 ? "Repetir la comprobación" : "Comprobar ahora"}
+                </Boton>
+              ) : null}
+            </>
+          )}
+        </PreguntaGuiada>
+
+        <PreguntaGuiada
+          numero={3}
+          estado={estadoConfirmar}
+          ultima
+          titulo="Confirma y envía"
+          subtitulo={
+            <>
+              Escribe <strong>{fmtInt(resumen.aEnviar)}</strong> en la barra de abajo y pulsa «Enviar{" "}
+              {cuantos(resumen.aEnviar, "correo", "correos")}». Escribirlo a mano es a propósito: obliga a leer cuántos salen.
+            </>
+          }
+        >
+          <p className="text-xs text-text-muted">
+            Saldrá en tandas de {TANDA}. Podrás detenerlo en cualquier momento; no cierres la página mientras envía.
+          </p>
+        </PreguntaGuiada>
+      </ListaGuiada>
 
       {envio.error ? <Aviso tipo="error">{envio.error}</Aviso> : null}
 

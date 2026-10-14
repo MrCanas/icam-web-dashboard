@@ -12,6 +12,7 @@ import { enviarPruebaAction, marcarPruebaVistaAction } from "@/modules/comunicac
 import { motivoParaContinuar } from "@/modules/comunicaciones/logic/asistente";
 import { pruebaVigente, puedeEnviarPrueba, type ContextoControles } from "@/modules/comunicaciones/logic/controles";
 
+import { ListaGuiada, PreguntaGuiada, type EstadoPregunta } from "./guiado";
 import { BarraDeAcciones, PasoDelAsistente } from "./marco";
 
 const MIRAR = [
@@ -49,6 +50,8 @@ export function PasoDePrueba({
   const [ocupado, setOcupado] = useState<"prueba" | "vista" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recienEnviada, setRecienEnviada] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [mirado, setMirado] = useState<string[]>([]);
 
   const hayPrueba = pruebaVigente(comunicacion);
   const probada = comunicacion.estado !== "borrador" && comunicacion.estado !== "revisada";
@@ -63,6 +66,8 @@ export function PasoDePrueba({
     setOcupado(null);
     if (r.ok) {
       setRecienEnviada(true);
+      setReenviando(false);
+      setMirado([]);
       router.refresh();
     } else setError(r.mensaje);
   };
@@ -80,11 +85,14 @@ export function PasoDePrueba({
     else setError(r.mensaje);
   };
 
+  const estadoEnviar: EstadoPregunta = reenviando || (!hayPrueba && !probada) ? "activa" : "hecha";
+  const estadoMirar: EstadoPregunta = probada && !reenviando ? "hecha" : hayPrueba && !reenviando ? "activa" : "bloqueada";
+
   return (
     <PasoDelAsistente
       ancho="estrecho"
       titulo="Envíate una prueba"
-      subtitulo={`Te llega el correo de verdad, con la plantilla elegida, solo a ti (${usuarioEmail}).`}
+      subtitulo="Antes de que salga a nadie, míralo tú como lo verá un inversor."
       ayuda={
         <>
           La prueba sale sobre la cuenta de pruebas de los ajustes, no sobre un destinatario de la lista, para no
@@ -95,9 +103,15 @@ export function PasoDePrueba({
       pie={
         <BarraDeAcciones
           atras={atras}
-          motivo={motivo ?? (!probada && puedeEscribir ? "Cuando la hayas mirado, dala por buena" : null)}
+          motivo={
+            probada || !puedeEscribir
+              ? null
+              : !hayPrueba
+                ? "1 de 2 · envíate la prueba"
+                : "2 de 2 · cuando la hayas mirado, dala por buena"
+          }
           principal={
-            <Boton variante="primario" cargando={ocupado === "vista"} disabled={motivo !== null || ocupado !== null} onClick={continuar}>
+            <Boton variante="primario" cargando={ocupado === "vista"} disabled={motivo !== null || ocupado !== null || reenviando} onClick={continuar}>
               {probada || !puedeEscribir ? "Continuar a Revisar y enviar" : "La he recibido y está bien"}
               <Icono nombre="chevron" className="h-3.5 w-3.5" />
             </Boton>
@@ -105,84 +119,110 @@ export function PasoDePrueba({
         />
       }
     >
-      {probada ? (
-        <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
-            <Icono nombre="check" className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 text-sm">
-            <p className="font-semibold text-green-900">Prueba dada por buena</p>
-            <p className="text-green-900/80">
-              {comunicacion.probada_por_email} · {fmtFechaHora(comunicacion.probada_at)} · desde {comunicacion.remitente_email}
-            </p>
-          </div>
-        </div>
-      ) : hayPrueba ? (
-        <div className="space-y-3 rounded-xl border border-icam-900/15 bg-card p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-icam-900/[0.06] text-icam-900">
-              <Icono nombre="correo" className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-base font-semibold text-text-primary">
-                {recienEnviada ? "¡Enviada! Mira tu bandeja" : "Mira tu bandeja de entrada"}
-              </p>
-              <p className="text-sm text-text-muted">
-                Enviada a {comunicacion.prueba_enviada_por_email} el {fmtFechaHora(comunicacion.prueba_enviada_at)}
-                {simulada ? " · pasarela simulada: no ha salido ningún correo" : ""}
-              </p>
+      <ListaGuiada>
+        <PreguntaGuiada
+          numero={1}
+          estado={estadoEnviar}
+          titulo="Envíate la prueba"
+          subtitulo={`Te llega solo a ti, a ${usuarioEmail}.`}
+          respuesta={
+            hayPrueba || probada ? (
+              <>
+                Enviada a {comunicacion.prueba_enviada_por_email ?? usuarioEmail}
+                <span className="font-normal text-text-muted">
+                  {" "}
+                  · {fmtFechaHora(comunicacion.prueba_enviada_at)} · desde {comunicacion.remitente_email}
+                  {simulada ? " · simulada, no ha salido ningún correo" : ""}
+                </span>
+              </>
+            ) : null
+          }
+          onCambiar={puedeEscribir ? () => setReenviando(true) : undefined}
+        >
+          {puedeEscribir ? (
+            <div className="space-y-3">
+              <Campo etiqueta="Desde">
+                <select value={remitente} onChange={(e) => setRemitente(e.target.value)} className={claseCampo}>
+                  {ajustes.remitentes_permitidos.length === 0 ? <option value="">(ninguno permitido)</option> : null}
+                  {ajustes.remitentes_permitidos.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <div className="flex flex-wrap items-center gap-2">
+                <Boton
+                  variante="primario"
+                  icono={<Icono nombre="enviar" />}
+                  cargando={ocupado === "prueba"}
+                  disabled={motivoPrueba !== null || ocupado !== null}
+                  onClick={enviar}
+                >
+                  {hayPrueba || probada ? "Enviarme otra prueba" : "Enviarme la prueba"}
+                </Boton>
+                {reenviando ? (
+                  <Boton variante="texto" onClick={() => setReenviando(false)}>
+                    Cancelar
+                  </Boton>
+                ) : null}
+              </div>
+              {motivoPrueba ? <p className="text-xs text-text-muted">{motivoPrueba}</p> : null}
+              {probada ? <p className="text-xs text-text-muted">Enviar otra prueba obliga a darla por buena de nuevo.</p> : null}
             </div>
-          </div>
-          <ul className="space-y-1.5 border-t border-subtle/60 pt-3 text-sm text-text-body">
-            {MIRAR.map((m) => (
-              <li key={m} className="flex items-start gap-2">
-                <Icono nombre="check" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-muted" />
-                {m}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-subtle bg-card px-6 py-8 text-center">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-icam-900/[0.06] text-icam-900">
-            <Icono nombre="enviar" className="h-5 w-5" />
-          </span>
-          <p className="text-base font-semibold text-text-primary">Todavía no te has enviado ninguna prueba</p>
-          <p className="max-w-md text-sm text-text-muted">
-            Ábrela en tu correo como la verá un inversor. Cuando esté bien, vuelve aquí y dala por buena.
-          </p>
-        </div>
-      )}
+          ) : (
+            <p className="text-sm text-text-muted">Todavía no se ha enviado ninguna prueba.</p>
+          )}
+        </PreguntaGuiada>
 
-      {puedeEscribir ? (
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-subtle/60 bg-card p-4">
-          <div className="min-w-[240px] flex-1">
-            <Campo etiqueta="Desde">
-              <select value={remitente} onChange={(e) => setRemitente(e.target.value)} className={claseCampo}>
-                {ajustes.remitentes_permitidos.length === 0 ? <option value="">(ninguno permitido)</option> : null}
-                {ajustes.remitentes_permitidos.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-          </div>
-          <Boton
-            variante={hayPrueba || probada ? "secundario" : "primario"}
-            icono={<Icono nombre="enviar" />}
-            cargando={ocupado === "prueba"}
-            disabled={motivoPrueba !== null || ocupado !== null}
-            onClick={enviar}
-          >
-            {hayPrueba || probada ? "Enviarme otra prueba" : "Enviarme la prueba"}
-          </Boton>
-          {motivoPrueba ? <p className="basis-full text-xs text-text-muted">{motivoPrueba}</p> : null}
-          {probada ? (
-            <p className="basis-full text-xs text-text-muted">Enviar otra prueba obliga a darla por buena de nuevo.</p>
+        <PreguntaGuiada
+          numero={2}
+          estado={estadoMirar}
+          ultima
+          titulo={recienEnviada && !probada ? "¡Enviada! Ábrela en tu bandeja y revísala" : "Ábrela en tu bandeja y revísala"}
+          subtitulo="Marca lo que ya has comprobado. Si todo está bien, dala por buena."
+          respuesta={
+            probada ? (
+              <>
+                Dada por buena
+                <span className="font-normal text-text-muted">
+                  {" "}
+                  · {comunicacion.probada_por_email} · {fmtFechaHora(comunicacion.probada_at)}
+                </span>
+              </>
+            ) : null
+          }
+        >
+          <ul className="space-y-1.5">
+            {MIRAR.map((m) => {
+              const hecho = mirado.includes(m);
+              return (
+                <li key={m}>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-text-body hover:bg-page">
+                    <input
+                      type="checkbox"
+                      checked={hecho}
+                      onChange={() => setMirado((l) => (hecho ? l.filter((x) => x !== m) : [...l, m]))}
+                      className="h-4 w-4 accent-green-600"
+                    />
+                    <span className={hecho ? "text-text-muted line-through" : ""}>{m}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          {puedeEscribir ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-subtle/60 pt-3">
+              <Boton variante="primario" icono={<Icono nombre="check" />} cargando={ocupado === "vista"} disabled={motivo !== null || ocupado !== null} onClick={continuar}>
+                La he recibido y está bien
+              </Boton>
+              <span className="text-xs text-text-muted">
+                {mirado.length === MIRAR.length ? "¡Todo comprobado!" : `${mirado.length} de ${MIRAR.length} comprobados`}
+              </span>
+            </div>
           ) : null}
-        </div>
-      ) : null}
+        </PreguntaGuiada>
+      </ListaGuiada>
 
       {error ? <Aviso tipo="error">{error}</Aviso> : null}
     </PasoDelAsistente>

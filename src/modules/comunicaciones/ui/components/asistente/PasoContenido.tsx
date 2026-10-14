@@ -131,7 +131,7 @@ export function PasoContenido({
       pie={
         <BarraDeAcciones
           atras={atras}
-          motivo={motivo}
+          motivo={!plantillaId ? "1 de 2 · elige una plantilla" : motivo ?? "2 de 2 · mira la vista previa con dos o tres destinatarios"}
           principal={
             <Boton variante="primario" disabled={motivo !== null || guardando} onClick={onContinuar}>
               Continuar a Prueba
@@ -147,7 +147,10 @@ export function PasoContenido({
         {/* Izquierda: la plantilla elegida o el selector. */}
         <div className="space-y-3 rounded-xl border border-subtle/60 bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-text-primary">Plantilla</h2>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+              <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${Boolean(plantillaId) && !eligiendo ? "bg-green-600 text-white" : "bg-icam-900 text-white"}`}>{Boolean(plantillaId) && !eligiendo ? <Icono nombre="check" className="h-3.5 w-3.5" /> : 1}</span>
+              Elige la plantilla
+            </h2>
             {editable && plantillaId && !eligiendo ? (
               <Boton variante="secundario" pequeno onClick={() => setEligiendo(true)}>
                 Cambiar
@@ -261,7 +264,10 @@ export function PasoContenido({
         {/* Derecha: cómo le llega a un destinatario. */}
         <div className="space-y-3 rounded-xl border border-subtle/60 bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-text-primary">Vista previa</h2>
+            <h2 className={`flex items-center gap-2 text-sm font-semibold ${plantillaId ? "text-text-primary" : "text-text-muted"}`}>
+              <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${plantillaId ? "bg-icam-900 text-white" : "border-2 border-subtle text-text-muted"}`}>2</span>
+              Mira cómo le llega
+            </h2>
             {plantillaId && destinatarios.length > 0 ? (
               <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs text-text-muted">
                 Cómo le llega a
