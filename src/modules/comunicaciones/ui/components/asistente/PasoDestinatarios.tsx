@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Aviso } from "@/components/ui/Aviso";
 import { Boton } from "@/components/ui/Boton";
 import { Icono } from "@/components/ui/Icono";
-import { fmtInt } from "@/lib/formatters";
+import { fmtFechaHora, fmtInt } from "@/lib/formatters";
 import { revisarDestinatariosAction } from "@/modules/comunicaciones/actions/envio";
 import { motivoParaContinuar } from "@/modules/comunicaciones/logic/asistente";
 import type { ContextoControles } from "@/modules/comunicaciones/logic/controles";
@@ -13,6 +13,7 @@ import type { ComDestinatarioRow } from "@/modules/comunicaciones/types";
 import { DestinatariosPanel } from "@/modules/comunicaciones/ui/components/DestinatariosPanel";
 import { cuantos } from "@/modules/comunicaciones/ui/components/envio/texto";
 
+import { ListaGuiada, PreguntaGuiada, type EstadoPregunta } from "./guiado";
 import { BarraDeAcciones, PasoDelAsistente } from "./marco";
 
 /**
@@ -63,22 +64,35 @@ export function PasoDestinatarios({
         : `He revisado los ${fmtInt(resumen.aEnviar)}`
       : "Continuar a Contenido";
 
+  // La lista se mira antes de confirmar. Si ya está revisada, se da por mirada.
+  const [mirando, setMirando] = useState(porRevisar);
+  const conAvisos = destinatarios.filter((d) => d.avisos.length > 0).length;
+  const estadoLista: EstadoPregunta = mirando ? "activa" : "hecha";
+  const estadoConfirmar: EstadoPregunta = !porRevisar ? "hecha" : mirando ? "bloqueada" : "activa";
+
   return (
     <PasoDelAsistente
       ancho="ancho"
       titulo="Revisa quién lo va a recibir"
-      subtitulo="Una fila por cuenta de inversión. Excluye a quien no deba recibirlo; no toca el CRM, solo esta comunicación."
+      subtitulo="Tres pasos cortos: mira las cifras, repasa la lista y confírmala."
       ayuda={
         <>
           La lista es una foto del momento en que se preparó: no se recalcula sola, y lo que revisas aquí es
-          exactamente lo que después se envía. Si después de confirmarla excluyes o incluyes a alguien, tendrás que
-          volver a confirmar que la has revisado.
+          exactamente lo que después se envía. Excluir a alguien no toca el CRM, solo esta comunicación. Si después de
+          confirmarla excluyes o incluyes a alguien, tendrás que volver a confirmar que la has revisado.
         </>
       }
       pie={
         <BarraDeAcciones
           atras={atras}
-          motivo={motivo ?? (porRevisar && puedeEscribir ? "Confirma que has revisado la lista para seguir" : null)}
+          motivo={
+            motivo ??
+            (!porRevisar || !puedeEscribir
+              ? null
+              : mirando
+                ? "2 de 3 · repasa la lista"
+                : "3 de 3 · confirma que la has revisado")
+          }
           principal={
             <Boton variante="primario" cargando={ocupado} disabled={motivo !== null} onClick={continuar}>
               {etiqueta}
@@ -89,46 +103,118 @@ export function PasoDestinatarios({
         />
       }
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
-        <div className="rounded-xl border border-icam-900/15 bg-icam-900/[0.04] p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-text-muted">Saldrán</p>
-          <p className="mt-0.5 text-2xl font-semibold text-icam-900">{cuantos(resumen.aEnviar, "correo", "correos")}</p>
-          <p className="text-xs text-text-muted">
-            uno por cuenta, a {cuantos(resumen.direcciones, "dirección", "direcciones")} ({cuantos(resumen.direccionesExternas, "externa", "externas")})
-          </p>
-        </div>
-        <Cifra titulo="Cuentas en la lista" valor={resumen.total} />
-        <Cifra titulo="Excluidas" valor={resumen.excluidos} />
-        <Cifra titulo="Sin destinatario" valor={resumen.sinDestinatario} nota="no recibirían nada" />
-      </div>
+      <ListaGuiada>
+        <PreguntaGuiada
+          numero={1}
+          estado="hecha"
+          abiertaSiHecha
+          titulo="Esto es lo que saldría"
+          respuesta={
+            <>
+              {cuantos(resumen.aEnviar, "correo", "correos")}
+              <span className="font-normal text-text-muted">
+                {" "}
+                · uno por cuenta, a {cuantos(resumen.direcciones, "dirección", "direcciones")} ({cuantos(resumen.direccionesExternas, "externa", "externas")})
+              </span>
+            </>
+          }
+        >
+          <div className="grid gap-2 sm:grid-cols-4">
+            <Cifra titulo="Saldrán" valor={resumen.aEnviar} nota="correos" destacada />
+            <Cifra titulo="Cuentas en la lista" valor={resumen.total} />
+            <Cifra titulo="Excluidas" valor={resumen.excluidos} />
+            <Cifra titulo="Sin destinatario" valor={resumen.sinDestinatario} nota="no recibirían nada" />
+          </div>
+        </PreguntaGuiada>
 
-      {!porRevisar && comunicacion.revisada_por_email ? (
-        <p className="flex items-center gap-1.5 text-xs text-green-700">
-          <Icono nombre="check" className="h-3.5 w-3.5" />
-          Revisada por {comunicacion.revisada_por_email}
-          {comunicacion.revisada_n !== null ? ` con ${cuantos(comunicacion.revisada_n, "correo", "correos")}` : ""}
-        </p>
-      ) : null}
+        <PreguntaGuiada
+          numero={2}
+          estado={estadoLista}
+          abiertaSiHecha={false}
+          titulo="Repasa la lista, cuenta por cuenta"
+          subtitulo={
+            conAvisos > 0 ? (
+              <>
+                Empieza por las <strong>{cuantos(conAvisos, "cuenta con avisos", "cuentas con avisos")}</strong> (filtro «Con
+                avisos»). Excluye a quien no deba recibirlo.
+              </>
+            ) : (
+              "Ninguna cuenta tiene avisos. Excluye a quien no deba recibirlo."
+            )
+          }
+          respuesta={
+            <>
+              {cuantos(resumen.total, "cuenta revisada", "cuentas revisadas")}
+              <span className="font-normal text-text-muted">
+                {" "}
+                · {cuantos(resumen.excluidos, "excluida", "excluidas")} · {cuantos(conAvisos, "con avisos", "con avisos")}
+              </span>
+            </>
+          }
+          onCambiar={() => setMirando(true)}
+        >
+          <DestinatariosPanel
+            comunicacionId={comunicacion.id}
+            nombre={comunicacion.nombre}
+            destinatarios={destinatarios}
+            dominiosInternos={dominiosInternos}
+            editable={editable}
+            compacta
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <span className="text-xs text-text-muted">
+              {cuantos(resumen.aEnviar, "cuenta recibiría", "cuentas recibirían")} el correo
+            </span>
+            <Boton variante={porRevisar ? "primario" : "secundario"} pequeno onClick={() => setMirando(false)}>
+              {porRevisar ? "Ya la he repasado" : "Cerrar la lista"}
+              <Icono nombre="check" className="h-3 w-3" />
+            </Boton>
+          </div>
+        </PreguntaGuiada>
+
+        <PreguntaGuiada
+          numero={3}
+          estado={estadoConfirmar}
+          ultima
+          titulo="Confirma que la has revisado"
+          subtitulo="Queda constancia de quién la ha revisado y con cuántos correos."
+          respuesta={
+            comunicacion.revisada_por_email ? (
+              <>
+                Revisada por {comunicacion.revisada_por_email}
+                <span className="font-normal text-text-muted">
+                  {comunicacion.revisada_n !== null ? ` · ${cuantos(comunicacion.revisada_n, "correo", "correos")}` : ""}
+                  {comunicacion.revisada_at ? ` · ${fmtFechaHora(comunicacion.revisada_at)}` : ""}
+                </span>
+              </>
+            ) : (
+              "Revisada"
+            )
+          }
+        >
+          {puedeEscribir ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Boton variante="primario" cargando={ocupado} disabled={motivo !== null} icono={<Icono nombre="check" />} onClick={continuar}>
+                {etiqueta} · Continuar
+              </Boton>
+              {motivo ? <span className="text-xs text-text-muted">{motivo}</span> : null}
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted">Tu rol es de lectura: no puedes confirmarla.</p>
+          )}
+        </PreguntaGuiada>
+      </ListaGuiada>
 
       {error ? <Aviso tipo="error">{error}</Aviso> : null}
-
-      <DestinatariosPanel
-        comunicacionId={comunicacion.id}
-        nombre={comunicacion.nombre}
-        destinatarios={destinatarios}
-        dominiosInternos={dominiosInternos}
-        editable={editable}
-        compacta
-      />
     </PasoDelAsistente>
   );
 }
 
-function Cifra({ titulo, valor, nota }: { titulo: string; valor: number; nota?: string }) {
+function Cifra({ titulo, valor, nota, destacada }: { titulo: string; valor: number; nota?: string; destacada?: boolean }) {
   return (
-    <div className="rounded-xl border border-subtle/60 bg-card p-4">
+    <div className={`rounded-lg border p-3 ${destacada ? "border-icam-900/15 bg-icam-900/[0.04]" : "border-subtle/60 bg-card"}`}>
       <p className="text-xs font-medium uppercase tracking-wider text-text-muted">{titulo}</p>
-      <p className="mt-0.5 text-2xl font-semibold tabular-nums text-text-primary">{fmtInt(valor)}</p>
+      <p className={`mt-0.5 text-2xl font-semibold tabular-nums ${destacada ? "text-icam-900" : "text-text-primary"}`}>{fmtInt(valor)}</p>
       {nota ? <p className="text-xs text-text-muted">{nota}</p> : null}
     </div>
   );

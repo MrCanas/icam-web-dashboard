@@ -48,35 +48,17 @@ const DESCRIPCION_TIPO: Record<TipoComunicacion, string> = {
   otro: "Cualquier otra cosa",
 };
 
-/** Las combinaciones habituales de quién recibe el correo en cada cuenta. */
-const PRESETS: { clave: string; titulo: string; detalle: string; para: RolContacto[]; copia: RolContacto[]; recomendado?: boolean }[] = [
-  {
-    clave: "principal",
-    titulo: "Solo el contacto principal",
-    detalle: "Lo habitual: una persona por cuenta.",
-    para: ["principal"],
-    copia: [],
-    recomendado: true,
-  },
-  {
-    clave: "principal_secundario",
-    titulo: "El principal, con el secundario en copia",
-    detalle: "Para que el segundo contacto también lo vea.",
-    para: ["principal"],
-    copia: ["secundario"],
-  },
-  {
-    clave: "principal_y_secundario",
-    titulo: "El principal y el secundario, los dos en «Para»",
-    detalle: "Ambos como destinatarios directos.",
-    para: ["principal", "secundario"],
-    copia: [],
-  },
-];
+const DESCRIPCION_ROL: Record<RolContacto, string> = {
+  principal: "La persona de referencia de la cuenta",
+  secundario: "El segundo contacto de la cuenta",
+  representante_legal: "Quien firma en nombre de la cuenta",
+  abogado: "El asesor legal de la cuenta",
+  intermediario: "Quien trajo la inversión",
+};
+
+type Destino = "para" | "copia";
 
 type Pregunta = "zoho" | "audiencia" | "promocion" | "tipo" | "contactos";
-
-const mismos = (a: RolContacto[], b: RolContacto[]) => a.length === b.length && a.every((r) => b.includes(r));
 
 /**
  * Paso 1 de una comunicación nueva, como una conversación: una pregunta cada
@@ -99,33 +81,37 @@ export function NuevaComunicacion({
 }) {
   const router = useRouter();
   const [audiencia, setAudiencia] = useState<Audiencia | "">("");
-  const [promocion, setPromocion] = useState("");
+  const [promociones, setPromociones] = useState<string[]>([]);
+  const [promocionesListas, setPromocionesListas] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [tipo, setTipo] = useState<TipoComunicacion | "">("");
-  const [rolesPara, setRolesPara] = useState<RolContacto[]>(["principal"]);
-  const [rolesCopia, setRolesCopia] = useState<RolContacto[]>([]);
+  // Qué papeles reciben el correo y cómo: en «Para» o en copia.
+  const [papeles, setPapeles] = useState<Partial<Record<RolContacto, Destino>>>({ principal: "para" });
   const [contactosListos, setContactosListos] = useState(false);
-  const [personalizando, setPersonalizando] = useState(false);
   const [editando, setEditando] = useState<Pregunta | null>(null);
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null);
   const [preparando, empezarPreparar] = useTransition();
   const [actualizando, empezarActualizar] = useTransition();
 
-  const promocionElegida = recuento.promociones.find((p) => p.zohoId === promocion);
+  const promocionesElegidas = recuento.promociones.filter((p) => promociones.includes(p.zohoId));
+  // Una cuenta en dos promociones cuenta una vez.
+  const cuentasDePromociones = new Set(promocionesElegidas.flatMap((p) => p.cuentaIds)).size;
   const cuentas =
     audiencia === "toda_la_base"
       ? recuento.todaLaBase
       : audiencia === "inversores_directos"
         ? recuento.inversoresDirectos
         : audiencia === "promocion"
-          ? (promocionElegida?.numCuentas ?? null)
+          ? cuentasDePromociones
           : null;
+  const rolesPara = ROLES_CONTACTO.filter((r) => papeles[r] === "para");
+  const rolesCopia = ROLES_CONTACTO.filter((r) => papeles[r] === "copia");
 
   // Las preguntas, en orden, y si cada una está respondida.
   const preguntas: { clave: Pregunta; respondida: boolean }[] = [
     ...(datosDeHoy ? [] : [{ clave: "zoho" as const, respondida: false }]),
     { clave: "audiencia", respondida: audiencia !== "" },
-    ...(audiencia === "promocion" ? [{ clave: "promocion" as const, respondida: promocion !== "" }] : []),
+    ...(audiencia === "promocion" ? [{ clave: "promocion" as const, respondida: promocionesListas && promociones.length > 0 }] : []),
     { clave: "tipo", respondida: tipo !== "" },
     { clave: "contactos", respondida: contactosListos && rolesPara.length > 0 },
   ];
@@ -151,10 +137,30 @@ export function NuevaComunicacion({
     return recuento.promociones.filter((p) => p.nombre.toLowerCase().includes(q) || (p.codigo ?? "").toLowerCase().includes(q));
   }, [busqueda, recuento.promociones]);
 
-  const preset = PRESETS.find((p) => mismos(p.para, rolesPara) && mismos(p.copia, rolesCopia));
-  const textoContactos = `${rolesPara.map((r) => ETIQUETA_ROL[r]).join(" y ") || "nadie"}${
-    rolesCopia.length > 0 ? `, con ${rolesCopia.map((r) => ETIQUETA_ROL[r].toLowerCase()).join(" y ")} en copia` : ""
+  const textoContactos = `${rolesPara.map((r) => ETIQUETA_ROL[r]).join(", ") || "nadie"} en Para${
+    rolesCopia.length > 0 ? ` · ${rolesCopia.map((r) => ETIQUETA_ROL[r]).join(", ")} en copia` : ""
   }`;
+  const textoPromociones =
+    promocionesElegidas.length === 1
+      ? promocionesElegidas[0].nombre
+      : `${promocionesElegidas.length} promociones o fondos`;
+
+  /** Marca o desmarca una promoción. Cambiarlas obliga a confirmar otra vez. */
+  const alternarPromocion = (id: string) => {
+    setPromociones((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
+    setPromocionesListas(false);
+  };
+
+  /** Marca o desmarca un papel; al marcarlo entra en «Para». */
+  const alternarPapel = (rol: RolContacto) => {
+    setPapeles((p) => {
+      const nuevo = { ...p };
+      if (nuevo[rol]) delete nuevo[rol];
+      else nuevo[rol] = "para";
+      return nuevo;
+    });
+    setContactosListos(false);
+  };
 
   const preparar = () => {
     if (!todoListo) return;
@@ -164,7 +170,7 @@ export function NuevaComunicacion({
         const r = await prepararComunicacionAction({
           tipo: tipo as TipoComunicacion,
           audiencia: audiencia as Audiencia,
-          promocionZohoId: promocion || null,
+          promocionesZohoIds: promociones,
           rolesPara,
           rolesCopia,
         });
@@ -187,7 +193,7 @@ export function NuevaComunicacion({
   const queFalta: Record<Pregunta, string> = {
     zoho: "Primero, actualiza los datos de Zoho",
     audiencia: "Elige la audiencia",
-    promocion: "Elige la promoción o el fondo",
+    promocion: "Elige las promociones o fondos",
     tipo: "Elige el tipo de comunicación",
     contactos: "Elige quién de cada cuenta lo recibe",
   };
@@ -271,7 +277,10 @@ export function NuevaComunicacion({
                     type="button"
                     onClick={() => {
                       setAudiencia(a);
-                      if (a !== "promocion") setPromocion("");
+                      if (a !== "promocion") {
+                        setPromociones([]);
+                        setPromocionesListas(false);
+                      }
                       // Si elige promoción, la siguiente pregunta es cuál.
                       setEditando(a === "promocion" ? "promocion" : null);
                     }}
@@ -304,14 +313,12 @@ export function NuevaComunicacion({
             <PreguntaGuiada
               numero={numeroDe("promocion")}
               estado={estadoDe("promocion")}
-              titulo="¿Qué promoción o fondo?"
-              subtitulo="Búscala por nombre o código."
+              titulo="¿Qué promociones o fondos?"
+              subtitulo="Marca una o varias. Una cuenta que esté en varias recibe un solo correo."
               respuesta={
-                promocionElegida ? (
+                promocionesElegidas.length > 0 ? (
                   <>
-                    {promocionElegida.codigo ? `${promocionElegida.codigo} · ` : ""}
-                    {promocionElegida.nombre}{" "}
-                    <span className="font-normal text-text-muted">· {fmtInt(promocionElegida.numCuentas)} cuentas</span>
+                    {textoPromociones} <span className="font-normal text-text-muted">· {fmtInt(cuentasDePromociones)} cuentas</span>
                   </>
                 ) : null
               }
@@ -329,27 +336,44 @@ export function NuevaComunicacion({
                   autoFocus
                 />
               </label>
-              <ul className="max-h-72 space-y-1 overflow-auto pr-1">
+              {promocionesElegidas.length > 0 ? (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {promocionesElegidas.map((p) => (
+                    <button
+                      key={p.zohoId}
+                      type="button"
+                      onClick={() => alternarPromocion(p.zohoId)}
+                      className="inline-flex items-center gap-1 rounded-full bg-icam-900 py-1 pl-2.5 pr-1.5 text-xs font-medium text-white transition hover:bg-icam-800"
+                      aria-label={`Quitar ${p.nombre}`}
+                    >
+                      {p.codigo ?? p.nombre}
+                      <Icono nombre="cerrar" className="h-3 w-3 opacity-80" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <ul className="max-h-72 space-y-1 overflow-auto rounded-lg border border-subtle/60 p-1">
                 {promocionesFiltradas.map((p) => {
-                  const elegida = p.zohoId === promocion;
+                  const marcada = promociones.includes(p.zohoId);
                   return (
                     <li key={p.zohoId}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPromocion(p.zohoId);
-                          responder();
-                        }}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-icam-900/40 ${
-                          elegida ? "border-icam-900 bg-icam-900/[0.04]" : "border-transparent hover:border-subtle hover:bg-page"
+                      <label
+                        className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-icam-900/40 ${
+                          marcada ? "bg-icam-900/[0.05]" : "hover:bg-page"
                         }`}
                       >
-                        <span className="min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={marcada}
+                          onChange={() => alternarPromocion(p.zohoId)}
+                          className="h-4 w-4 shrink-0 accent-icam-900"
+                        />
+                        <span className="min-w-0 flex-1">
                           <span className="font-medium text-text-primary">{p.nombre}</span>
                           {p.codigo ? <span className="ml-2 text-xs text-text-muted">{p.codigo}</span> : null}
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-text-muted">{fmtInt(p.numCuentas)} cuentas</span>
-                      </button>
+                      </label>
                     </li>
                   );
                 })}
@@ -357,6 +381,31 @@ export function NuevaComunicacion({
                   <li className="px-3 py-4 text-center text-sm text-text-muted">Ninguna promoción con ese texto.</li>
                 ) : null}
               </ul>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-text-muted">
+                  {promociones.length === 0 ? (
+                    "Ninguna marcada todavía"
+                  ) : (
+                    <>
+                      <strong className="text-text-primary">{promociones.length}</strong> marcadas ·{" "}
+                      <strong className="text-text-primary">{fmtInt(cuentasDePromociones)}</strong> cuentas sin repetir
+                    </>
+                  )}
+                </span>
+                <Boton
+                  variante="primario"
+                  pequeno
+                  disabled={promociones.length === 0}
+                  onClick={() => {
+                    setPromocionesListas(true);
+                    setBusqueda("");
+                    responder();
+                  }}
+                >
+                  {promociones.length <= 1 ? "Usar esta" : `Usar estas ${promociones.length}`}
+                  <Icono nombre="chevron" className="h-3 w-3" />
+                </Boton>
+              </div>
             </PreguntaGuiada>
           ) : null}
 
@@ -393,129 +442,78 @@ export function NuevaComunicacion({
             estado={estadoDe("contactos")}
             ultima
             titulo="¿Quién de cada cuenta lo recibe?"
-            subtitulo="Sale un correo por cuenta, no uno por persona."
-            ayuda="Quien tiene un papel marcado en «Para» recibe el correo; quien lo tiene en copia, va en copia. Nadie va a la vez en los dos. Los papeles son los del CRM."
+            subtitulo="Marca uno o varios papeles. Sale un correo por cuenta, no uno por persona."
+            ayuda="Quien tiene un papel en «Para» recibe el correo; quien lo tiene en copia, va en copia. Nadie va a la vez en los dos. Los papeles son los del CRM."
             respuesta={textoContactos}
-            onCambiar={() => {
-              setEditando("contactos");
-              setPersonalizando(!preset);
-            }}
+            onCambiar={() => setEditando("contactos")}
           >
             <div className="grid gap-2">
-              {PRESETS.map((p) => {
-                const elegido = !personalizando && preset?.clave === p.clave;
+              {ROLES_CONTACTO.map((rol) => {
+                const destino = papeles[rol];
                 return (
-                  <button
-                    key={p.clave}
-                    type="button"
-                    onClick={() => {
-                      setRolesPara(p.para);
-                      setRolesCopia(p.copia);
-                      setPersonalizando(false);
-                      setContactosListos(true);
-                      responder();
-                    }}
-                    className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-icam-900/40 ${
-                      elegido ? "border-icam-900 bg-icam-900/[0.04]" : "border-subtle hover:border-icam-900/40 hover:bg-page"
+                  <div
+                    key={rol}
+                    className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
+                      destino ? "border-icam-900 bg-icam-900/[0.04]" : "border-subtle hover:border-icam-900/40"
                     }`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${elegido ? "border-icam-900" : "border-subtle"}`}
-                    >
-                      {elegido ? <span className="h-2 w-2 rounded-full bg-icam-900" /> : null}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2 font-medium text-text-primary">
-                        {p.titulo}
-                        {p.recomendado ? <Chip tono="marca">Recomendado</Chip> : null}
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(destino)}
+                        onChange={() => alternarPapel(rol)}
+                        className="h-4 w-4 shrink-0 accent-icam-900"
+                      />
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-2 font-medium text-text-primary">
+                          {ETIQUETA_ROL[rol]}
+                          {rol === "principal" ? <Chip tono="marca">Lo habitual</Chip> : null}
+                        </span>
+                        <span className="block text-xs text-text-muted">{DESCRIPCION_ROL[rol]}</span>
                       </span>
-                      <span className="block text-xs text-text-muted">{p.detalle}</span>
-                    </span>
-                  </button>
+                    </label>
+                    {destino ? (
+                      <div role="radiogroup" aria-label={`Cómo recibe ${ETIQUETA_ROL[rol]}`} className="inline-flex rounded-lg border border-subtle bg-card p-0.5 text-xs">
+                        {(["para", "copia"] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            role="radio"
+                            aria-checked={destino === d}
+                            onClick={() => {
+                              setPapeles((p) => ({ ...p, [rol]: d }));
+                              setContactosListos(false);
+                            }}
+                            className={`rounded-md px-2.5 py-1 font-medium transition ${
+                              destino === d ? "bg-icam-900 text-white" : "text-text-muted hover:text-text-primary"
+                            }`}
+                          >
+                            {d === "para" ? "Para" : "En copia"}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setPersonalizando(true)}
-                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-icam-900/40 ${
-                  personalizando ? "border-icam-900 bg-icam-900/[0.04]" : "border-subtle hover:border-icam-900/40 hover:bg-page"
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${personalizando ? "border-icam-900" : "border-subtle"}`}
-                >
-                  {personalizando ? <span className="h-2 w-2 rounded-full bg-icam-900" /> : null}
-                </span>
-                <span>
-                  <span className="block font-medium text-text-primary">Otra combinación</span>
-                  <span className="block text-xs text-text-muted">Representante legal, abogado, intermediario…</span>
-                </span>
-              </button>
             </div>
-
-            {personalizando ? (
-              <div className="mt-3 space-y-3 rounded-xl border border-subtle bg-page/50 p-3">
-                <div className="overflow-auto rounded-md border border-subtle bg-card">
-                  <table className="w-full text-sm">
-                    <thead className="bg-subtle/30">
-                      <tr className="text-left">
-                        <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-icam-900">Papel en la cuenta</th>
-                        <th scope="col" className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-icam-900">Para</th>
-                        <th scope="col" className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-icam-900">Copia</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ROLES_CONTACTO.map((rol) => (
-                        <tr key={rol} className="border-t border-subtle/60">
-                          <th scope="row" className="px-3 py-1.5 text-left font-normal text-text-body">
-                            {ETIQUETA_ROL[rol]}
-                          </th>
-                          <td className="px-3 py-1.5 text-center">
-                            <input
-                              type="checkbox"
-                              aria-label={`${ETIQUETA_ROL[rol]} en Para`}
-                              checked={rolesPara.includes(rol)}
-                              onChange={() => {
-                                setRolesPara((l) => (l.includes(rol) ? l.filter((r) => r !== rol) : [...l, rol]));
-                                // Nadie va a la vez en «Para» y en copia.
-                                setRolesCopia((l) => l.filter((r) => r !== rol));
-                              }}
-                              className="accent-icam-900"
-                            />
-                          </td>
-                          <td className="px-3 py-1.5 text-center">
-                            <input
-                              type="checkbox"
-                              aria-label={`${ETIQUETA_ROL[rol]} en copia`}
-                              checked={rolesCopia.includes(rol)}
-                              disabled={rolesPara.includes(rol)}
-                              onChange={() => setRolesCopia((l) => (l.includes(rol) ? l.filter((r) => r !== rol) : [...l, rol]))}
-                              className="accent-icam-900"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {rolesPara.length === 0 ? <span className="text-xs text-text-muted">Marca al menos un papel en «Para».</span> : null}
-                  <Boton
-                    variante="primario"
-                    pequeno
-                    disabled={rolesPara.length === 0}
-                    onClick={() => {
-                      setContactosListos(true);
-                      responder();
-                    }}
-                  >
-                    Usar esta combinación
-                  </Boton>
-                </div>
-              </div>
-            ) : null}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <span className={`text-sm ${rolesPara.length === 0 ? "text-red-700" : "text-text-muted"}`}>
+                {rolesPara.length === 0 ? "Hace falta al menos un papel en «Para»." : textoContactos}
+              </span>
+              <Boton
+                variante="primario"
+                pequeno
+                disabled={rolesPara.length === 0}
+                onClick={() => {
+                  setContactosListos(true);
+                  responder();
+                }}
+              >
+                Listo
+                <Icono nombre="check" className="h-3 w-3" />
+              </Boton>
+            </div>
           </PreguntaGuiada>
         </ListaGuiada>
 
@@ -530,9 +528,9 @@ export function NuevaComunicacion({
                 <strong>{ETIQUETA_TIPO[tipo as TipoComunicacion]}</strong> ·{" "}
                 <strong>
                   {fmtInt(cuentas ?? 0)} cuentas
-                  {audiencia === "promocion" && promocionElegida ? ` de ${promocionElegida.nombre}` : ` · ${ETIQUETA_AUDIENCIA[audiencia as Audiencia]}`}
+                  {audiencia === "promocion" ? ` de ${textoPromociones}` : ` · ${ETIQUETA_AUDIENCIA[audiencia as Audiencia]}`}
                 </strong>{" "}
-                · lo recibe: {textoContactos.toLowerCase()}.
+                · {textoContactos}.
               </p>
               <p className="mt-0.5 text-green-900/80">Al continuar verás la lista exacta, cuenta por cuenta.</p>
             </div>

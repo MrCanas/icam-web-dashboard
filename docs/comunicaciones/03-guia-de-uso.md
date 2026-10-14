@@ -38,16 +38,23 @@ de 4») y qué falta. «Continuar» solo se enciende cuando están todas.
    minuto. Hasta entonces no se puede seguir.
 2. **¿A quién quieres escribir?** Promoción o fondo, toda la base o inversores directos, cada una con
    su número de cuentas.
-3. **¿Qué promoción o fondo?** (solo si eliges promoción): búscala por nombre o código.
+3. **¿Qué promociones o fondos?** (solo si eliges promoción): marca **una o varias**, buscándolas
+   por nombre o código, y pulsa «Usar estas». Se ve cuántas cuentas suman sin repetir: una cuenta
+   que esté en varias recibe un solo correo.
 4. **¿Qué tipo de comunicación es?** Reporte, evento, newsletter, oportunidad u otro.
-5. **¿Quién de cada cuenta lo recibe?** Elige una combinación habitual (la recomendada es solo el
-   contacto principal) u «Otra combinación» para marcar los papeles a mano.
+5. **¿Quién de cada cuenta lo recibe?** Marca **uno o varios papeles** (contacto principal,
+   secundario, representante legal, abogado, intermediario) y, en cada uno, si va en «Para» o en
+   copia. Hace falta al menos uno en «Para». Pulsa «Listo».
 
 Al terminar, una tarjeta verde resume lo elegido. **«Continuar a Destinatarios»** calcula la lista y
 guarda el borrador; no envía nada. Sale **un correo por cuenta**, no uno por persona. La audiencia
 queda fijada: para otra, empieza una comunicación nueva.
 
 ## 2. Destinatarios
+
+Tres pasos cortos, con el mismo aspecto que el anterior: **① esto es lo que saldría** (las cifras),
+**② repasa la lista, cuenta por cuenta** (empieza por las que tienen avisos; «Ya la he repasado» la
+pliega) y **③ confirma que la has revisado**.
 
 Una fila por cuenta, con su situación:
 

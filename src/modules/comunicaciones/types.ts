@@ -189,7 +189,9 @@ export interface ComComunicacionRow {
   nombre: string;
   tipo: TipoComunicacion;
   audiencia: Audiencia;
+  /** Con varias promociones, sus ids separados por comas (sin migración: es texto). */
   promocion_zoho_id: string | null;
+  /** Con varias promociones, sus nombres separados por « · ». */
   promocion_nombre: string | null;
   roles_para: RolContacto[];
   roles_copia: RolContacto[];
@@ -330,6 +332,8 @@ export interface OpcionPromocion {
   nombre: string;
   codigo: string | null;
   numCuentas: number;
+  /** Las cuentas suscritas: para contar sin repetir al elegir varias promociones. */
+  cuentaIds: string[];
 }
 
 /** Lo que la pantalla «Nueva» necesita para enseñar cuántas cuentas hay en cada audiencia. */

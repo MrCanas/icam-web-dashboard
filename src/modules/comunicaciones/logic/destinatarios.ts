@@ -37,8 +37,10 @@ export interface EspejosDeContacto {
 
 export interface SeleccionAudiencia {
   audiencia: Audiencia;
-  /** Obligatorio si la audiencia es `promocion`. */
+  /** Obligatorio si la audiencia es `promocion` (o `promocionesZohoIds`). */
   promocionZohoId?: string | null;
+  /** Varias promociones: entran las cuentas suscritas a cualquiera, sin repetir. */
+  promocionesZohoIds?: readonly string[];
 }
 
 export interface OpcionesDestinatarios {
@@ -96,11 +98,13 @@ export function cuentasDeAudiencia(
     case "inversores_directos":
       return cuentas.filter((c) => c.tiene_intermediario === false).sort(porNombre);
     case "promocion": {
-      if (!seleccion.promocionZohoId) return [];
+      const ids = [
+        ...new Set([...(seleccion.promocionesZohoIds ?? []), ...(seleccion.promocionZohoId ? [seleccion.promocionZohoId] : [])]),
+      ];
+      if (ids.length === 0) return [];
       const vivas = new Set(cuentas.map((c) => c.zoho_id));
-      const enPromocion =
-        cuentasPorPromocion(espejos.cuentaPromocion, vivas).get(seleccion.promocionZohoId) ??
-        new Set<string>();
+      const porPromocion = cuentasPorPromocion(espejos.cuentaPromocion, vivas);
+      const enPromocion = new Set(ids.flatMap((id) => [...(porPromocion.get(id) ?? [])]));
       return cuentas.filter((c) => enPromocion.has(c.zoho_id)).sort(porNombre);
     }
     default:
@@ -118,6 +122,7 @@ export function contarAudiencias(espejos: EspejosDeContacto): RecuentoAudiencias
       nombre: p.nombre,
       codigo: p.codigo,
       numCuentas: porPromocion.get(p.zoho_id)?.size ?? 0,
+      cuentaIds: [...(porPromocion.get(p.zoho_id) ?? [])],
     }))
     // Una promoción sin ninguna cuenta no es una audiencia.
     .filter((p) => p.numCuentas > 0)

@@ -20,11 +20,10 @@ import {
   ZONA_COMUNICACIONES,
 } from "@/modules/comunicaciones/logic/paths";
 import { pct } from "@/modules/comunicaciones/ui/components/CifrasDeAnalitica";
-import { ETIQUETA_PASO, indiceDe, PASOS, pasoSugerido } from "@/modules/comunicaciones/logic/asistente";
+import { ETIQUETA_PASO, indiceDe, nombreDeAudiencia, PASOS, pasoSugerido } from "@/modules/comunicaciones/logic/asistente";
 import { ChipEntorno } from "@/modules/comunicaciones/ui/components/asistente/ChipEntorno";
 import { entornoDe } from "@/modules/comunicaciones/ui/components/asistente/entorno";
 import { ChipEstadoComunicacion } from "@/modules/comunicaciones/ui/components/ui/ChipEstado";
-import { ETIQUETA_AUDIENCIA } from "@/modules/comunicaciones/types";
 
 /** Las que todavía no han terminado: se retoman en el asistente. */
 const EN_CURSO = ["borrador", "revisada", "probada", "enviando", "pausada"];
@@ -124,8 +123,7 @@ export default async function HistorialPage() {
               <tbody>
                 {comunicaciones.map(({ comunicacion: c, resumen, seguimiento }) => {
                   const medible = esMedible(c) && seguimiento.enviados > 0;
-                  const audiencia =
-                    c.audiencia === "promocion" && c.promocion_nombre ? c.promocion_nombre : ETIQUETA_AUDIENCIA[c.audiencia];
+                  const audiencia = nombreDeAudiencia(c);
                   return (
                     <tr key={c.id} className={TABLA.trPulsable}>
                       <th scope="row" className={`${TABLA.td} max-w-[420px] text-left font-normal`}>

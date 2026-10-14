@@ -7,6 +7,7 @@ import {
   avisoDeRetroceso,
   estadosDePasos,
   motivoParaContinuar,
+  nombreDeAudiencia,
   pasoAMostrar,
   pasoCompletado,
   pasoSugerido,
@@ -109,4 +110,11 @@ test("retroceder avisa de qué hay que repetir", () => {
   assert.ok(avisoDeRetroceso("probada", "revisada")?.includes("prueba"));
   assert.equal(avisoDeRetroceso("borrador", "revisada"), null);
   assert.equal(avisoDeRetroceso("probada", "enviando"), null);
+});
+
+test("el nombre de la audiencia, con una, dos o más promociones", () => {
+  assert.equal(nombreDeAudiencia({ audiencia: "toda_la_base", promocion_nombre: null }), "Toda la base");
+  assert.equal(nombreDeAudiencia({ audiencia: "promocion", promocion_nombre: "GQ8" }), "GQ8");
+  assert.equal(nombreDeAudiencia({ audiencia: "promocion", promocion_nombre: "GQ8 · SE84" }), "GQ8 · SE84");
+  assert.equal(nombreDeAudiencia({ audiencia: "promocion", promocion_nombre: "A · B · C" }), "3 promociones");
 });

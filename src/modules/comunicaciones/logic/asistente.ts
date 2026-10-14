@@ -145,7 +145,12 @@ export function avisoDeRetroceso(antes: EstadoComunicacion, ahora: EstadoComunic
   return "Has cambiado la plantilla: envíate una prueba nueva antes de seguir.";
 }
 
-/** A quién va, en corto: el nombre de la promoción o la audiencia. */
+/**
+ * A quién va, en corto: el nombre de la promoción, «A · B» si son dos, «N
+ * promociones» si son más, o la audiencia.
+ */
 export function nombreDeAudiencia(c: Pick<ComComunicacionRow, "audiencia" | "promocion_nombre">): string {
-  return c.audiencia === "promocion" && c.promocion_nombre ? c.promocion_nombre : ETIQUETA_AUDIENCIA[c.audiencia];
+  if (c.audiencia !== "promocion" || !c.promocion_nombre) return ETIQUETA_AUDIENCIA[c.audiencia];
+  const nombres = c.promocion_nombre.split(" · ");
+  return nombres.length > 2 ? `${nombres.length} promociones` : c.promocion_nombre;
 }
