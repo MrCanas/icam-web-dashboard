@@ -133,9 +133,12 @@ export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedA
           </div>
         </Tarjeta>
 
-        <Tarjeta titulo="Distribución de los activos" subtitulo="Un activo con varios usos cuenta en cada uno">
+        <Tarjeta titulo="Distribución de los activos">
           <div className="flex flex-col gap-6">
-            <Barras title="Por uso" data={porN(d.uses)} total={d.total} />
+            <div>
+              <Barras title="Por uso" data={porN(d.uses)} total={d.total} />
+              <p className="mt-2 text-xs text-text-muted">Un activo con varios usos cuenta en cada uno.</p>
+            </div>
             <Barras title="Por ubicación" data={porN(d.provincias)} total={d.total} />
           </div>
         </Tarjeta>
