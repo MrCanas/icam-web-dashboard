@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
+import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
+import { Tarjeta } from "@/components/ui/Tarjeta";
 import {
   avgTicket,
   buildAdqData,
@@ -10,35 +12,12 @@ import {
   discardRate,
   type AdqAsset,
 } from "@/modules/monday/logic/adquisiciones-dashboard";
-
-// Colores del dashboard del Comité de Adquisiciones.
-const NAVY = "#1C2E69";
-const GOLD = "#9B7F57";
-const GRAY = "#E2DEDA";
-const BORDER = "#E2DEDA";
-const MUTED = "#9BA3B2";
-const INK = "#1A2035";
-
-const USO_COLOR: Record<string, string> = {
-  Residencial: NAVY,
-  Hotel: GOLD,
-  Oficinas: "#7D8799",
-  "Apartamentos Turísticos": GRAY,
-};
-const PROV_COLOR: Record<string, string> = {
-  Madrid: NAVY,
-  Sevilla: GOLD,
-  Granada: GOLD,
-  Málaga: "#7D8799",
-  Lisboa: GRAY,
-  Cantabria: "#A8A29E",
-  Barcelona: "#4F6A9E",
-};
+import { KPICard } from "@/modules/portfolio/ui/KPICard";
 
 const fmtInt = (n: number) => Number(n || 0).toLocaleString("es-ES");
 const fmtM = (n: number) => {
   const m = Number(n || 0) / 1e6;
-  return (m >= 100 ? Math.round(m) : Math.round(m * 10) / 10).toLocaleString("es-ES") + "M€";
+  return (m >= 100 ? Math.round(m) : Math.round(m * 10) / 10).toLocaleString("es-ES") + " M€";
 };
 const fmtEur = (n: number) => Math.round(n).toLocaleString("es-ES") + " €";
 const fmtM2 = (n: number) =>
@@ -61,136 +40,122 @@ export function AdquisicionesDashboard({ assets, fetchedAt }: Props) {
     [assets, vista],
   );
 
-  const uses = Object.entries(d.uses)
-    .map(([name, n]) => ({ name, n }))
-    .sort((a, b) => b.n - a.n);
-  const provincias = Object.entries(d.provincias)
-    .map(([name, n]) => ({ name, n }))
-    .sort((a, b) => b.n - a.n);
+  const porN = (rec: Record<string, number>) =>
+    Object.entries(rec)
+      .map(([name, n]) => ({ name, n }))
+      .sort((a, b) => b.n - a.n);
   const funnel = buildFunnel(d.stages);
   const base = funnel[0]?.reached ?? 0;
   const descarte = discardRate(d);
+  const leido = new Date(fetchedAt).toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Madrid",
+  });
 
   return (
-    <div className="min-w-0" style={{ color: INK }}>
-      <div
-        className="mb-4 pb-3 flex flex-wrap gap-2 items-center justify-between"
-        style={{ borderBottom: `1px solid ${BORDER}` }}
-      >
-        <h1 className="font-bold text-lg">Análisis de oportunidades</h1>
-        <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: BORDER }}>
-          <VistaBoton activo={vista === "analisis"} color={NAVY} onClick={() => setVista("analisis")}>
-            En análisis
-          </VistaBoton>
-          <VistaBoton activo={vista === "comite"} color={GOLD} onClick={() => setVista("comite")}>
-            En Comité
-          </VistaBoton>
-        </div>
-      </div>
+    <div className="space-y-4 min-w-0">
+      <EncabezadoDePagina
+        titulo="Análisis de oportunidades"
+        meta={`Datos en directo de Monday · leídos el ${leido}`}
+        acciones={
+          <div className="flex rounded-md overflow-hidden border border-subtle" role="group" aria-label="Vista">
+            <VistaBoton activo={vista === "analisis"} activoClase="bg-icam-900" onClick={() => setVista("analisis")}>
+              En análisis
+            </VistaBoton>
+            <VistaBoton activo={vista === "comite"} activoClase="bg-icam-gold" onClick={() => setVista("comite")}>
+              En Comité
+            </VistaBoton>
+          </div>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-        <Kpi
-          label="Activos en análisis"
+      <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <KPICard
+          title="Activos en análisis"
           value={fmtInt(d.total)}
-          sub={`${fmtInt(d.total - d.discarded)} activos en curso · ${fmtInt(d.discarded)} descartados`}
+          subtitle={`${fmtInt(d.total - d.discarded)} en curso · ${fmtInt(d.discarded)} descartados`}
         />
-        <Kpi
-          label="Volumen analizado"
+        <KPICard
+          title="Volumen analizado"
           value={fmtM(d.vol)}
-          sub={`asking disponible en ${fmtInt(d.withPrice)} de ${fmtInt(d.total)} activos`}
+          subtitle={`asking en ${fmtInt(d.withPrice)} de ${fmtInt(d.total)} activos`}
         />
-        <Kpi label="Ticket medio" value={fmtM(avgTicket(d))} sub={`sobre ${fmtInt(d.withPrice)} activos con precio`} />
-        <Kpi
-          label="Precio medio €/m²"
+        <KPICard title="Ticket medio" value={fmtM(avgTicket(d))} subtitle={`sobre ${fmtInt(d.withPrice)} activos con precio`} />
+        <KPICard
+          title="Precio medio €/m²"
           value={d.eurM2 != null ? fmtEur(d.eurM2) : "—"}
-          sub={`sobre ${fmtInt(d.eurM2Count)} activos con ambos datos`}
+          subtitle={`sobre ${fmtInt(d.eurM2Count)} activos con ambos datos`}
         />
-        <Kpi label="M² analizados" value={fmtM2(d.m2)} sub={`superficie total de ${fmtInt(d.m2Count)} activos`} />
-        <Kpi
-          label="Tasa de descarte"
+        <KPICard title="m² analizados" value={fmtM2(d.m2)} subtitle={`en ${fmtInt(d.m2Count)} activos`} />
+        <KPICard
+          title="Tasa de descarte"
           value={`${descarte.rate}%`}
-          sub={`${fmtInt(d.discarded)} descartados de ${fmtInt(descarte.base)} activos`}
+          subtitle={`${fmtInt(d.discarded)} descartados de ${fmtInt(descarte.base)}`}
+          highlight
         />
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title="Avance de etapas">
-          <div className="space-y-2.5 py-1">
+        <Tarjeta titulo="Avance de etapas" subtitulo="Acumulado: cada activo cuenta en las etapas por las que ya ha pasado">
+          <div className="space-y-2.5">
             {funnel.map((s, i) => {
               if (s.reached === 0 && i > 0) return null;
               const pct = base > 0 ? (s.reached / base) * 100 : 0;
               return (
                 <div key={s.name}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium">{s.name}</span>
-                    <span className="font-semibold" style={{ color: NAVY }}>
+                    <span className="text-text-body">{s.name}</span>
+                    <span className="font-semibold text-text-primary">
                       {fmtInt(s.reached)} · {Math.round(pct)}%
                     </span>
                   </div>
-                  <div className="h-5 rounded" style={{ background: GRAY }}>
+                  <div className="h-4 rounded bg-subtle">
                     <div
-                      className="h-5 rounded"
-                      style={{
-                        width: `${Math.max(pct, 1.5)}%`,
-                        background: NAVY,
-                        opacity: Math.max(1 - i * 0.06, 0.3),
-                      }}
+                      className="h-4 rounded bg-icam-900"
+                      style={{ width: `${Math.max(pct, 1.5)}%`, opacity: Math.max(1 - i * 0.07, 0.35) }}
                     />
                   </div>
                 </div>
               );
             })}
           </div>
-        </Panel>
+        </Tarjeta>
 
-        <Panel title="Distribución de los activos">
+        <Tarjeta titulo="Distribución de los activos" subtitulo="Un activo con varios usos cuenta en cada uno">
           <div className="flex flex-col gap-6">
-            <Barras title="Por uso" data={uses} total={d.total} colors={USO_COLOR} />
-            <Barras title="Por ubicación" data={provincias} total={d.total} colors={PROV_COLOR} />
+            <Barras title="Por uso" data={porN(d.uses)} total={d.total} />
+            <Barras title="Por ubicación" data={porN(d.provincias)} total={d.total} />
           </div>
-        </Panel>
+        </Tarjeta>
       </div>
 
       {comite.length > 0 ? (
-        <div className="mt-4">
-          <div className="text-xs font-semibold tracking-widest uppercase mb-2 px-1" style={{ color: MUTED }}>
-            Activos en Comité
-          </div>
+        <section className="space-y-2">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted px-1">Activos en Comité</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {comite.map((a) => {
               const contenido = (
-                <div className="p-5">
-                  <div className="text-xl font-bold leading-tight" style={{ color: NAVY }}>
-                    {a.name}
+                <>
+                  <div className="h-[3px] bg-icam-gold" />
+                  <div className="p-4 sm:p-5">
+                    <p className="text-lg font-semibold text-text-primary leading-tight">{a.name}</p>
+                    <p className="text-xs text-text-muted mt-0.5 mb-4">{a.location}</p>
+                    <dl className="grid grid-cols-3 gap-2">
+                      <Dato etiqueta="Asking">{a.price ? fmtM(a.price) : "—"}</Dato>
+                      <Dato etiqueta="Superficie">{a.m2 ? `${fmtInt(Math.round(a.m2))} m²` : "—"}</Dato>
+                      <Dato etiqueta="Repercusión">
+                        {a.repercusion ? `${fmtInt(Math.round(a.repercusion))} €/m²` : "—"}
+                      </Dato>
+                    </dl>
                   </div>
-                  <div className="text-xs mt-0.5 mb-4" style={{ color: MUTED }}>
-                    {a.location}
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        ["Asking", a.price ? fmtM(a.price) : "—"],
-                        ["Superficie", a.m2 ? `${fmtInt(Math.round(a.m2))} m²` : "—"],
-                        ["Repercusión", a.repercusion ? `${fmtInt(Math.round(a.repercusion))} €/m²` : "—"],
-                      ] as const
-                    ).map(([lbl, val]) => (
-                      <div key={lbl}>
-                        <div
-                          className="text-[10px] font-semibold tracking-widest uppercase mb-1"
-                          style={{ color: MUTED }}
-                        >
-                          {lbl}
-                        </div>
-                        <div className="text-lg font-bold leading-tight" style={{ color: NAVY }}>
-                          {val}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                </>
               );
-              const clases = "block rounded-lg border bg-card shadow-sm overflow-hidden transition hover:shadow-md";
-              const estilo = { borderColor: BORDER, borderTop: `3px solid ${NAVY}` };
+              const clases =
+                "block min-w-0 overflow-hidden rounded-lg border border-subtle/50 bg-card shadow-sm transition";
               return a.mapsQuery ? (
                 <a
                   key={a.name}
@@ -198,124 +163,87 @@ export function AdquisicionesDashboard({ assets, fetchedAt }: Props) {
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Ver en Google Maps"
-                  className={clases}
-                  style={estilo}
+                  className={`${clases} hover:border-icam-900 hover:shadow-md`}
                 >
                   {contenido}
                 </a>
               ) : (
-                <div key={a.name} className={clases} style={estilo}>
+                <div key={a.name} className={clases}>
                   {contenido}
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       ) : null}
-
-      <p className="text-xs mt-3" style={{ color: MUTED }}>
-        Datos en directo de Monday · leídos el{" "}
-        {new Date(fetchedAt).toLocaleString("es-ES", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Europe/Madrid",
-        })}
-        .
-      </p>
     </div>
   );
 }
 
 function VistaBoton({
   activo,
-  color,
+  activoClase,
   onClick,
   children,
 }: {
   activo: boolean;
-  color: string;
+  activoClase: string;
   onClick: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      className="px-4 py-1.5 text-sm font-semibold transition"
-      style={{ background: activo ? color : "#fff", color: activo ? "#fff" : MUTED }}
+      className={`min-h-9 px-4 text-sm font-medium transition ${
+        activo ? `${activoClase} text-white` : "bg-card text-text-muted hover:text-text-primary"
+      }`}
     >
       {children}
     </button>
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
-    <div className="bg-card rounded-lg border p-3 shadow-sm min-w-0" style={{ borderColor: BORDER, borderTop: `3px solid ${NAVY}` }}>
-      <div className="text-[10px] font-semibold tracking-wide uppercase leading-tight" style={{ color: MUTED }}>
-        {label}
-      </div>
-      <div className="mt-1 text-[22px] sm:text-[32px] font-bold leading-none">{value}</div>
-      <div className="text-[11px] mt-1 leading-tight" style={{ color: MUTED }}>
-        {sub}
-      </div>
+    <div className="min-w-0">
+      <dt className="text-[10px] font-medium uppercase tracking-wider text-text-muted mb-1">{etiqueta}</dt>
+      <dd className="text-base sm:text-lg font-semibold text-text-primary leading-tight">{children}</dd>
     </div>
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-card rounded-lg border shadow-sm min-w-0" style={{ borderColor: BORDER }}>
-      <div className="px-4 py-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
-        <h2 className="font-semibold text-sm">{title}</h2>
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
-function Barras({
-  title,
-  data,
-  total,
-  colors,
-}: {
-  title: string;
-  data: { name: string; n: number }[];
-  total: number;
-  colors: Record<string, string>;
-}) {
+function Barras({ title, data, total }: { title: string; data: { name: string; n: number }[]; total: number }) {
   const maxN = Math.max(...data.map((x) => x.n), 1);
   return (
     <div>
-      <div className="text-sm font-semibold mb-3">{title}</div>
-      <div className="flex gap-3 overflow-x-auto">
-        {data.map((x) => {
-          const pct = total > 0 ? Math.round((x.n / total) * 100) : 0;
-          const barH = Math.max((x.n / maxN) * 100, 20);
-          return (
-            <div key={x.name} className="flex flex-col items-center flex-1 min-w-[56px]">
-              <div className="flex items-end w-full" style={{ height: 100 }}>
-                <div className="w-full rounded-t relative" style={{ height: barH, background: colors[x.name] ?? MUTED }}>
-                  <span className="absolute top-1 inset-x-0 text-center text-[11px] font-bold text-white">{x.n}</span>
+      <p className="text-sm font-medium text-text-primary mb-3">{title}</p>
+      {data.length === 0 ? (
+        <p className="text-sm text-text-muted">Sin datos.</p>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto">
+          {data.map((x, i) => {
+            const pct = total > 0 ? Math.round((x.n / total) * 100) : 0;
+            return (
+              <div key={x.name} className="flex flex-col items-center flex-1 min-w-[56px]">
+                <div className="flex items-end w-full h-24">
+                  <div
+                    className={`w-full rounded-t relative ${i === 0 ? "bg-icam-900" : "bg-icam-800"}`}
+                    style={{ height: `${Math.max((x.n / maxN) * 100, 20)}%`, opacity: i === 0 ? 1 : 0.75 }}
+                  >
+                    <span className="absolute top-1 inset-x-0 text-center text-[11px] font-semibold text-white">
+                      {x.n}
+                    </span>
+                  </div>
                 </div>
+                <p className="mt-1.5 text-center text-xs leading-snug text-text-muted">{x.name}</p>
+                <p className="text-xs font-semibold text-text-primary">{pct}%</p>
               </div>
-              <div className="text-center w-full mt-1.5">
-                <div className="text-[12px] leading-snug" style={{ color: MUTED }}>
-                  {x.name}
-                </div>
-                <div className="text-[12px] font-semibold" style={{ color: NAVY }}>
-                  {pct}%
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
