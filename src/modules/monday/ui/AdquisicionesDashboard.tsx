@@ -282,7 +282,7 @@ function Barras({ title, data, total }: { title: string; data: { name: string; n
       {data.length === 0 ? (
         <p className="text-sm text-text-muted">Sin datos.</p>
       ) : (
-        <div className="flex gap-3 overflow-x-auto">
+        <div className="hidden sm:flex gap-3">
           {data.map((x, i) => {
             const pct = total > 0 ? Math.round((x.n / total) * 100) : 0;
             return (
@@ -304,6 +304,27 @@ function Barras({ title, data, total }: { title: string; data: { name: string; n
           })}
         </div>
       )}
+      {/* En móvil las columnas no caben: barras horizontales con nombre, barra y cifra. */}
+      {data.length > 0 ? (
+        <div className="flex sm:hidden flex-col gap-2">
+          {data.map((x, i) => (
+            <div key={x.name} className="grid grid-cols-[88px_1fr_56px] items-center gap-2 text-xs">
+              <span className="truncate text-text-muted" title={x.name}>
+                {CHART_LABEL[x.name] ?? x.name}
+              </span>
+              <div className="h-3.5 rounded bg-subtle">
+                <div
+                  className={`h-3.5 rounded ${i === 0 ? "bg-icam-900" : "bg-icam-800"}`}
+                  style={{ width: `${Math.max((x.n / maxN) * 100, 4)}%`, opacity: i === 0 ? 1 : 0.75 }}
+                />
+              </div>
+              <span className="text-right font-semibold text-text-primary tabular-nums">
+                {x.n} · {total > 0 ? Math.round((x.n / total) * 100) : 0}%
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
