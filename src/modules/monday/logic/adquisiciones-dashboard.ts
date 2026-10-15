@@ -2,6 +2,7 @@ import type { MondayItem } from "@/modules/monday/data/types";
 
 // Dashboard del Comité de Adquisiciones: cálculos puros sobre el tablero
 // ADQUISICIONES AUTO de Monday, grupo «En análisis».
+// Revisado por Canas.
 
 export const ADQ_BOARD_ID = "18410571463";
 export const ADQ_GROUP_TITLE = "En análisis";
