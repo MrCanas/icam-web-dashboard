@@ -49,4 +49,4 @@ export const ZONE_ORDER: ZoneKey[] = [
  * Zonas sin pestaña en la fila primaria de la nav. Siguen en el registry
  * (permisos, guards y URL directa intactos): solo DashboardNav las filtra.
  */
-export const NAV_HIDDEN_ZONES: ZoneKey[] = ["adquisiciones"];
+export const NAV_HIDDEN_ZONES: ZoneKey[] = [];
