@@ -34,8 +34,11 @@ function material(fuentes: Fuente[]): MaterialInforme {
   };
 }
 
-test("la biblioteca tiene sus 39 slides con números estables", () => {
-  assert.equal(biblioteca.length, 39);
+test("la biblioteca tiene sus 40 slides con números estables", () => {
+  assert.equal(biblioteca.length, 40);
+  // La nº 40 es la slide fija que sustituye a la 8 y la 9, que conservan su número.
+  assert.equal(biblioteca.find((b) => b.n === 40)?.id, "estrategia-compraventa");
+  assert.equal(biblioteca.find((b) => b.n === 8)?.id, "estrategia");
   assert.deepEqual(biblioteca[0], {
     n: 1,
     nombre: "Portada",

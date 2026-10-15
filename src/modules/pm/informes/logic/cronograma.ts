@@ -1,6 +1,7 @@
 import type { SlideJson } from "../slides/tipos";
 import type { Analisis, HitoCronograma, PrevioEstructurado } from "../types";
 import { normalizarHitos } from "./analisis";
+import { defFija, destinoHitos } from "./estructuraFija";
 import { clon, nodosDe } from "./informe";
 
 /**
@@ -43,6 +44,9 @@ export function hitosObligatorios(analisis: Analisis | null, previo: PrevioEstru
 
 /** ¿Lleva esta slide cronograma (o le toca llevarlo)? */
 export function esSlideDeCronograma(slideId: string, obligatorios: HitoCronograma[], slide?: SlideJson | null): boolean {
+  // En la estructura fija lo dice su definición: el «calendario» ya no lleva cronograma (va en «calendario-timeline»).
+  const fija = defFija(slideId);
+  if (fija?.huecos) return fija.huecos.some((h) => h.tipo === "hitos");
   if (obligatorios.some((h) => h.slide === slideId)) return true;
   if (slide && nodosDe(slide, "Timeline").length) return true;
   return /^calendario/.test(slideId);
@@ -70,7 +74,7 @@ export interface CambioHito {
 /**
  * Repone en las slides los hitos obligatorios que falten (salvo los que el
  * equipo ha pedido quitar) y lista los cambios de fecha. Cada hito vuelve al
- * Timeline de su slide de origen o, si esa ya no tiene, al primero que haya.
+ * Timeline de su slide de origen (o de la fija que la sustituye) o, si no, al primero que haya.
  * No muta: devuelve las slides nuevas.
  */
 export function reponerHitos(
@@ -99,7 +103,8 @@ export function reponerHitos(
       return;
     }
     if (quitados.has(k)) return;
-    const destino = conTimeline.find((s) => s.id === h.slide) ?? conTimeline[0]!;
+    // Su slide de origen; si ya no lleva cronograma, la que lo ha heredado (el «calendario» viejo → «calendario-timeline»).
+    const destino = conTimeline.find((s) => s.id === h.slide) ?? conTimeline.find((s) => s.id === destinoHitos(h.slide)) ?? conTimeline[0]!;
     const t = timelines(destino)[0]!;
     const props = (t.props ?? (t.props = {})) as { hitos?: unknown[] };
     const lista = Array.isArray(props.hitos) ? props.hitos : (props.hitos = []);

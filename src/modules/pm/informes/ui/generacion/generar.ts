@@ -9,7 +9,8 @@ import { anadirAvisos, normalizarCoherencia, nuevaRevision, resolverSlides } fro
 import { mapaNumeros } from "../../logic/operaciones";
 import { hitosObligatorios, reponerHitos, textoCambioHito } from "../../logic/cronograma";
 import { conFlotantesDe, flotantesAlHeredar, flotantesValidos } from "../../logic/flotantes";
-import { actualizarPeriodo, clon, idNuevo, ordenar, renumerar, slideDeterminista, tituloDe, validarSlide } from "../../logic/informe";
+import { defFija, huecosPendientes, montarFija, slideDesdeClaude, slideVacia } from "../../logic/estructuraFija";
+import { actualizarPeriodo, clon, idNuevo, normalizarEstructura, ordenar, renumerar, slideDeterminista, tituloDe } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { qCierre } from "../../logic/trimestre";
 import type { Foto, Informe, PrevioEstructurado, QaInforme } from "../../types";
@@ -27,7 +28,9 @@ import { esCancelado, mensajeErrorClaude, pedirClaude } from "../lib/claude";
  * volver se reanuda con las que falten.
  */
 
-export type EstadoFila = "cola" | "curso" | "hecho" | "error" | "fijo";
+const SEGUNDA_CM_PM = "situacion-cm-pm-2";
+
+export type EstadoFila ="cola" | "curso" | "hecho" | "error" | "fijo";
 
 export interface FilaGeneracion {
   id: string;
@@ -83,7 +86,9 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
   const { informe: d, previo } = o;
   const permitidos = componentesPermitidos();
   const prevPorId = new Map((previo?.slides ?? []).map((s) => [s.id, s]));
-  const sel = d.seleccion ?? { estructura: d.analisis?.estructura ?? [], anadir: [] };
+  const base = d.seleccion ?? { estructura: d.analisis?.estructura ?? [], anadir: [] };
+  // La estructura fija entra siempre, aunque el análisis se hiciera antes de que existiera.
+  const sel = { ...base, estructura: normalizarEstructura(base.estructura, previo) };
   const accionDe = new Map(sel.estructura.map((e) => [e.id, e]));
   const periodo = { trimestre: d.trimestre, trimestreAnterior: d.trimestreAnterior, siguiente: d.siguiente, proyecto: d.proyecto.nombre };
 
@@ -96,7 +101,7 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
     meta = { ...metaInforme(d, previo), ...d.contenido!.meta };
     slides = clon(d.contenido!.slides);
     for (const s of slides) {
-      if (s.oculto || slideHecha(s)) continue;
+      if (s.oculto || slideHecha(s) || s.id === SEGUNDA_CM_PM) continue;
       const e = accionDe.get(s.id);
       const prev = prevPorId.get(s.id) ?? null;
       tareas.push({ id: s.id, accion: prev ? (e?.accion ?? "actualizar") : "nueva", prev, titulo: e?.titulo || (prev ? tituloDe(prev) : s.id) });
@@ -124,6 +129,11 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
         continue;
       }
       delete s.oculto;
+      // La 2.ª página de CM/PM no se redacta sola: la monta (o la oculta) la de CM/PM.
+      if (e.id === SEGUNDA_CM_PM) {
+        slides.push(s);
+        continue;
+      }
       if (prev) {
         // Se reescribe: hasta que Claude la redacte no cuenta como hecha.
         s.origen = e.accion === "mantener" ? s.origen : "error";
@@ -159,17 +169,42 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
   refrescar();
   if (!reanudar) await o.guardar(contenido(), { estado: "generando" }, "Generación iniciada (GO)");
 
+  // CM/PM ocupa una slide o dos: la segunda va justo detrás de la primera, o se oculta si sobra.
+  const ponerSegundaCmPm = (s: SlideJson, segunda: SlideJson | undefined) => {
+    const i2 = slides.findIndex((x) => x.id === SEGUNDA_CM_PM);
+    if (segunda) {
+      segunda.origen = s.origen;
+      if (s.fuentes) segunda.fuentes = s.fuentes;
+      if (i2 >= 0) slides[i2] = conFlotantesDe(slides[i2], segunda);
+      else slides.splice(slides.findIndex((x) => x.id === s.id) + 1, 0, segunda);
+    } else if (i2 >= 0) slides[i2]!.oculto = true;
+  };
+
   async function redactar(t: Tarea, f: FilaGeneracion, peticion: Parameters<typeof pedirClaude>[0], origen: string) {
+    // En las slides de la estructura fija Claude devuelve sus huecos y aquí se monta siempre el mismo esqueleto.
+    const leer = (json: unknown) => slideDesdeClaude(json, t.id, permitidos, periodo).map((x) => actualizarPeriodo(x, periodo));
     try {
       const { json } = await pedirClaude(peticion, { signal: o.signal });
-      let s = actualizarPeriodo(validarSlide(json, t.id, permitidos), periodo);
+      let [s, segunda] = leer(json) as [SlideJson, SlideJson | undefined];
       s.origen = s.origen || origen;
       let m: MedidaSlide = medirFuera(s, 5, meta);
       if (m.error) throw new Error(m.error);
+      const def = defFija(t.id);
+      // CM/PM que no cabe en una: se parte en dos en vez de recortar.
+      if (t.id === "situacion-cm-pm" && m.desborde && !segunda && def?.extraer) {
+        const h = def.extraer(s);
+        if (h) {
+          const dos = montarFija(def, h, { ...periodo, dividir: true });
+          if (dos.length === 2) {
+            [s, segunda] = [{ ...dos[0]!, origen: s.origen, fuentes: s.fuentes }, dos[1]];
+            m = medirFuera(s, 5, meta);
+          }
+        }
+      }
       // Un ajuste si desborda o queda corta; un segundo solo si sigue desbordando (a menudo por pocos px,
-      // y una slide que desborda bloquea la aprobación).
-      for (let intento = 0; intento < 2; intento++) {
-        const hace = intento === 0 ? m.desborde || (m.relleno != null && m.relleno < 80) : m.desborde;
+      // y una slide que desborda bloquea la aprobación). Con bloques «Pendiente» no se pide rellenar: no hay más información.
+      for (let intento = 0; intento < 2 && t.id !== "situacion-cm-pm"; intento++) {
+        const hace = intento === 0 ? m.desborde || (m.relleno != null && m.relleno < 80 && !huecosPendientes(s)) : m.desborde;
         if (!hace) break;
         f.detalle = m.desborde ? `Ajustando: desborda${intento ? " (2.º intento)" : ""}` : `Ajustando: relleno ${m.relleno} %`;
         refrescar();
@@ -178,7 +213,7 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
             { tipo: "ajuste", informeId: d.id, slide: s, medida: { desborde: m.desborde, ocupacion: m.ocupacion, relleno: m.relleno } },
             { signal: o.signal },
           );
-          const s2 = actualizarPeriodo(validarSlide(j2, t.id, permitidos), periodo);
+          const s2 = leer(j2)[0]!;
           s2.origen = s2.origen || origen;
           const m2 = medirFuera(s2, 5, meta);
           // Se queda el ajuste salvo que rompa algo que antes estaba bien.
@@ -192,6 +227,7 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
         }
       }
       poner(t.id, s);
+      if (t.id === "situacion-cm-pm") ponerSegundaCmPm(s, segunda);
       await o.guardar(contenido());
       f.estado = "hecho";
       f.detalle = "";
@@ -201,7 +237,12 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
       f.detalle = "";
       f.nota = esCancelado(e) ? "Parado" : mensajeErrorClaude(e);
       const actual = slides.find((x) => x.id === t.id);
-      if (actual && !slideHecha(actual)) {
+      // Una fija se queda con su estructura y los bloques «Pendiente»; se repite al reanudar.
+      const vacia = slideVacia(t.id, periodo);
+      if (actual && !slideHecha(actual) && vacia) {
+        poner(t.id, { ...vacia, origen: "error" });
+        await o.guardar(contenido());
+      } else if (actual && !slideHecha(actual)) {
         poner(t.id, {
           id: t.id,
           origen: "error",

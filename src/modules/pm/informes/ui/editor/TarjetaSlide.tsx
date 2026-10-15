@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import { accionAnadirFuente } from "../../actions/informes";
 import { arbolBloques, desplegar, normalizar } from "../../logic/edicion";
+import { defFija } from "../../logic/estructuraFija";
 import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, tituloDe, validarSlide } from "../../logic/informe";
 import { slidesCitadas, type ResultadoRevision } from "../../logic/operaciones";
@@ -60,6 +61,8 @@ interface Props {
   siguiente: SlideJson | null;
   /** Esta slide en el informe anterior, si la había (para «Comparar»). */
   previa: SlideJson | null;
+  /** La sustituye por la del informe anterior (al periodo actual); null si el anterior no la tenía o no está en el portal. */
+  traer: (() => Promise<void>) | null;
   metaPrevia: MetaInforme | null;
   /** «Slide 5» para un id. */
   numeroDe: (id: string) => string;
@@ -98,6 +101,7 @@ export function TarjetaSlide({
   alternarCerrada,
   siguiente,
   previa,
+  traer,
   metaPrevia,
   numeroDe,
   ocupadoGlobal,
@@ -115,6 +119,8 @@ export function TarjetaSlide({
   const [operacion, setOperacion] = useState<{ tipo: Operacion; texto: string } | null>(null);
   const [comparando, setComparando] = useState(false);
   const cerrada = !!slide.cerrada;
+  // De la estructura fija: siempre está (no se oculta ni se duplica); la 2.ª página de CM/PM sí se puede ocultar.
+  const fija = !!defFija(slide.id) && slide.id !== "situacion-cm-pm-2";
   const n = numeroDe(slide.id);
   const lienzo = useRef<HTMLElement | null>(null);
   // «flotantes»: las imágenes libres, que van por encima de la slide y tienen su propia capa.
@@ -417,7 +423,7 @@ export function TarjetaSlide({
             <Boton pequeno aria-label="Bajar" disabled={pagina === total} onClick={() => mover(1)}>
               ↓
             </Boton>
-            {!["disclaimer", "cierre"].includes(slide.id) ? (
+            {!fija ? (
               <Boton pequeno onClick={ocultar}>
                 Ocultar
               </Boton>
@@ -442,7 +448,12 @@ export function TarjetaSlide({
           <Boton pequeno disabled={trabajando || ocupadoGlobal} title="Claude crea una slide nueva justo detrás de esta" onClick={() => abrirOperacion("nueva")}>
             ＋ Slide detrás
           </Boton>
-          <Boton pequeno disabled={trabajando || ["portada", "indice", "disclaimer", "cierre"].includes(slide.id)} onClick={() => (duplicar(), setMas(false))}>
+          <Boton
+            pequeno
+            disabled={trabajando || fija}
+            title={fija ? "Es de la estructura fija del informe: no se duplica" : undefined}
+            onClick={() => (duplicar(), setMas(false))}
+          >
             Duplicar
           </Boton>
           <Boton
@@ -454,6 +465,28 @@ export function TarjetaSlide({
           </Boton>
           <Boton pequeno disabled={!previa} title={previa ? `Compárala con la del ${informe.trimestreAnterior}` : "No estaba en el informe anterior"} onClick={() => (setComparando(true), setMas(false))}>
             Comparar con el {informe.trimestreAnterior}
+          </Boton>
+          <Boton
+            pequeno
+            disabled={!traer || cerrada || trabajando}
+            title={
+              traer
+                ? `Sustituye su contenido por el del informe del ${informe.trimestreAnterior} (con «Deshacer»)`
+                : h.previo
+                  ? "No estaba en el informe anterior"
+                  : "El informe anterior no está en el portal (se aportó en PDF/PPTX)"
+            }
+            onClick={() => {
+              setMas(false);
+              setTrabajando(true);
+              setEstado("");
+              void traer!()
+                .then(() => setEstado(`Traída del ${informe.trimestreAnterior}.`))
+                .catch((e) => setEstado(e instanceof Error ? `No se pudo traer: ${e.message}` : "No se pudo traer."))
+                .finally(() => setTrabajando(false));
+            }}
+          >
+            Traer del {informe.trimestreAnterior}
           </Boton>
         </div>
       ) : null}

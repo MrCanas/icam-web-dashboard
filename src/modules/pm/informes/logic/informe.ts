@@ -1,6 +1,7 @@
 import type { NodoJson, SlideJson } from "../slides/tipos";
 import type { EntradaEstructura, Foto, PrevioEstructurado } from "../types";
 import type { EntradaBiblioteca } from "./biblioteca";
+import { conservaEstructura, defFija, huecosDelAnterior, huecosPendientes, IDS_FIJOS, montarFija, subOrden, SUSTITUIDAS } from "./estructuraFija";
 import { conFlotantesDe, flotantesValidos } from "./flotantes";
 
 /**
@@ -76,10 +77,19 @@ export function seccionDe(id: string): number {
 }
 
 function rango(s: SlideJson): number {
-  return s.id === "portada" ? -2 : s.id === "indice" ? -1 : s.id === "disclaimer" ? 100 : s.id === "cierre" ? 101 : seccionDe(s.id);
+  return rangoDeId(s.id);
 }
 
-/** Orden canónico: portada, índice, secciones en su orden (estable dentro de cada una), disclaimer, cierre. */
+/** Posición canónica de un id: sección y, dentro, su sitio en la estructura fija (logic/estructuraFija.ts). */
+export function rangoDeId(id: string): number {
+  if (id === "portada") return -2;
+  if (id === "indice") return -1;
+  if (id === "disclaimer") return 100;
+  if (id === "cierre") return 101;
+  return seccionDe(id) + subOrden(id) / 1000;
+}
+
+/** Orden canónico: portada, índice, secciones en su orden (y la estructura fija dentro de cada una; el resto estable), disclaimer, cierre. */
 export function ordenar(slides: SlideJson[]): SlideJson[] {
   return slides
     .map((s, i) => [s, i] as const)
@@ -170,8 +180,9 @@ const ACCIONES = ["mantener", "actualizar", "ocultar", "nueva"] as const;
 
 /**
  * Estructura del análisis, saneada: sin repetidos, con todas las slides del
- * informe anterior, y portada, índice y resumen al inicio y disclaimer y cierre
- * al final.
+ * informe anterior y con la estructura fija completa (logic/estructuraFija.ts)
+ * en su orden: portada, índice, resumen… disclaimer y cierre. Las fijas no se
+ * ocultan; las slides viejas que una fija sustituye, sí.
  */
 export function normalizarEstructura(est: unknown, previo: PrevioEstructurado | null): EntradaEstructura[] {
   const vistos = new Set<string>();
@@ -193,13 +204,28 @@ export function normalizarEstructura(est: unknown, previo: PrevioEstructurado | 
       out.push({ id: s.id, titulo: tituloDe(s), accion: s.oculto ? "ocultar" : "actualizar", motivo: "" });
     }
   });
-  ["portada", "indice", "resumen-ejecutivo"].forEach((id, i) => {
-    if (!vistos.has(id)) out.splice(i, 0, { id, titulo: "", accion: "nueva", motivo: "Obligatoria" });
+  const enPrevio = new Set((previo?.slides ?? []).filter((s) => !s.oculto).map((s) => s.id));
+  IDS_FIJOS.forEach((id) => {
+    const e = out.find((x) => x.id === id);
+    if (e) {
+      if (e.accion === "ocultar") e.accion = enPrevio.has(id) ? "actualizar" : "nueva";
+      return;
+    }
+    out.push({
+      id,
+      titulo: "",
+      accion: id === "disclaimer" || id === "cierre" ? "mantener" : enPrevio.has(id) ? "actualizar" : "nueva",
+      motivo: "Estructura fija",
+    });
   });
-  ["disclaimer", "cierre"].forEach((id) => {
-    if (!vistos.has(id)) out.push({ id, titulo: "", accion: "mantener", motivo: "Obligatoria" });
+  out.forEach((e) => {
+    const por = SUSTITUIDAS[e.id];
+    if (por && e.accion !== "ocultar") {
+      e.accion = "ocultar";
+      e.motivo = `Sustituida por «${defFija(por)?.titulo ?? por}» (estructura fija)`;
+    }
   });
-  return out;
+  return out.map((e, i) => [e, i] as const).sort((a, b) => rangoDeId(a[0].id) - rangoDeId(b[0].id) || a[1] - b[1]).map((x) => x[0]);
 }
 
 export const SLIDES_FINANZAS = ["resumen-financiero", "varianzas", "seguimiento-economico-obra"];
@@ -268,6 +294,17 @@ function plantillaDeterminista(
     };
   }
   if (t.accion === "mantener") {
+    // Una fija se vuelve a montar con lo que tenía: así conserva la estructura aunque venga de un informe viejo.
+    const def = defFija(t.id);
+    const h = def?.modo === "claude" && !/^situacion-cm-pm/.test(t.id) ? huecosDelAnterior(def, [s]) : null;
+    if (def && h) {
+      const montada = montarFija(def, h, d)[0];
+      if (montada) {
+        montada.origen = "heredada";
+        if (s.fuentes) montada.fuentes = s.fuentes;
+        return montada;
+      }
+    }
     s = actualizarPeriodo(s, d);
     s.origen = "heredada";
     return s;
@@ -293,11 +330,26 @@ export function qaMecanico(slides: SlideJson[], medidas: Record<string, MedidaQa
   const out: IncidenciaQa[] = [];
   const sl = slides.filter((s) => !s.oculto);
   if (!sl.some((s) => s.c === "Disclaimer")) out.push({ nivel: "error", slide: "", texto: "Falta el Disclaimer." });
+  // Solo en informes hechos con la estructura fija (los anteriores no la tienen y no se les pide).
+  const conEstructuraFija = slides.some((x) => x.id === "estrategia-compraventa");
+  IDS_FIJOS.forEach((id) => {
+    if (id === "disclaimer" || !conEstructuraFija) return;
+    const s = slides.find((x) => x.id === id);
+    if (!s) out.push({ nivel: "aviso", slide: "", texto: `Falta la slide fija «${defFija(id)!.titulo}».` });
+    else if (s.oculto) out.push({ nivel: "aviso", slide: id, texto: `La slide fija «${defFija(id)!.titulo}» está oculta.` });
+  });
   sl.forEach((s) => {
     const m = medidas[s.id] || {};
     if (m.pendientes) out.push({ nivel: "error", slide: s.id, texto: `${m.pendientes} dato(s) [pendiente] sin resolver.` });
+    const pendientesFijos = huecosPendientes(s);
+    if (pendientesFijos) {
+      out.push({ nivel: "aviso", slide: s.id, texto: `${pendientesFijos} bloque(s) de la estructura fija «Pendiente»: complétalos o tráelos del trimestre anterior.` });
+    }
+    if (conEstructuraFija && !conservaEstructura(s, sl)) {
+      out.push({ nivel: "aviso", slide: s.id, texto: "Ya no tiene los bloques de su estructura fija: revisa que no falte ninguno." });
+    }
     if (m.desborde) out.push({ nivel: "error", slide: s.id, texto: "El contenido desborda la slide." });
-    else if (m.relleno != null && m.relleno < 80 && s.c !== "SlideBloqueado") {
+    else if (m.relleno != null && m.relleno < 80 && s.c !== "SlideBloqueado" && !pendientesFijos) {
       out.push({ nivel: "aviso", slide: s.id, texto: `Relleno ${m.relleno} %: queda hueco.` });
     }
     if (m.error) out.push({ nivel: "error", slide: s.id, texto: m.error });

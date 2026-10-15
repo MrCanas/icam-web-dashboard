@@ -52,6 +52,33 @@ Bloques más usados:
 - `{"c":"ImagenMarco","props":{"src":"fotos/fachada.jpg","ancho":348,"alto":290,"pie":"Fachada a septiembre de 2026"}}`
 - `{"c":"div","props":{"style":{"marginTop":24}},"hijos":[…]}` — solo para separar; no inventes estilos de color o fuente.
 
+## Estructura fija (manda sobre el catálogo)
+
+Estas slides salen siempre, en este orden, con los mismos bloques cada trimestre. Su maqueta la monta el sistema
+(`logic/estructuraFija.ts`): cuando se pide una, se devuelven solo sus huecos (`{"huecos":{…},"fuentes":"…"}`),
+no el slide. Un hueco sin información real se deja vacío y sale «Pendiente de información este trimestre.».
+
+| Orden | id | Bloques fijos (huecos) |
+|---|---|---|
+| 1 | `portada` | Trimestre, «INFORME TRIMESTRAL», proyecto, foto (determinista) |
+| 2 | `indice` | Secciones numeradas (determinista) |
+| 3 | `resumen-ejecutivo` | SITUACIÓN ACTUAL (`situacion`) · COMPRAVENTA Y FINANCIACIÓN (`compraventa`) · OPERACIÓN Y CRONOGRAMA (`operacion`) · LOGROS Qx (`logros`) |
+| 4 | `resumen-financiero` | Página de Finanzas (bloqueada) |
+| 5 | `varianzas` | Página de Finanzas (bloqueada) |
+| 6 | `estrategia-compraventa` | ESTRATEGIA DE PROYECTO (`estrategia`) · COMPRAVENTA DEL INMUEBLE Y FINANCIACIÓN (`compraventa`) · 2 imágenes a la derecha (`imagenes`). Sustituye a `estrategia` + `compraventa-financiacion`. |
+| 7 | `calendario` | CALENDARIO: Antecedentes Q-1 (`anterior`) y Novedades Q (`actual`), a ancho completo. Sin timeline. |
+| 8 | `calendario-timeline` | CALENDARIO (`intro`) · Hitos reseñables · Timeline (`hitos`) |
+| 9 | `kpis-riesgos-objetivos` | INDICADORES CLAVE (`kpis`) · RIESGOS Y MITIGACIONES (`riesgos`) · OBJETIVOS Q+1 (`objetivos`) |
+| 10 | `situacion-cm-pm` (+ `situacion-cm-pm-2`) | CONSTRUCTION MANAGEMENT (`cm`) · PROJECT MANAGEMENT (`pm`) · nota del portal (`nota`). Una slide a dos columnas o, si no cabe, dos slides (CM y PM, cada una a dos columnas). |
+| 11 | `sostenibilidad` | SOSTENIBILIDAD Y ESTRATEGIA GLOBAL (`texto`) · intro (`intro`) · calificación BREEAM (`breeam`) · puntuación consolidada (`consolidacion`) · categorías (`categorias`) |
+| 12 | `sostenibilidad-seguimiento` | SEGUIMIENTO Y CRONOGRAMA (`texto`) · Timeline BREEAM (`hitos`) · nota (`nota`) |
+| 13 | `colaboradores` | intro (`intro`) · roles (`roles`) · logos (`logos`) |
+| 14 | `vehiculo` | DETALLES (`detalles`) · fichas AEAT, siguiente reunión CdA, inscripción RM, siguiente informe (`fichas`) |
+| 15 | `disclaimer` | Texto legal (determinista) |
+| 16 | `cierre` | Contraportada (determinista) |
+
+Las opcionales (licencia, arquitectura, obra, licitaciones…) van en su sección; las de Situación, entre CM/PM y Sostenibilidad.
+
 ## Catálogo (sección → layout → receta)
 
 Los límites de caracteres del design system son **orientativos**: manda la medición real de `construir.py` (desborde y

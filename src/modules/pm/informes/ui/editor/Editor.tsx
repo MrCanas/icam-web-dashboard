@@ -13,7 +13,8 @@ import {
   accionRegistrarRevision,
   accionRevisiones,
 } from "../../actions/informes";
-import { ESTRUCTURALES } from "../../logic/biblioteca";
+import { NO_ANADIBLES } from "../../logic/biblioteca";
+import { slideDesdeClaude, traerDelAnterior } from "../../logic/estructuraFija";
 import { anadirAvisos, instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision, resolverSlides, slidesDeAviso } from "../../logic/coherencia";
 import { hitosObligatorios, reponerHitos, textoCambioHito } from "../../logic/cronograma";
 import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
@@ -100,7 +101,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
   const contenido = informe.contenido;
   const [medidas, setMedidas] = useState<Record<string, ResultadoVisor>>({});
   const [ocupado, setOcupado] = useState("");
-  const [bib, setBib] = useState<number>(() => biblioteca.find((b) => !ESTRUCTURALES.includes(b.id))?.n ?? 0);
+  const [bib, setBib] = useState<number>(() => biblioteca.find((b) => !NO_ANADIBLES.includes(b.id))?.n ?? 0);
   const [confirmar, setConfirmar] = useState(false);
   const [historial, setHistorial] = useState<Cambio[] | null>(null);
   const [uso, setUso] = useState<ResumenUso | null>(usoInicial);
@@ -374,6 +375,32 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     );
   }
 
+  /**
+   * «Traer del trimestre anterior»: la slide como estaba en el informe
+   * anterior, al periodo de este (las fijas, montadas con su estructura). Con
+   * su «Deshacer»; CM/PM, que puede ocupar dos, se cambia de una vez.
+   */
+  function traerAnterior(id: string, pagina: number): (() => Promise<void>) | null {
+    const previo = h.previo?.slides;
+    if (!previo) return null;
+    const actual = contenido!.slides.find((x) => x.id === id) ?? null;
+    const nuevas = traerDelAnterior(id, previo, actual, informe);
+    if (!nuevas?.length) return null;
+    const cambio = `${tituloDe(nuevas[0]!)}: traída del ${informe.trimestreAnterior}`;
+    if (!/^situacion-cm-pm/.test(id)) return async () => void (await cambiarSlide(id, pagina, nuevas[0]!, cambio));
+    return async () =>
+      conSlides((sl) => {
+        const i = sl.findIndex((x) => x.id === "situacion-cm-pm");
+        const i2 = sl.findIndex((x) => x.id === "situacion-cm-pm-2");
+        const [primera, segunda] = nuevas;
+        if (i >= 0) sl[i] = conFlotantesDe(sl[i], primera!);
+        if (segunda) {
+          if (i2 >= 0) sl[i2] = conFlotantesDe(sl[i2], segunda);
+          else sl.splice(i + 1, 0, segunda);
+        } else if (i2 >= 0) sl[i2]!.oculto = true;
+      }, cambio);
+  }
+
   function duplicar(id: string) {
     const d = duplicarSlide(contenido!.slides, id);
     if (!d) return;
@@ -442,7 +469,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
       setOcupado(`Claude está montando «${tituloDe(actual)}» con ${documentos} (${n + 1} de ${lista.length})…`);
       try {
         const { json } = await pedirClaude({ tipo: "slide", informeId: informe.id, slideId: actual.id, modo: "dirigida", slide: actual });
-        let s = actualizarPeriodo(validarSlide(json, actual.id, permitidos), informe);
+        let s = actualizarPeriodo(slideDesdeClaude(json, actual.id, permitidos, informe)[0]!, informe);
         s.origen = "actualizada";
         let m = medirFuera(s, p.pagina, base.meta);
         if (m.error) throw new Error(m.error);
@@ -456,7 +483,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
               slide: s,
               medida: { desborde: true, ocupacion: m.ocupacion, relleno: m.relleno },
             });
-            const s2 = actualizarPeriodo(validarSlide(j2, actual.id, permitidos), informe);
+            const s2 = actualizarPeriodo(slideDesdeClaude(j2, actual.id, permitidos, informe)[0]!, informe);
             s2.origen = "actualizada";
             const m2 = medirFuera(s2, p.pagina, base.meta);
             if (!m2.error && !m2.desborde) {
@@ -744,7 +771,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
               Añadir slide de la biblioteca
               <select className={claseCampo} value={bib} onChange={(e) => setBib(Number(e.target.value))}>
                 {biblioteca
-                  .filter((b) => !ESTRUCTURALES.includes(b.id))
+                  .filter((b) => !NO_ANADIBLES.includes(b.id))
                   .map((b) => (
                     <option key={b.n} value={b.n}>
                       {b.n} · {b.nombre}
@@ -869,6 +896,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
             alternarCerrada={() => alternarCerrada(s.id)}
             siguiente={visibles[i + 1] ?? null}
             previa={h.previo?.slides.find((x) => x.id === s.id) ?? null}
+            traer={traerAnterior(s.id, i + 1)}
             metaPrevia={h.previo?.meta ?? null}
             numeroDe={numeroDe}
             ocupadoGlobal={revisando}

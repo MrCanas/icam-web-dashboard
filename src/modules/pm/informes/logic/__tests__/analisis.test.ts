@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 
 import { cerrarRonda, comentar, fuentesNuevas, leerRespuestas, marcarEditado, normalizarAnalisis } from "@/modules/pm/informes/logic/analisis";
+import { IDS_FIJOS } from "@/modules/pm/informes/logic/estructuraFija";
 import { parsearBiblioteca } from "@/modules/pm/informes/logic/biblioteca";
 import { instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision, resolverSlides } from "@/modules/pm/informes/logic/coherencia";
 import { leerPeticion, montarPrompt, tipoUso } from "@/modules/pm/informes/logic/peticiones";
@@ -48,11 +49,8 @@ test("normalizar: listas que faltan, textos, hechos sin texto fuera y comentario
   assert.deepEqual(a.faltan, []);
   assert.equal(a.omitidos, undefined);
   assert.equal(a.comentarios, undefined);
-  // Estructura obligatoria: portada, índice, resumen, disclaimer y cierre.
-  assert.deepEqual(
-    a.estructura.map((e) => e.id),
-    ["portada", "indice", "resumen-ejecutivo", "calendario", "disclaimer", "cierre"],
-  );
+  // Estructura fija completa y en su orden (logic/estructuraFija.ts).
+  assert.deepEqual(a.estructura.map((e) => e.id), IDS_FIJOS);
 });
 
 test("comentar, editar y cerrar una ronda", () => {
