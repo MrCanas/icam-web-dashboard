@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-export function PerfilPasswordForm() {
+interface PerfilPasswordFormProps {
+  /** Si se pasa, se llama tras un cambio correcto en vez de mostrar el aviso. */
+  onChanged?: () => void;
+}
+
+export function PerfilPasswordForm({ onChanged }: PerfilPasswordFormProps = {}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -44,6 +49,10 @@ export function PerfilPasswordForm() {
         return;
       }
 
+      if (onChanged) {
+        onChanged();
+        return;
+      }
       setSuccess("Contraseña actualizada correctamente.");
       setCurrentPassword("");
       setNewPassword("");

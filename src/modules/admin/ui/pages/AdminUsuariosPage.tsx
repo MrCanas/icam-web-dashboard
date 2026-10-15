@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import type { AdminUserRow } from "@/modules/admin/types";
 import { AdminDeleteUserModal } from "@/modules/admin/ui/components/AdminDeleteUserModal";
+import { AdminForcePasswordChangeModal } from "@/modules/admin/ui/components/AdminForcePasswordChangeModal";
 import { AdminPasswordModal } from "@/modules/admin/ui/components/AdminPasswordModal";
 import { AdminPermissionsModal } from "@/modules/admin/ui/components/AdminPermissionsModal";
 import { AdminUserFormModal } from "@/modules/admin/ui/components/AdminUserFormModal";
@@ -27,6 +28,7 @@ export function AdminUsuariosPage({
   );
   const [passwordUser, setPasswordUser] = useState<AdminUserRow | null>(null);
   const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
+  const [forcePasswordOpen, setForcePasswordOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -48,13 +50,22 @@ export function AdminUsuariosPage({
               Da de alta usuarios y decide a qué zonas y páginas accede cada uno.
             </p>
           </div>
-          <button
-            type="button"
-            className="min-h-11 px-4 rounded-md bg-icam-900 text-white text-sm font-medium hover:bg-icam-800 transition"
-            onClick={() => setCreateOpen(true)}
-          >
-            Nuevo usuario
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-11 px-4 rounded-md border border-subtle/60 text-sm font-medium text-text-primary hover:bg-page transition"
+              onClick={() => setForcePasswordOpen(true)}
+            >
+              Forzar cambio de contraseña
+            </button>
+            <button
+              type="button"
+              className="min-h-11 px-4 rounded-md bg-icam-900 text-white text-sm font-medium hover:bg-icam-800 transition"
+              onClick={() => setCreateOpen(true)}
+            >
+              Nuevo usuario
+            </button>
+          </div>
         </div>
 
         <div className="mt-4">
@@ -111,6 +122,16 @@ export function AdminUsuariosPage({
           onClose={() => setPasswordUser(null)}
           onDone={() => {
             setPasswordUser(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
+
+      {forcePasswordOpen ? (
+        <AdminForcePasswordChangeModal
+          onClose={() => setForcePasswordOpen(false)}
+          onDone={() => {
+            setForcePasswordOpen(false);
             router.refresh();
           }}
         />

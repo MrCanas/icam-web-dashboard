@@ -73,6 +73,11 @@ function Badges({ user }: { user: AdminUserRow }) {
           Inactivo
         </span>
       ) : null}
+      {user.mustChangePassword ? (
+        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+          Cambio de contraseña pendiente
+        </span>
+      ) : null}
     </>
   );
 }

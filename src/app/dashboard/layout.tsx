@@ -1,8 +1,11 @@
+import { redirect } from "next/navigation";
+
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { DashboardZoneGuard } from "@/components/layout/DashboardZoneGuard";
 import { CurrentUserProvider } from "@/lib/auth/CurrentUserProvider";
 import { getCurrentUser } from "@/lib/auth/currentUser";
+import { mustChangePassword } from "@/lib/auth/must-change-password";
 import { hasZoneAccess } from "@/lib/auth/permissions";
 import {
   fetchPmProjectNavItems,
@@ -31,6 +34,11 @@ export default async function DashboardLayout({
     }
   } catch {
     pmProjects = [];
+  }
+
+  // Fuera del try: redirect() lanza y el catch se lo tragaría.
+  if (user && (await mustChangePassword(user.id))) {
+    redirect("/cambiar-contrasena");
   }
 
   return (

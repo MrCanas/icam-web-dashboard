@@ -11,6 +11,8 @@ export interface AdminUserRow {
   /** Zona ausente = sin acceso. */
   zones: Partial<Record<ZoneKey, ZoneRole>>;
   deniedRouteKeys: string[];
+  /** Tiene que cambiar la contraseña en su siguiente acceso. */
+  mustChangePassword: boolean;
   createdAt: string;
   lastSignInAt: string | null;
 }
