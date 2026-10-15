@@ -90,24 +90,20 @@ export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedA
         <KPICard
           title="Activos en análisis"
           value={fmtInt(d.total)}
-          subtitle={`${fmtInt(d.total - d.discarded)} en curso · ${fmtInt(d.discarded)} descartados`}
         />
         <KPICard
           title="Volumen analizado"
           value={fmtM(d.vol)}
-          subtitle={`asking en ${fmtInt(d.withPrice)} de ${fmtInt(d.total)} activos`}
         />
-        <KPICard title="Ticket medio" value={fmtM(avgTicket(d))} subtitle={`sobre ${fmtInt(d.withPrice)} activos con precio`} />
+        <KPICard title="Ticket medio" value={fmtM(avgTicket(d))} />
         <KPICard
           title="Precio medio €/m²"
           value={d.eurM2 != null ? fmtEur(d.eurM2) : "—"}
-          subtitle={`sobre ${fmtInt(d.eurM2Count)} activos con ambos datos`}
         />
-        <KPICard title="m² analizados" value={fmtM2(d.m2)} subtitle={`en ${fmtInt(d.m2Count)} activos`} />
+        <KPICard title="m² analizados" value={fmtM2(d.m2)} />
         <KPICard
           title="Tasa de adquisición"
           value={`${adquisicion.rate.toLocaleString("es-ES")}%`}
-          subtitle={`${fmtInt(adquisicion.acquired)} adquiridos de ${fmtInt(adquisicion.rest)} no adquiridos`}
           highlight
         />
       </section>
@@ -148,7 +144,7 @@ export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedA
       {cards.length > 0 ? (
         <section className="space-y-2">
           <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted px-1">
-            {vista === "comite" ? "Activos en Comité" : "Activos en estudio · Servilleta, Pre-Comité, Comité y FCF"}
+            {vista === "comite" ? "Activos en Comité" : "Activos en análisis"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {cards.map((a) => (
@@ -260,6 +256,9 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
+/** Nombres cortos en los gráficos. */
+const CHART_LABEL: Record<string, string> = { "Apartamentos Turísticos": "AT" };
+
 function Barras({ title, data, total }: { title: string; data: { name: string; n: number }[]; total: number }) {
   const maxN = Math.max(...data.map((x) => x.n), 1);
   return (
@@ -283,7 +282,7 @@ function Barras({ title, data, total }: { title: string; data: { name: string; n
                     </span>
                   </div>
                 </div>
-                <p className="mt-1.5 text-center text-xs leading-snug text-text-muted">{x.name}</p>
+                <p className="mt-1.5 text-center text-xs leading-snug text-text-muted">{CHART_LABEL[x.name] ?? x.name}</p>
                 <p className="text-xs font-semibold text-text-primary">{pct}%</p>
               </div>
             );
