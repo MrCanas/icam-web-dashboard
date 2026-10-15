@@ -191,6 +191,18 @@ function TarjetaActivo({ a, rc }: { a: AdqCard; rc: string | null }) {
             <p className="text-xs text-text-muted mt-0.5">{a.location}</p>
           </div>
           <div className="flex shrink-0 gap-1">
+            {a.mapsQuery ? (
+              <a
+                href={mapsUrl(a.mapsQuery)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Ver en Google Maps"
+                aria-label="Abrir en Google Maps"
+                className={enlace}
+              >
+                <Icono nombre="ubicacion" className="h-[18px] w-[18px]" />
+              </a>
+            ) : null}
             <a
               href={catastroUrl(rc)}
               target="_blank"

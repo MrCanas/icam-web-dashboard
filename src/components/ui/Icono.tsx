@@ -22,7 +22,8 @@ export type NombreIcono =
   | "play"
   | "buscar"
   | "documento"
-  | "planeta";
+  | "planeta"
+  | "ubicacion";
 
 const TRAZOS: Record<NombreIcono, string> = {
   info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 16v-4 M12 8h.01",
@@ -46,6 +47,7 @@ const TRAZOS: Record<NombreIcono, string> = {
   documento: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   planeta:
     "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z",
+  ubicacion: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
 };
 
 export function Icono({ nombre, className = "h-4 w-4", titulo }: { nombre: NombreIcono; className?: string; titulo?: string }) {
