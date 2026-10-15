@@ -58,11 +58,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
   }
 
+  if (newPassword === currentPassword) {
+    return NextResponse.json(
+      { error: "La nueva contraseña debe ser distinta de la actual" },
+      { status: 400 },
+    );
+  }
+
   const password_hash = await bcrypt.hash(newPassword, 10);
   const { error: updateError } = await admin
     .from("app_user_password")
     .update({
       password_hash,
+      must_change_password: false,
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id);

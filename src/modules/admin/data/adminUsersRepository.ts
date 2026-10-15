@@ -65,12 +65,16 @@ async function listAuthUsers(): Promise<AuthUserLite[]> {
 export async function listAdminUsers(): Promise<AdminUserRow[]> {
   const admin = createServiceRoleClient();
 
-  const [authUsers, zonesResult, accountsResult, deniesResult] =
+  const [authUsers, zonesResult, accountsResult, deniesResult, passwordsResult] =
     await Promise.all([
       listAuthUsers(),
       admin.from("app_user_zone_role").select("user_id, zone_key, role"),
       admin.from("app_user_account").select("user_id, is_platform_admin, is_active"),
       admin.from("app_user_route_deny").select("user_id, route_key"),
+      admin
+        .from("app_user_password")
+        .select("user_id")
+        .eq("must_change_password", true),
     ]);
 
   if (zonesResult.error) {
@@ -82,6 +86,13 @@ export async function listAdminUsers(): Promise<AdminUserRow[]> {
   if (deniesResult.error) {
     throw new Error(`app_user_route_deny: ${deniesResult.error.message}`);
   }
+  if (passwordsResult.error) {
+    throw new Error(`app_user_password: ${passwordsResult.error.message}`);
+  }
+
+  const mustChangePassword = new Set(
+    (passwordsResult.data ?? []).map((row) => row.user_id as string),
+  );
 
   const zonesByUser = new Map<string, Partial<Record<ZoneKey, ZoneRole>>>();
   for (const row of zonesResult.data ?? []) {
@@ -114,6 +125,7 @@ export async function listAdminUsers(): Promise<AdminUserRow[]> {
       isActive: account?.is_active !== false,
       zones: zonesByUser.get(user.id) ?? {},
       deniedRouteKeys: deniesByUser.get(user.id) ?? [],
+      mustChangePassword: mustChangePassword.has(user.id),
       createdAt: user.createdAt,
       lastSignInAt: user.lastSignInAt,
     };
@@ -199,6 +211,21 @@ export async function setUserPassword(
     { onConflict: "user_id" },
   );
   if (error) throw new Error(`app_user_password upsert: ${error.message}`);
+}
+
+/**
+ * Marca a todos los usuarios con contraseña para que la cambien en su
+ * siguiente acceso. Devuelve cuántos quedan marcados.
+ */
+export async function markAllUsersMustChangePassword(): Promise<number> {
+  const admin = createServiceRoleClient();
+  const { data, error } = await admin
+    .from("app_user_password")
+    .update({ must_change_password: true })
+    .not("user_id", "is", null)
+    .select("user_id");
+  if (error) throw new Error(`app_user_password update: ${error.message}`);
+  return data?.length ?? 0;
 }
 
 async function upsertAccountFlags(
