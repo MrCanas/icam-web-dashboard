@@ -104,7 +104,6 @@ export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedA
         <KPICard
           title="Tasa de adquisición"
           value={`${adquisicion.rate.toLocaleString("es-ES")}%`}
-          highlight
         />
       </section>
 
