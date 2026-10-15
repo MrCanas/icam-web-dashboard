@@ -1,6 +1,6 @@
 import type { UserContext } from "@/lib/auth/currentUser";
 
-import { mensajeErrorBd } from "../logic/errores";
+import { esTablaInexistente, mensajeErrorBd } from "../logic/errores";
 import type { SlideJson } from "../slides/tipos";
 import type { RevisionInforme, TipoRevision } from "../types";
 import { getInformesSupabase } from "./client";
@@ -9,8 +9,8 @@ type R<T> = { data: T; error: null } | { data: null; error: string };
 
 /** Falta la migración 050: el mensaje dice qué hay que aplicar. */
 function sinTabla(error: { code?: string; message?: string }): string | null {
-  return error.code === "42P01" || (/informe_revision/.test(error.message ?? "") && /does not exist|no existe/.test(error.message ?? ""))
-    ? "Falta la tabla informe_revision: aplica la migración 050 (npm run pm:apply-migration-050 -- --apply)."
+  return esTablaInexistente(error)
+    ? "Falta la tabla informe_revision: aplica la migración 050 (npm run pm:apply-migration-050 -- --apply). Mientras tanto las revisiones funcionan, pero no quedan en este historial."
     : null;
 }
 
