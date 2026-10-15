@@ -3,6 +3,7 @@ import type { Analisis, Foto, Fuente, PrevioEstructurado } from "../types";
 import { comentariosActivos } from "./analisis";
 import { entradaDeId, type EntradaBiblioteca } from "./biblioteca";
 import { bloqueCronograma, esSlideDeCronograma, hitosObligatorios } from "./cronograma";
+import { avisoConservarEstructura, bloqueHuecos, defFija, destinoHitos, esFijaConHuecos, huecosDelAnterior, IDS_FIJOS, textoEstructuraFija, type Huecos } from "./estructuraFija";
 import { fuentesParaSlide } from "./dirigidas";
 import { flotantesValidos, sinFlotantes } from "./flotantes";
 import { textos, tituloDe } from "./informe";
@@ -194,7 +195,7 @@ export function esquemaPrevio(m: Pick<MaterialInforme, "previo" | "previoTexto">
 }
 
 export function bibliotecaTexto(bib: EntradaBiblioteca[]): string {
-  return bib.map((b) => `${b.n} · ${b.nombre} · id ${b.id} · ${b.para} · sugerir: ${b.sugerir}`).join("\n");
+  return bib.map((b) => `${b.n} · ${b.nombre} · id ${b.id} · ${b.para} · sugerir: ${IDS_FIJOS.includes(b.id) ? "SIEMPRE (estructura fija)" : b.sugerir}`).join("\n");
 }
 
 function salida(d: ContextoInforme): string {
@@ -222,6 +223,7 @@ function baseSlide(m: MaterialInforme): BloquePrompt[] {
         "== FORMATO DE informe.json Y CATÁLOGO DE LAYOUTS ==\n" + m.referencias.recetas,
         "== API DE COMPONENTES ==\n" + m.referencias.api,
         "== REGLAS DE REDACCIÓN ==\n" + m.referencias.reglas,
+        textoEstructuraFija(),
         salida(d),
       ].join("\n\n"),
     },
@@ -268,7 +270,7 @@ export function bloqueComentarios(m: Pick<MaterialInforme, "analisis">, slideId:
 function cronogramaDe(m: MaterialInforme, slideId: string, slide?: SlideJson | null): string | null {
   const obligatorios = hitosObligatorios(m.analisis, m.previo);
   if (!esSlideDeCronograma(slideId, obligatorios, slide)) return null;
-  const propios = obligatorios.filter((h) => !h.slide || h.slide === slideId);
+  const propios = obligatorios.filter((h) => !h.slide || h.slide === slideId || destinoHitos(h.slide) === slideId);
   return bloqueCronograma(propios.length ? propios : obligatorios);
 }
 
@@ -277,12 +279,30 @@ export function cabeceraSlide(n: number | null, s: SlideJson): string {
   return `### ${n ? `Slide ${n} · ` : "(oculta) · "}${s.id} · ${tituloDe(s)}${s.cerrada ? " · CERRADA (no se toca)" : ""}`;
 }
 
+/**
+ * Qué se pide de un slide de la estructura fija: sus huecos (lo normal) o, en
+ * una corrección del equipo, el slide entero sin perder sus bloques.
+ */
+interface ModoFija {
+  modo: "huecos" | "conservar";
+  /** Huecos del slide que se ajusta. */
+  actuales?: Huecos | null;
+}
+
+function bloqueFija(m: MaterialInforme, slideId: string | null, f: ModoFija | undefined): string | null {
+  const def = slideId ? defFija(slideId) : undefined;
+  if (!def || !slideId || !esFijaConHuecos(slideId)) return null;
+  if (f?.modo === "conservar") return avisoConservarEstructura(def);
+  return bloqueHuecos(def, { actuales: f?.actuales, previos: f?.actuales ? null : huecosDelAnterior(def, m.previo?.slides ?? []) });
+}
+
 function conTarea(
   m: MaterialInforme,
   tarea: string,
   extra: string[] = [],
   slideId: string | null = null,
   slide: SlideJson | null = null,
+  fija?: ModoFija,
 ): BloquePrompt[] {
   return [
     ...baseSlide(m),
@@ -291,6 +311,7 @@ function conTarea(
       texto: [
         "== TAREA ==\n" + tarea,
         ...extra,
+        bloqueFija(m, slideId, fija),
         slideId ? cronogramaDe(m, slideId, slide) : null,
         bloqueComentarios(m, slideId),
         bloqueNoReportar(m.fuentes),
@@ -354,7 +375,7 @@ export function promptResumen(m: MaterialInforme, slides: SlideJson[], prev: Sli
     (prev ? "\nRESUMEN EJECUTIVO ANTERIOR (estructura y datos persistentes):\n" + jsonDeSlide(prev) : "") +
     "\nRESTO DEL INFORME YA REDACTADO:\n" +
     recortar(otros, 22_000);
-  return conTarea(m, t);
+  return conTarea(m, t, [], "resumen-ejecutivo");
 }
 
 export interface MedidaAjuste {
@@ -367,7 +388,8 @@ export function promptAjuste(m: MaterialInforme, slide: SlideJson, med: MedidaAj
   const t = med.desborde
     ? `El slide "${slide.id}" DESBORDA: su contenido ocupa el ${med.ocupacion} % del área útil medida en el navegador. Acórtalo hasta ~90 % quitando lo menos relevante, sin cambiar estilos ni tamaños (o cambia a un layout más compacto).`
     : `El slide "${slide.id}" queda al ${med.relleno} % del área tras repartir huecos (objetivo ≥ 85 %). Amplíalo con información REAL de las fuentes o del texto vigente del informe anterior, o agranda las fotos (disposición mayor). Si no hay más información real, devuélvelo sin cambios.`;
-  return conTarea(m, t + "\nSLIDE ACTUAL:\n" + jsonDeSlide(slide), [], slide.id, slide);
+  const actuales = defFija(slide.id)?.extraer?.(slide);
+  return conTarea(m, t + "\nSLIDE ACTUAL:\n" + jsonDeSlide(slide), [], slide.id, slide, actuales ? { modo: "huecos", actuales } : undefined);
 }
 
 export function promptCorreccion(
@@ -390,6 +412,7 @@ export function promptCorreccion(
     [extra.marcas, recortar(extra.adjuntos ?? "", 24_000), dirigida ? dirigida + "\n" + REGLAS_DIRIGIDA : null].filter((x): x is string => !!x),
     slide.id,
     slide,
+    { modo: "conservar" },
   );
 }
 
@@ -420,6 +443,7 @@ export function promptAnalisis(m: MaterialInforme): BloquePrompt[] {
           (estructurado
             ? '- "estructura" recorre TODAS las slides del informe anterior en su orden, con su mismo id. "mantener" solo para slides legales o sin información nueva que no citen el trimestre (disclaimer, cierre, colaboradores sin cambios); "actualizar" para las que deben reflejar el nuevo trimestre (portada, índice y financieras se tratan aparte, márcalas "actualizar"); "ocultar" si ya no aplican. Añade al final con "nueva" las slides que el material pida y no existan (id de la biblioteca).\n'
             : '- "estructura" propone el informe completo usando ids de la biblioteca en el orden canónico (portada, indice, resumen-ejecutivo, … , disclaimer, cierre), todas con "nueva" salvo disclaimer y cierre ("mantener").\n') +
+          `- Estructura fija: ${IDS_FIJOS.join(", ")} van SIEMPRE en "estructura", en ese orden, con "actualizar" (o "mantener" si no cambian; "nueva" si no estaban); nunca "ocultar". Las opcionales van entre ellas, en su sección. "estrategia" y "compraventa-financiacion" de informes anteriores se sustituyen por "estrategia-compraventa".\n` +
           `- Evalúa cada objetivo que el informe anterior fijó para ${d.trimestre}.\n- "faltan": datos necesarios que no están en las fuentes. "contradicciones": datos que no cuadran entre fuentes.` +
           (hitosDelTexto
             ? '\n- "hitosPrevios": TODOS los hitos del cronograma (calendario, timeline o hitos del proyecto) del informe anterior, en su orden, con el título exacto, la fecha en MM/AA y "hecho" según el informe anterior. [] si no tenía cronograma.'

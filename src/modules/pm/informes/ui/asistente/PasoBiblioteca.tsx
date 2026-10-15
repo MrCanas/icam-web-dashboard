@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 
 import { accionRegistrarRevision } from "../../actions/informes";
 import { cerrarRonda, comentar, comentariosActivos, fuentesNuevas, leerRespuestas, marcarEditado, normalizarAnalisis, quitarDeLista, type ListaTexto } from "../../logic/analisis";
-import { ESTRUCTURALES } from "../../logic/biblioteca";
+import { NO_ANADIBLES } from "../../logic/biblioteca";
+import { defFija } from "../../logic/estructuraFija";
+import { normalizarEstructura } from "../../logic/informe";
 import { hitosObligatorios } from "../../logic/cronograma";
 import type { AccionEstructura, Analisis, EntradaEstructura, HitoCronograma, Seleccion } from "../../types";
 import { Boton, Chip, claseCampo, Tarjeta } from "../componentes";
@@ -45,7 +47,9 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
   const { informe, biblioteca, puedeEditar } = h;
   const a = informe.analisis;
   const hayNoReportar = h.fuentes.some((f) => f.tipo === "no_reportar" && f.texto.trim());
-  const sel: Seleccion = informe.seleccion ?? { estructura: a?.estructura ?? [], anadir: [] };
+  const base: Seleccion = informe.seleccion ?? { estructura: a?.estructura ?? [], anadir: [] };
+  // Siempre con la estructura fija completa y en su orden (también en análisis hechos antes de que existiera).
+  const sel: Seleccion = { ...base, estructura: normalizarEstructura(base.estructura, h.previo) };
   const presentes = new Set(sel.estructura.map((e) => e.id));
   const sugeridas = a?.sugeridas ?? [];
   const nClaude = sel.estructura.filter((e) => e.accion === "actualizar" || e.accion === "nueva").length + sel.anadir.length + 2;
@@ -368,6 +372,8 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
         <div className="flex flex-col divide-y divide-subtle/60 rounded-lg border border-subtle/60">
           {sel.estructura.map((e, i) => {
             const b = biblioteca.find((x) => x.id === e.id);
+            // Las de la estructura fija no se ocultan.
+            const fija = !!defFija(e.id);
             return (
               <div key={e.id} className="grid gap-2 p-3 md:grid-cols-[32px_1.2fr_190px_1fr]">
                 <span className="pt-1 text-sm tabular-nums text-text-muted">{i + 1}</span>
@@ -380,7 +386,10 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
                     onGuardar={(t) => editarFila(i, { titulo: t })}
                     {...com(`estructura.${e.id}`)}
                   />
-                  <span className="text-xs text-text-muted">{e.id}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-text-muted">
+                    {e.id}
+                    {fija ? <Chip tono="neutro">Fija</Chip> : null}
+                  </span>
                 </div>
                 <div>
                   <select
@@ -390,7 +399,7 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
                     disabled={!puedeEditar}
                     onChange={(ev) => editarFila(i, { accion: ev.target.value as AccionEstructura })}
                   >
-                    {ACCIONES.map(([v, t]) => (
+                    {ACCIONES.filter(([v]) => !fija || v !== "ocultar").map(([v, t]) => (
                       <option key={v} value={v}>
                         {t}
                       </option>
@@ -418,7 +427,7 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
             </thead>
             <tbody>
               {biblioteca
-                .filter((b) => !presentes.has(b.id) && !ESTRUCTURALES.includes(b.id))
+                .filter((b) => !presentes.has(b.id) && !NO_ANADIBLES.includes(b.id))
                 .map((b) => (
                   <tr key={b.n} className="border-t border-subtle/60 align-top">
                     <td className="p-3">

@@ -1,3 +1,5 @@
+import { IDS_FIJOS, SUSTITUIDAS } from "./estructuraFija";
+
 /**
  * Biblioteca de slides (referencia/biblioteca.md → lista). Mismo parseo que
  * construir_app.py:biblioteca() de la app original: una fila por slide con su
@@ -38,3 +40,9 @@ export const ESTRUCTURALES = ["portada", "indice", "disclaimer", "cierre"];
 export function entradaDeId(bib: EntradaBiblioteca[], id: string): EntradaBiblioteca | undefined {
   return bib.find((x) => x.id === id || (x.id.indexOf("<") > 0 && id.indexOf(x.id.split("<")[0]!) === 0));
 }
+
+/**
+ * No se ofrecen para añadir: las estructurales, las de la estructura fija (ya
+ * están siempre) y las que una fija ha sustituido (estrategia, compraventa).
+ */
+export const NO_ANADIBLES = [...ESTRUCTURALES, ...IDS_FIJOS, ...Object.keys(SUSTITUIDAS)];

@@ -6,6 +6,12 @@ responder «añade 14 y 22». La receta técnica de cada una está en `layouts.m
 Leyenda de «Sugerir cuando»: condición que, si aparece en el material del trimestre, hace que la propongas
 entre las 3 recomendadas.
 
+Estructura fija (logic/estructuraFija.ts): estas slides salen SIEMPRE, en este orden y con los mismos bloques
+cada trimestre (solo cambia el texto): portada, indice, resumen-ejecutivo, resumen-financiero, varianzas,
+estrategia-compraventa, calendario, calendario-timeline, kpis-riesgos-objetivos, situacion-cm-pm (una o dos
+slides), sostenibilidad, sostenibilidad-seguimiento, colaboradores, vehiculo, disclaimer y cierre. Las demás son
+opcionales y van en su sección.
+
 ## Estructura (siempre presentes)
 
 | Nº | Slide | Para qué sirve | id |
@@ -27,10 +33,11 @@ entre las 3 recomendadas.
 
 | Nº | Slide | Para qué sirve | Sugerir cuando | id |
 |---|---|---|---|---|
-| 8 | Estrategia y descripción | Estrategia, programa del edificio, mapa y foto | Primer informe o cambio de estrategia | `estrategia` |
-| 9 | Compraventa y financiación | Préstamo, disposiciones, seguros, monitoring/VIO | Novedades de financiación o seguros | `compraventa-financiacion` |
-| 10 | Calendario | Antecedentes/Novedades, hitos reseñables y timeline | Siempre | `calendario` |
-| 11 | Timeline a página completa | Cronograma largo o por fases/subproyectos | > 8 hitos o varios subproyectos | `calendario-timeline` |
+| 40 | Estrategia, compraventa y financiación | Estrategia de proyecto, compraventa del inmueble y financiación, con 2 imágenes | Siempre (estructura fija) | `estrategia-compraventa` |
+| 8 | Estrategia y descripción (informes anteriores; sustituida por nº 40) | Estrategia, programa del edificio, mapa y foto | No se propone | `estrategia` |
+| 9 | Compraventa y financiación (informes anteriores; sustituida por nº 40) | Préstamo, disposiciones, seguros, monitoring/VIO | No se propone | `compraventa-financiacion` |
+| 10 | Calendario | Antecedentes del trimestre anterior y Novedades del actual (texto) | Siempre (estructura fija) | `calendario` |
+| 11 | Calendario · hitos reseñables | Texto del calendario, hitos reseñables y timeline del proyecto | Siempre (estructura fija) | `calendario-timeline` |
 | 12 | KPIs, riesgos y objetivos | Indicadores, riesgos-mitigaciones y objetivos Q+1 | Siempre | `kpis-riesgos-objetivos` |
 
 ## Situación de proyecto (módulos)
@@ -43,10 +50,10 @@ entre las 3 recomendadas.
 | 16 | Ingeniería e instalaciones | Estructura, MEP, estudios técnicos | Incidencia o hito técnico | `situacion-ingenieria` |
 | 17 | Arrendaticia / operador | Contrato con operador, condiciones, coordinación | Hay operador | `situacion-arrendaticia` |
 | 18 | Suministros y mantenimiento | Acometidas, contratos, ascensor, legalizaciones | Fase final de obra o explotación | `situacion-suministros` |
-| 19 | Construction & Project Management | Gestión de obra y coordinación de Impar | Obra en curso | `situacion-cm-pm` |
+| 19 | Construction & Project Management | Construction management y project management (una slide, o dos si hay mucho contenido) | Siempre (estructura fija) | `situacion-cm-pm` |
 | 20 | Licitaciones y contratación | Estado por lote/paquete | Adjudicaciones en el trimestre | `licitaciones` |
-| 21 | Sostenibilidad BREEAM | Calificación objetivo, puntuación consolidada, plan de gestión | Hay informe del asesor | `sostenibilidad` |
-| 22 | Cronograma BREEAM | Seguimiento y timeline de la certificación | Fases de evaluación en curso | `sostenibilidad-seguimiento` |
+| 21 | Sostenibilidad BREEAM | Estrategia de sostenibilidad, calificación objetivo y puntuación por categorías | Siempre (estructura fija) | `sostenibilidad` |
+| 22 | Cronograma BREEAM | Seguimiento y timeline de la certificación | Siempre (estructura fija) | `sostenibilidad-seguimiento` |
 | 23 | Marca y aprobaciones | Aprobaciones del brand (p. ej. Marriott) | Branded residences | `situacion-marca` |
 | 24 | Marketing | Posicionamiento, materiales, lanzamiento | Pre-lanzamiento comercial | `situacion-marketing` |
 | 25 | Comercialización / preventas | Reservas, ventas, precios, canales | Hay ventas o reservas | `situacion-comercializacion` |
