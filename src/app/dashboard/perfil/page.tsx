@@ -8,6 +8,7 @@ const ZONE_LABELS: Record<string, string> = {
   pm: "Proyectos",
   adquisiciones: "Adquisiciones",
   comunicaciones: "Comunicaciones",
+  relaciones: "Relaciones",
   data: "Data",
 };
 
