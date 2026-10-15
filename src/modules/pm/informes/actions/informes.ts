@@ -26,6 +26,7 @@ import {
   type CambiosInforme,
 } from "../data/informesRepository";
 import { listarExportaciones, registrarExportacion } from "../data/exportacionesRepository";
+import { listarRevisiones, marcarDeshecha, registrarRevision, type NuevaRevision } from "../data/revisionesRepository";
 import { resumenUsoInforme } from "../data/usoRepository";
 import { esIdInforme, limpiarCodigo, parseTrimestre, qSig } from "../logic/trimestre";
 import type { Pie } from "../slides/tipos";
@@ -42,7 +43,9 @@ import {
   type PrevioEstructurado,
   type Resultado,
   type ResumenUso,
+  type RevisionInforme,
   type TipoFuente,
+  type TipoRevision,
   type TipoFuenteAuto,
 } from "../types";
 import { usuarioEscritura, usuarioLectura } from "./acceso";
@@ -375,5 +378,44 @@ export async function accionBorrarFoto(id: string, fotoId: string): Promise<Resu
   const acceso = await usuarioEscritura();
   if ("error" in acceso) return mal(acceso.error);
   const r = await borrarFoto(acceso.user, id, fotoId);
+  return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
+}
+
+/* ------------------------------------------------------------------ revisiones */
+
+const TIPOS_REVISION: TipoRevision[] = ["instruccion", "correccion", "coherencia", "desdoblar", "fusionar", "duplicar", "nueva", "analisis"];
+
+/**
+ * Anota una revisión (lo pedido, lo que había y lo que quedó) para el
+ * historial con «Deshacer». Si falta la migración 050 no impide nada: la
+ * revisión ya está guardada en el informe; solo se avisa.
+ */
+export async function accionRegistrarRevision(id: string, r: NuevaRevision): Promise<Resultado<RevisionInforme>> {
+  try {
+    if (!esIdInforme(id)) return mal("Informe no válido.");
+    if (!TIPOS_REVISION.includes(r.tipo)) return mal("Tipo de revisión no válido.");
+    const acceso = await usuarioEscritura();
+    if ("error" in acceso) return mal(acceso.error);
+    const x = await registrarRevision(acceso.user, id, r);
+    return x.error !== null ? mal(x.error) : { ok: true, data: x.data };
+  } catch (err) {
+    console.error("[informes] registrar revisión", err);
+    return mal(err instanceof Error ? err.message : "No se ha podido anotar la revisión");
+  }
+}
+
+export async function accionRevisiones(id: string): Promise<Resultado<RevisionInforme[]>> {
+  if (!esIdInforme(id)) return mal("Informe no válido.");
+  const acceso = await usuarioLectura();
+  if ("error" in acceso) return mal(acceso.error);
+  const r = await listarRevisiones(acceso.user, id);
+  return r.error !== null ? mal(r.error) : { ok: true, data: r.data };
+}
+
+export async function accionMarcarRevisionDeshecha(id: string, revisionId: number): Promise<Resultado> {
+  if (!esIdInforme(id)) return mal("Informe no válido.");
+  const acceso = await usuarioEscritura();
+  if ("error" in acceso) return mal(acceso.error);
+  const r = await marcarDeshecha(acceso.user, id, revisionId);
   return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
 }

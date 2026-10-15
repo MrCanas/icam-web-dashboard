@@ -71,6 +71,31 @@ export interface Analisis {
   contradicciones: string[];
   /** Lo que Claude ha dejado fuera por «No reportar». Solo para el equipo: no va a los prompts de slide. */
   omitidos?: string[];
+  /**
+   * Hitos del cronograma del informe anterior que el informe nuevo tiene que
+   * conservar (logic/cronograma.ts). Con previo estructurado salen de sus
+   * Timeline; con previo en PDF/PPTX los extrae Claude. El equipo los edita en
+   * el paso 3: esta lista, si existe, es la que manda.
+   */
+  hitosPrevios?: HitoCronograma[];
+  /** Comentarios del equipo por elemento (logic/analisis.ts: «resumen.3», «estructura.calendario», «general»…). */
+  comentarios?: Record<string, string>;
+  /** Cómo atendió Claude cada comentario en la última revisión (misma clave). */
+  respuestas?: Record<string, string>;
+  /** Claves de lo que el equipo ha editado a mano: en la revisión se respeta tal cual. */
+  editados?: string[];
+  /** Ronda de análisis (1 = el primero) y cuándo se hizo: las fuentes posteriores son «nuevas». */
+  ronda?: number;
+  fecha?: string;
+}
+
+export interface HitoCronograma {
+  titulo: string;
+  /** MM/AA, como Timeline. */
+  fecha: string;
+  hecho: boolean;
+  /** Slide del informe anterior en la que estaba (para reponerlo en su sitio). */
+  slide?: string;
 }
 
 export interface Seleccion {
@@ -88,11 +113,22 @@ export interface IncidenciaCoherencia {
   slide: string;
   problema: string;
   sugerencia?: string;
+  /** Desde que se pueden comentar y aplicar; las antiguas no lo tienen (logic/coherencia.ts lo pone al leer). */
+  id?: string;
+  estado?: "pendiente" | "aplicado" | "descartado";
+  /** Lo que el equipo añade al aviso antes de aplicarlo. */
+  comentario?: string;
+  /** Otras slides afectadas por el mismo problema. */
+  slides?: string[];
+  /** De dónde viene: la revisión de coherencia, el aviso de una corrección o la comprobación del cronograma. */
+  origen?: "coherencia" | "correccion" | "cronograma";
 }
 
 export interface QaInforme {
   coherencia: IncidenciaCoherencia[];
   fecha: string;
+  /** Comentario general del equipo sobre la presentación, pendiente de aplicar. */
+  comentarioGeneral?: string;
 }
 
 export interface Informe {
@@ -183,6 +219,24 @@ export interface Cambio {
   fecha: string;
   autor: string | null;
 }
+
+/** Una revisión con Claude o una operación de estructura (desdoblar, fusionar…): lo que había y lo que quedó. */
+export interface RevisionInforme {
+  id: number;
+  tipo: TipoRevision;
+  instruccion: string;
+  resumen: string;
+  /** Slides afectadas antes y después (por id). */
+  antes: SlideJson[];
+  despues: SlideJson[];
+  /** Orden de ids visible antes de la revisión, para deshacer altas y bajas. */
+  ordenAntes: string[];
+  fecha: string;
+  autor: string | null;
+  deshecha: boolean;
+}
+
+export type TipoRevision = "instruccion" | "correccion" | "coherencia" | "desdoblar" | "fusionar" | "duplicar" | "nueva" | "analisis";
 
 export interface VersionGuardada {
   version: number;

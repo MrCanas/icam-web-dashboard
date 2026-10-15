@@ -6,7 +6,7 @@ import { ErrorPeticionClaude, pedirAClaude, type ImagenPeticion } from "@/module
 import { cargarMaterial } from "@/modules/pm/informes/data/materialRepository";
 import { registrarUso } from "@/modules/pm/informes/data/usoRepository";
 import { costeUsd, extraerJson, JsonNoValidoError, MAX_BYTES_PROMPT, MAX_IMAGENES } from "@/modules/pm/informes/logic/peticion-claude";
-import { leerPeticion, montarPrompt } from "@/modules/pm/informes/logic/peticiones";
+import { leerPeticion, montarPrompt, tipoUso } from "@/modules/pm/informes/logic/peticiones";
 import { tamano } from "@/modules/pm/informes/logic/prompts";
 import { esIdInforme } from "@/modules/pm/informes/logic/trimestre";
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         await registrarUso(ctx, {
           ...r.uso,
           informeId,
-          tipo: peticion.tipo,
+          tipo: tipoUso(peticion.tipo),
           modelo: r.modelo,
           costeUsd: coste,
           stopReason: r.stopReason,

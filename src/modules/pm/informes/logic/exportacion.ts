@@ -20,6 +20,8 @@ export function incidenciasExportacion(
   const visibles = slides.filter((s) => !s.oculto);
   const ids = new Set(visibles.map((s) => s.id));
   coherencia.forEach((c) => {
+    // Los avisos que el equipo ya ha aplicado o descartado no cuentan.
+    if (c.estado === "aplicado" || c.estado === "descartado") return;
     if (c.slide && !ids.has(c.slide)) return;
     out.push({ nivel: "aviso", slide: c.slide, texto: `Incoherencia señalada en la revisión: ${c.problema}${c.sugerencia ? ` (${c.sugerencia})` : ""}` });
   });
