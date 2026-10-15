@@ -9,8 +9,21 @@ export const metadata: Metadata = { title: "Comunicación" };
 // general lee de Zoho el registro de cada destinatario para montar su correo.
 export const maxDuration = 300;
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ paso?: string | string[]; clasica?: string | string[] }>;
+}) {
   const ctx = await requireRouteAccess("comunicaciones.historial");
-  const { id } = await params;
-  return <DetallePage ctx={ctx} id={decodeURIComponent(id)} />;
+  const [{ id }, { paso, clasica }] = await Promise.all([params, searchParams]);
+  return (
+    <DetallePage
+      ctx={ctx}
+      id={decodeURIComponent(id)}
+      paso={typeof paso === "string" ? paso : undefined}
+      clasica={clasica !== undefined}
+    />
+  );
 }

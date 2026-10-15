@@ -9,7 +9,8 @@ export const metadata: Metadata = { title: "Nueva comunicación" };
 // Server Action de esta página: el mismo margen que su cron.
 export const maxDuration = 300;
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ clasica?: string | string[] }> }) {
   await requireRouteAccess("comunicaciones.nueva");
-  return <NuevaPage />;
+  const { clasica } = await searchParams;
+  return <NuevaPage clasica={clasica !== undefined} />;
 }

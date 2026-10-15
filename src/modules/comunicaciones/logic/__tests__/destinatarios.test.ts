@@ -183,6 +183,26 @@ test("la audiencia de una promoción son sus cuentas suscritas, sin repetir", ()
   );
 });
 
+test("con varias promociones entran las cuentas de todas, sin repetir", () => {
+  const e = espejos({
+    cuentas: [cuenta({ zoho_id: "a", nombre: "A" }), cuenta({ zoho_id: "b", nombre: "B" }), cuenta({ zoho_id: "c", nombre: "C" })],
+    promociones: [promocion("gq8", "Glorieta de Quevedo 8"), promocion("se84", "Santa Engracia 84")],
+    // «a» está en las dos: sale una vez.
+    cuentaPromocion: [suscripcion("a", "gq8"), suscripcion("a", "se84"), suscripcion("b", "se84")],
+  });
+  assert.deepEqual(
+    cuentasDeAudiencia(e, { audiencia: "promocion", promocionesZohoIds: ["gq8", "se84"] }).map((c) => c.zoho_id),
+    ["a", "b"],
+  );
+  assert.deepEqual(
+    contarAudiencias(e).promociones.map((p) => [p.zohoId, [...p.cuentaIds].sort()]),
+    [
+      ["gq8", ["a"]],
+      ["se84", ["a", "b"]],
+    ],
+  );
+});
+
 test("la audiencia «promoción» sin promoción elegida no devuelve a nadie", () => {
   const e = espejos({ cuentas: [cuenta({ zoho_id: "a", nombre: "A" })] });
   assert.deepEqual(cuentasDeAudiencia(e, { audiencia: "promocion" }), []);

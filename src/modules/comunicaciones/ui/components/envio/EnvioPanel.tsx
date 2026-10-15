@@ -1,20 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Aviso } from "@/components/ui/Aviso";
 import { Desplegable } from "@/components/ui/Ayuda";
 import { fmtInt } from "@/lib/formatters";
 import {
-  confirmarEnvioAction,
-  detenerEnvioAction,
   ensayarEnvioAction,
   enviarPruebaAction,
   type InformeDeEnsayo,
-  enviarTandaAction,
   marcarPruebaVistaAction,
-  reanudarEnvioAction,
   revisarDestinatariosAction,
 } from "@/modules/comunicaciones/actions/envio";
 import {
@@ -32,7 +28,6 @@ import type { Progreso } from "@/modules/comunicaciones/logic/envio";
 import type {
   ComAjustesRow,
   ComComunicacionRow,
-  EstadoComunicacion,
   NombrePasarela,
   ResumenDestinatarios,
 } from "@/modules/comunicaciones/types";
@@ -43,6 +38,7 @@ import { PasoEnvio } from "./PasoEnvio";
 import { PasoPrueba } from "./PasoPrueba";
 import { PasoRevisar } from "./PasoRevisar";
 import { cuantos } from "./texto";
+import { useEnvioPorTandas } from "./useEnvioPorTandas";
 
 export interface CandadoSimulado {
   permitidos: number;
@@ -91,24 +87,23 @@ export function EnvioPanel({
   seguimiento,
 }: Props) {
   const router = useRouter();
-  const [ocupado, setOcupado] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [ocupadoAqui, setOcupado] = useState(false);
+  const [errorAqui, setError] = useState<string | null>(null);
+  const [avisoAqui, setAviso] = useState<string | null>(null);
   const [remitente, setRemitente] = useState(
     ajustes.remitentes_permitidos.includes(usuarioEmail.toLowerCase())
       ? usuarioEmail.toLowerCase()
       : (comunicacion.remitente_email ?? ajustes.remitentes_permitidos[0] ?? ""),
   );
   const [numero, setNumero] = useState("");
-  // El envío en curso manda sobre lo que trajo la página: se actualiza tanda a tanda.
-  const [enVivo, setEnVivo] = useState<{ progreso: Progreso; estado: EstadoComunicacion } | null>(null);
-  const [enviando, setEnviando] = useState(false);
   const [ensayando, setEnsayando] = useState(false);
   const [informe, setInforme] = useState<InformeDeEnsayo | null>(null);
-  const parar = useRef(false);
+  const envio = useEnvioPorTandas({ comunicacionId: comunicacion.id, estadoInicial: comunicacion.estado, progresoInicial: progreso });
+  const { estado, avance, enviando, enviarTandas, detener, reanudar } = envio;
+  const ocupado = ocupadoAqui || envio.ocupado;
+  const error = errorAqui ?? envio.error;
+  const aviso = avisoAqui ?? envio.aviso;
 
-  const estado = enVivo?.estado ?? comunicacion.estado;
-  const avance = enVivo?.progreso ?? progreso;
   const ctx: ContextoControles = { comunicacion, resumen, ajustes, rol };
   const puedeEscribir = rol === "admin" || rol === "editor";
 
@@ -128,30 +123,6 @@ export function EnvioPanel({
     }
     setOcupado(false);
     return r.ok;
-  };
-
-  /** Pide tandas hasta que no quede nadie, alguien detenga o algo falle. */
-  const enviarTandas = async () => {
-    parar.current = false;
-    setEnviando(true);
-    setError(null);
-    setAviso(null);
-    for (;;) {
-      if (parar.current) break;
-      const r = await enviarTandaAction(comunicacion.id);
-      if (!r.ok) {
-        setError(r.mensaje);
-        break;
-      }
-      setEnVivo({ progreso: r.progreso, estado: r.estado });
-      if (r.detenidoPor) {
-        setAviso(r.detenidoPor);
-        break;
-      }
-      if (r.estado !== "enviando") break;
-    }
-    setEnviando(false);
-    router.refresh();
   };
 
   /** Monta y valida todos los correos sin enviar ninguno. */
@@ -174,40 +145,9 @@ export function EnvioPanel({
   };
 
   const confirmar = async () => {
-    setOcupado(true);
     setError(null);
     setAviso(null);
-    const r = await confirmarEnvioAction(comunicacion.id, Number(numero));
-    setOcupado(false);
-    if (!r.ok) {
-      setError(r.mensaje);
-      return;
-    }
-    setEnVivo({ progreso, estado: "enviando" });
-    await enviarTandas();
-  };
-
-  const detener = async () => {
-    parar.current = true;
-    setOcupado(true);
-    const r = await detenerEnvioAction(comunicacion.id);
-    if (r.ok) setEnVivo((v) => ({ progreso: v?.progreso ?? progreso, estado: "pausada" }));
-    else setError(r.mensaje);
-    setOcupado(false);
-    router.refresh();
-  };
-
-  const reanudar = async () => {
-    setOcupado(true);
-    setError(null);
-    const r = await reanudarEnvioAction(comunicacion.id);
-    setOcupado(false);
-    if (!r.ok) {
-      setError(r.mensaje);
-      return;
-    }
-    setEnVivo((v) => ({ progreso: v?.progreso ?? progreso, estado: "enviando" }));
-    await enviarTandas();
+    await envio.confirmar(Number(numero));
   };
 
   const revisada = estado !== "borrador";

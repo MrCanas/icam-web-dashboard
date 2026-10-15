@@ -79,6 +79,8 @@ export interface PrepararEntrada {
   tipo: string;
   audiencia: string;
   promocionZohoId?: string | null;
+  /** Varias promociones o fondos a la vez. */
+  promocionesZohoIds?: string[];
   rolesPara: string[];
   rolesCopia: string[];
 }
@@ -108,9 +110,12 @@ export async function prepararComunicacionAction(
   if (rolesPara.length === 0) {
     return { ok: false, mensaje: "Elige al menos un papel de contacto para «Para»." };
   }
-  const promocionZohoId = audiencia === "promocion" ? (entrada.promocionZohoId ?? "").trim() : "";
-  if (audiencia === "promocion" && !promocionZohoId) {
-    return { ok: false, mensaje: "Elige la promoción o el fondo." };
+  const promocionesZohoIds =
+    audiencia === "promocion"
+      ? [...new Set([...(entrada.promocionesZohoIds ?? []), entrada.promocionZohoId ?? ""].map((id) => String(id).trim()).filter(Boolean))]
+      : [];
+  if (audiencia === "promocion" && promocionesZohoIds.length === 0) {
+    return { ok: false, mensaje: "Elige al menos una promoción o un fondo." };
   }
 
   try {
@@ -129,13 +134,13 @@ export async function prepararComunicacionAction(
       };
     }
 
-    const promocion =
-      audiencia === "promocion" ? espejos.promociones.find((p) => p.zoho_id === promocionZohoId) : undefined;
-    if (audiencia === "promocion" && !promocion) {
-      return { ok: false, mensaje: "La promoción elegida ya no está en los datos de Zoho." };
+    const promociones = promocionesZohoIds.map((id) => espejos.promociones.find((p) => p.zoho_id === id));
+    if (promociones.some((p) => !p)) {
+      return { ok: false, mensaje: "Alguna de las promociones elegidas ya no está en los datos de Zoho." };
     }
+    const elegidas = promociones.filter((p) => p !== undefined);
 
-    const cuentas = cuentasDeAudiencia(espejos, { audiencia, promocionZohoId });
+    const cuentas = cuentasDeAudiencia(espejos, { audiencia, promocionesZohoIds });
     if (cuentas.length === 0) {
       return { ok: false, mensaje: "Esa audiencia no tiene ninguna cuenta de inversión." };
     }
@@ -148,15 +153,20 @@ export async function prepararComunicacionAction(
     });
 
     const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
-    const destino = promocion ? (promocion.codigo ?? promocion.nombre) : ETIQUETA_AUDIENCIA[audiencia];
+    const destino =
+      elegidas.length === 0
+        ? ETIQUETA_AUDIENCIA[audiencia]
+        : elegidas.length <= 3
+          ? elegidas.map((p) => p.codigo ?? p.nombre).join(" + ")
+          : `${elegidas.length} promociones`;
     const creada = await crearComunicacion(
       user,
       {
         nombre: `${ETIQUETA_TIPO[tipo]} · ${destino} · ${hoy}`,
         tipo,
         audiencia,
-        promocionZohoId: promocion?.zoho_id ?? null,
-        promocionNombre: promocion?.nombre ?? null,
+        promocionZohoId: elegidas.length > 0 ? elegidas.map((p) => p.zoho_id).join(",") : null,
+        promocionNombre: elegidas.length > 0 ? elegidas.map((p) => p.nombre).join(" · ") : null,
         rolesPara,
         rolesCopia,
         datosZohoAt,
