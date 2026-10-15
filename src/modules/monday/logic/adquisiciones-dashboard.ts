@@ -182,10 +182,22 @@ export function avgTicket(d: AdqData): number {
   return d.withPrice > 0 ? d.vol / d.withPrice : 0;
 }
 
-/** Descartados ÷ (total − Info. Solicitada), en %. */
-export function discardRate(d: AdqData): { rate: number; base: number } {
-  const base = Math.max(d.total - (d.stages["Info. Solicitada"] ?? 0), 1);
-  return { rate: Math.round((d.discarded / base) * 100), base };
+export interface AdqAcquisition {
+  acquired: number;
+  rest: number;
+  /** Adquiridos ÷ resto, en %, con un decimal. */
+  rate: number;
+}
+
+/** Tasa de adquisición de todo el tablero: adquiridos ÷ el resto de activos. */
+export function acquisitionRate(items: MondayItem[]): AdqAcquisition {
+  const acquired = items.filter(
+    (item) =>
+      item.group?.title?.trim() === "Adquiridos" ||
+      item.column_values.find((c) => c.id === ADQ_COLUMNS.etapa)?.text?.trim() === "Adquirido",
+  ).length;
+  const rest = items.length - acquired;
+  return { acquired, rest, rate: rest > 0 ? Math.round((acquired / rest) * 1000) / 10 : 0 };
 }
 
 /**

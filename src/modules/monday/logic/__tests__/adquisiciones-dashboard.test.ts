@@ -11,7 +11,7 @@ import {
   CARD_STAGES,
   catastroUrl,
   buildFunnel,
-  discardRate,
+  acquisitionRate,
   parseMondayNumber,
   provincia,
   type AdqAsset,
@@ -51,7 +51,16 @@ test("KPIs de la foto del 13 oct 2026", () => {
   assert.equal(Math.round(avgTicket(d)), 27_127_857);
   assert.equal(d.eurM2Count, 13);
   assert.equal(d.m2Count, 15);
-  assert.deepEqual(discardRate(d), { rate: 24, base: 17 });
+});
+
+test("tasa de adquisición: adquiridos ÷ el resto del tablero", () => {
+  const item = (group: string, etapa: string) =>
+    ({ name: "x", group: { title: group }, column_values: [{ id: "estado_186", text: etapa, value: null }] }) as never;
+  const items = [
+    ...Array.from({ length: 25 }, () => item("Adquiridos", "Adquirido")),
+    ...Array.from({ length: 694 }, () => item("Stand by", "Stand by")),
+  ];
+  assert.deepEqual(acquisitionRate(items), { acquired: 25, rest: 694, rate: 3.6 });
 });
 
 test("situación actual: activos por etapa hoy, sin acumular", () => {

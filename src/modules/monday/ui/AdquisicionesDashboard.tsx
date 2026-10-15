@@ -12,10 +12,10 @@ import {
   buildFunnel,
   CARD_STAGES,
   catastroUrl,
-  discardRate,
   earthUrl,
   mapsUrl,
   STAGE_LABEL,
+  type AdqAcquisition,
   type AdqAsset,
   type AdqCard,
 } from "@/modules/monday/logic/adquisiciones-dashboard";
@@ -34,13 +34,15 @@ type Vista = "analisis" | "comite";
 
 interface Props {
   assets: AdqAsset[];
+  /** Tasa de adquisición de todo el tablero, no solo del grupo «En análisis». */
+  adquisicion: AdqAcquisition;
   /** Referencia catastral por nombre de activo (null si no se encontró). */
   catastro: Record<string, string | null>;
   /** Momento de la lectura de Monday (ISO). */
   fetchedAt: string;
 }
 
-export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
+export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedAt }: Props) {
   const [vista, setVista] = useState<Vista>("analisis");
 
   const cards = useMemo(
@@ -58,7 +60,6 @@ export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
       .sort((a, b) => b.n - a.n);
   const funnel = buildFunnel(d.stages);
   const base = d.total;
-  const descarte = discardRate(d);
   const leido = new Date(fetchedAt).toLocaleString("es-ES", {
     day: "2-digit",
     month: "short",
@@ -104,9 +105,9 @@ export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
         />
         <KPICard title="m² analizados" value={fmtM2(d.m2)} subtitle={`en ${fmtInt(d.m2Count)} activos`} />
         <KPICard
-          title="Tasa de descarte"
-          value={`${descarte.rate}%`}
-          subtitle={`${fmtInt(d.discarded)} descartados de ${fmtInt(descarte.base)}`}
+          title="Tasa de adquisición"
+          value={`${adquisicion.rate.toLocaleString("es-ES")}%`}
+          subtitle={`${fmtInt(adquisicion.acquired)} adquiridos de ${fmtInt(adquisicion.rest)} no adquiridos`}
           highlight
         />
       </section>
