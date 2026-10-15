@@ -109,7 +109,7 @@ export function AdquisicionesDashboard({ assets, adquisicion, catastro, fetchedA
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Tarjeta titulo="Situación actual" subtitulo="Activos en cada etapa hoy, según Monday">
+        <Tarjeta titulo="Situación actual">
           <div className="space-y-2.5">
             {funnel.map((s, i) => {
               const pct = base > 0 ? (s.count / base) * 100 : 0;
