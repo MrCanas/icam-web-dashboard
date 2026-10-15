@@ -1,5 +1,6 @@
+import { buscarReferenciaCatastral } from "@/modules/monday/data/catastro";
 import { fetchAllItemsForBoard } from "@/modules/monday/data/dashboard-read";
-import { ADQ_BOARD_ID, buildAdqAssets } from "@/modules/monday/logic/adquisiciones-dashboard";
+import { ADQ_BOARD_ID, buildAdqAssets, CARD_STAGES, type AdqAsset } from "@/modules/monday/logic/adquisiciones-dashboard";
 import { AdquisicionesDashboard } from "@/modules/monday/ui/AdquisicionesDashboard";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,13 @@ async function loadAssets() {
   }
 }
 
+/** Referencia catastral de cada activo con tarjeta (por nombre). La respuesta del Catastro se cachea 30 días. */
+async function loadCatastro(assets: AdqAsset[]): Promise<Record<string, string | null>> {
+  const conTarjeta = assets.filter((a) => (CARD_STAGES as readonly string[]).includes(a.stage) && a.loc);
+  const refs = await Promise.all(conTarjeta.map((a) => buscarReferenciaCatastral(a.loc)));
+  return Object.fromEntries(conTarjeta.map((a, i) => [a.name, refs[i] ?? null]));
+}
+
 export default async function MondayDashboardPage() {
   const { assets, error } = await loadAssets();
 
@@ -25,5 +33,6 @@ export default async function MondayDashboardPage() {
     return <section className="bg-card rounded-lg border border-red-200 p-6 text-red-700">{error}</section>;
   }
 
-  return <AdquisicionesDashboard assets={assets} fetchedAt={new Date().toISOString()} />;
+  const catastro = await loadCatastro(assets);
+  return <AdquisicionesDashboard assets={assets} catastro={catastro} fetchedAt={new Date().toISOString()} />;
 }

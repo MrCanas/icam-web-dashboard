@@ -7,7 +7,9 @@ import {
   avgTicket,
   buildAdqAssets,
   buildAdqData,
-  buildComiteCards,
+  buildCards,
+  CARD_STAGES,
+  catastroUrl,
   buildFunnel,
   discardRate,
   parseMondayNumber,
@@ -75,9 +77,15 @@ test("provincia desde la dirección", () => {
   assert.equal(provincia(""), null);
 });
 
-test("tarjetas de Comité", () => {
-  const cards = buildComiteCards(ASSETS);
+test("tarjetas de Comité y de las etapas en estudio", () => {
+  const cards = buildCards(ASSETS, ["Comité"]);
   assert.deepEqual(cards.map((c) => c.name), ["Somera, 9", "Caños del Peral, 11"]);
+  assert.deepEqual(
+    buildCards(ASSETS, CARD_STAGES).map((c) => c.stage),
+    ["Comité", "Comité", "Servilleta"],
+  );
+  assert.match(catastroUrl("9947609VK3794F"), /rc1=9947609&rc2=VK3794F$/);
+  assert.match(catastroUrl(null), /OVCBusqueda/);
   assert.equal(Math.round(cards[1]!.repercusion!), 8082);
   assert.equal(cards[1]!.location, "Madrid · Residencial");
 });

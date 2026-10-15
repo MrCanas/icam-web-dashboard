@@ -3,14 +3,21 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { EncabezadoDePagina } from "@/components/ui/EncabezadoDePagina";
+import { Icono } from "@/components/ui/Icono";
 import { Tarjeta } from "@/components/ui/Tarjeta";
 import {
   avgTicket,
   buildAdqData,
-  buildComiteCards,
+  buildCards,
   buildFunnel,
+  CARD_STAGES,
+  catastroUrl,
   discardRate,
+  earthUrl,
+  mapsUrl,
+  STAGE_LABEL,
   type AdqAsset,
+  type AdqCard,
 } from "@/modules/monday/logic/adquisiciones-dashboard";
 import { KPICard } from "@/modules/portfolio/ui/KPICard";
 
@@ -27,14 +34,19 @@ type Vista = "analisis" | "comite";
 
 interface Props {
   assets: AdqAsset[];
+  /** Referencia catastral por nombre de activo (null si no se encontró). */
+  catastro: Record<string, string | null>;
   /** Momento de la lectura de Monday (ISO). */
   fetchedAt: string;
 }
 
-export function AdquisicionesDashboard({ assets, fetchedAt }: Props) {
+export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
   const [vista, setVista] = useState<Vista>("analisis");
 
-  const comite = useMemo(() => buildComiteCards(assets), [assets]);
+  const cards = useMemo(
+    () => buildCards(assets, vista === "comite" ? ["Comité"] : CARD_STAGES),
+    [assets, vista],
+  );
   const d = useMemo(
     () => buildAdqData(vista === "comite" ? assets.filter((a) => a.stage === "Comité") : assets),
     [assets, vista],
@@ -133,50 +145,84 @@ export function AdquisicionesDashboard({ assets, fetchedAt }: Props) {
         </Tarjeta>
       </div>
 
-      {comite.length > 0 ? (
+      {cards.length > 0 ? (
         <section className="space-y-2">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted px-1">Activos en Comité</h2>
+          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted px-1">
+            {vista === "comite" ? "Activos en Comité" : "Activos en estudio · Servilleta, Pre-Comité, Comité y FCF"}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {comite.map((a) => {
-              const contenido = (
-                <>
-                  <div className="h-[3px] bg-icam-gold" />
-                  <div className="p-4 sm:p-5">
-                    <p className="text-lg font-semibold text-text-primary leading-tight">{a.name}</p>
-                    <p className="text-xs text-text-muted mt-0.5 mb-4">{a.location}</p>
-                    <dl className="grid grid-cols-3 gap-2">
-                      <Dato etiqueta="Asking">{a.price ? fmtM(a.price) : "—"}</Dato>
-                      <Dato etiqueta="Superficie">{a.m2 ? `${fmtInt(Math.round(a.m2))} m²` : "—"}</Dato>
-                      <Dato etiqueta="Repercusión">
-                        {a.repercusion ? `${fmtInt(Math.round(a.repercusion))} €/m²` : "—"}
-                      </Dato>
-                    </dl>
-                  </div>
-                </>
-              );
-              const clases =
-                "block min-w-0 overflow-hidden rounded-lg border border-subtle/50 bg-card shadow-sm transition";
-              return a.mapsQuery ? (
-                <a
-                  key={a.name}
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.mapsQuery)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Ver en Google Maps"
-                  className={`${clases} hover:border-icam-900 hover:shadow-md`}
-                >
-                  {contenido}
-                </a>
-              ) : (
-                <div key={a.name} className={clases}>
-                  {contenido}
-                </div>
-              );
-            })}
+            {cards.map((a) => (
+              <TarjetaActivo key={a.name} a={a} rc={catastro[a.name] ?? null} />
+            ))}
           </div>
         </section>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Tarjeta de un activo: pulsarla abre Google Maps; los iconos abren su ficha
+ * del Catastro y Google Earth en la misma ubicación.
+ */
+function TarjetaActivo({ a, rc }: { a: AdqCard; rc: string | null }) {
+  const enlace = "relative z-10 rounded p-1.5 text-text-muted transition hover:bg-subtle hover:text-icam-900";
+  return (
+    <article className="relative min-w-0 overflow-hidden rounded-lg border border-subtle/50 bg-card shadow-sm transition hover:border-icam-900 hover:shadow-md">
+      <div className={`h-[3px] ${a.stage === "Comité" ? "bg-icam-gold" : "bg-icam-900"}`} />
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-text-muted">
+              {STAGE_LABEL[a.stage] ?? a.stage}
+            </p>
+            {a.mapsQuery ? (
+              <a
+                href={mapsUrl(a.mapsQuery)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Ver en Google Maps"
+                className="block text-lg font-semibold text-text-primary leading-tight after:absolute after:inset-0"
+              >
+                {a.name}
+              </a>
+            ) : (
+              <p className="text-lg font-semibold text-text-primary leading-tight">{a.name}</p>
+            )}
+            <p className="text-xs text-text-muted mt-0.5">{a.location}</p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <a
+              href={catastroUrl(rc)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={rc ? `Ficha del Catastro (${rc})` : "Buscar en el Catastro"}
+              aria-label="Abrir en el Catastro"
+              className={enlace}
+            >
+              <Icono nombre="documento" className="h-[18px] w-[18px]" />
+            </a>
+            {a.mapsQuery ? (
+              <a
+                href={earthUrl(a.mapsQuery)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Ver en Google Earth"
+                aria-label="Abrir en Google Earth"
+                className={enlace}
+              >
+                <Icono nombre="planeta" className="h-[18px] w-[18px]" />
+              </a>
+            ) : null}
+          </div>
+        </div>
+        <dl className="grid grid-cols-3 gap-2 mt-4">
+          <Dato etiqueta="Asking">{a.price ? fmtM(a.price) : "—"}</Dato>
+          <Dato etiqueta="Superficie">{a.m2 ? `${fmtInt(Math.round(a.m2))} m²` : "—"}</Dato>
+          <Dato etiqueta="Repercusión">{a.repercusion ? `${fmtInt(Math.round(a.repercusion))} €/m²` : "—"}</Dato>
+        </dl>
+      </div>
+    </article>
   );
 }
 

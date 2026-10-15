@@ -27,6 +27,15 @@ export const PIPELINE = [
   "Adquirido",
 ] as const;
 
+/**
+ * Etapas cuyas tarjetas se ven con «En análisis». «2º Análisis» es el análisis
+ * en Flujo de Caja (FCF), según la descripción de la etapa en Monday.
+ */
+export const CARD_STAGES = ["Servilleta", "Pre-Comité", "Comité", "2º Análisis"] as const;
+
+/** Nombre corto de la etapa en las tarjetas. */
+export const STAGE_LABEL: Record<string, string> = { "2º Análisis": "FCF · 2º Análisis" };
+
 /** Coordenadas exactas para Maps cuando la dirección de Monday no lleva al sitio. */
 const MAPS_OVERRIDE: Record<string, string> = {
   "Project Sabika": "37.181619941515955,-3.5900531565536515",
@@ -64,12 +73,16 @@ export interface AdqFunnelStep {
   reached: number;
 }
 
-export interface AdqComiteCard {
+export interface AdqCard {
   name: string;
+  stage: string;
   location: string;
+  /** Dirección tal cual viene de Monday («» si no tiene). */
+  address: string;
   price: number | null;
   m2: number | null;
   repercusion: number | null;
+  /** Dirección o coordenadas para Maps y Earth. */
   mapsQuery: string | null;
 }
 
@@ -190,15 +203,30 @@ export function buildFunnel(stages: Record<string, number>): AdqFunnelStep[] {
   return PIPELINE.map((s) => ({ name: s, reached: reached[s]! }));
 }
 
-export function buildComiteCards(list: AdqAsset[]): AdqComiteCard[] {
+/** Tarjetas de los activos en las etapas pedidas, en el orden del embudo. */
+export function buildCards(list: AdqAsset[], stages: readonly string[]): AdqCard[] {
+  const order = (stage: string) => (PIPELINE as readonly string[]).indexOf(stage);
   return list
-    .filter((a) => a.stage === "Comité")
+    .filter((a) => stages.includes(a.stage))
+    .sort((a, b) => order(b.stage) - order(a.stage))
     .map((a) => ({
       name: a.name,
+      stage: a.stage,
       location: [provincia(a.loc), a.uso].filter(Boolean).join(" · "),
+      address: a.loc,
       price: a.price,
       m2: a.m2,
       repercusion: a.price && a.m2 ? a.price / a.m2 : null,
       mapsQuery: MAPS_OVERRIDE[a.name] ?? (a.loc || null),
     }));
 }
+
+export const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+
+export const earthUrl = (q: string) => `https://earth.google.com/web/search/${encodeURIComponent(q)}`;
+
+/** Ficha del Catastro de la parcela, o el buscador si no hay referencia. */
+export const catastroUrl = (rc: string | null) =>
+  rc && rc.length >= 14
+    ? `https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCListaBienes.aspx?rc1=${rc.slice(0, 7)}&rc2=${rc.slice(7, 14)}`
+    : "https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx";
