@@ -5,7 +5,8 @@ import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
 import type { EntradaBiblioteca } from "../../logic/biblioteca";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
-import { anadirAvisos, normalizarCoherencia, nuevaRevision } from "../../logic/coherencia";
+import { anadirAvisos, normalizarCoherencia, nuevaRevision, resolverSlides } from "../../logic/coherencia";
+import { mapaNumeros } from "../../logic/operaciones";
 import { hitosObligatorios, reponerHitos, textoCambioHito } from "../../logic/cronograma";
 import { conFlotantesDe, flotantesAlHeredar, flotantesValidos } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, renumerar, slideDeterminista, tituloDe, validarSlide } from "../../logic/informe";
@@ -291,7 +292,8 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
   let qa: QaInforme | undefined;
   try {
     const { json } = await pedirClaude({ tipo: "coherencia", informeId: d.id, slides }, { signal: o.signal });
-    qa = nuevaRevision(null, normalizarCoherencia(json).slice(0, 12), new Date().toISOString());
+    const avisos = resolverSlides(normalizarCoherencia(json).slice(0, 12), mapaNumeros(slides).porNumero, new Set(slides.map((s) => s.id)));
+    qa = nuevaRevision(null, avisos, new Date().toISOString());
   } catch {
     // La coherencia se puede repetir desde el editor.
   }

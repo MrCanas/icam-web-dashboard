@@ -454,7 +454,7 @@ export function promptCoherencia(d: ContextoInforme, slides: SlideJson[], fuente
             recortar(noReportar, MAX_BYTES_NO_REPORTAR) +
             "\nComprueba también que ningún slide lo menciona ni lo insinúa. Cada aparición es un problema («Contenido que el equipo pidió no reportar: …»), con la sugerencia de quitarlo, y va antes que los demás."
           : null,
-        'Devuelve SOLO un array JSON: [{"slide":"id","slides":["ids de otros slides implicados, si los hay"],"problema":"…","sugerencia":"…"}] (máximo 12; [] si no hay problemas). En "problema" y "sugerencia" cita los slides por su número («Slide 5»).',
+        'Devuelve SOLO un array JSON: [{"slide":"id del slide (el id, no su número)","slides":["ids de otros slides implicados, si los hay"],"problema":"…","sugerencia":"…"}] (máximo 12; [] si no hay problemas). En "slide" y "slides" van ids; en "problema" y "sugerencia" cita los slides por su número («Slide 5»).',
         recortar(cuerpo, 52_000),
       ]
         .filter((x): x is string => !!x)
@@ -565,7 +565,7 @@ export function promptRevisionInforme(m: MaterialInforme, p: PeticionRevisionInf
     "Devuelve SOLO este JSON:\n" +
     '{"reemplazos":[{"id":"…","slides":[<slide completo>, …]}],"eliminar":["id"],"nuevas":[{"despuesDe":"id","slide":<slide completo>}],' +
     '"hitosQuitados":["título de cada hito del cronograma que quitas porque la instrucción lo pide"],' +
-    '"avisos":[{"slide":"id","problema":"otro cambio que haría falta por coherencia y no has hecho"}],' +
+    '"avisos":[{"slide":"id (no el número)","problema":"otro cambio que haría falta por coherencia y no has hecho"}],' +
     '"resumen":"qué has cambiado, en una o dos frases, citando los slides por su número"}\n' +
     "Cada slide sigue las reglas de salida (componentes del API, periodo, sin inventar).";
   return conTarea(

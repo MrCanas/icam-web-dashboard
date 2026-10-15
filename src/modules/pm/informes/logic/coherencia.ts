@@ -56,6 +56,22 @@ export function pendientes(qa: QaInforme | null): IncidenciaCoherencia[] {
   return normalizarCoherencia(qa?.coherencia ?? []).filter((x) => x.estado === "pendiente");
 }
 
+/**
+ * Claude a veces cita las slides por su número visible («8», «Slide 8») en vez
+ * de por su id: se traducen con la numeración del informe que revisó.
+ */
+export function resolverSlides(avisos: IncidenciaCoherencia[], porNumero: Map<number, string>, ids: Set<string>): IncidenciaCoherencia[] {
+  const resolver = (ref: string): string => {
+    if (!ref || ids.has(ref)) return ref;
+    const m = /^(?:slide\s*)?(\d+)$/i.exec(ref.trim());
+    return m ? (porNumero.get(Number(m[1])) ?? ref) : ref;
+  };
+  return avisos.map((x) => {
+    const slides = (x.slides ?? []).map(resolver).filter((id) => id && id !== resolver(x.slide));
+    return { ...x, slide: resolver(x.slide), ...(slides.length ? { slides: [...new Set(slides)] } : {}) };
+  });
+}
+
 /** Cambia estado o comentario de unos avisos. */
 export function marcar(qa: QaInforme | null, ids: string[], cambios: Partial<Pick<IncidenciaCoherencia, "estado" | "comentario">>): QaInforme {
   const set = new Set(ids);

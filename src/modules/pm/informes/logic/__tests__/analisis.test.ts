@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { cerrarRonda, comentar, fuentesNuevas, leerRespuestas, marcarEditado, normalizarAnalisis } from "@/modules/pm/informes/logic/analisis";
 import { parsearBiblioteca } from "@/modules/pm/informes/logic/biblioteca";
-import { instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision } from "@/modules/pm/informes/logic/coherencia";
+import { instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision, resolverSlides } from "@/modules/pm/informes/logic/coherencia";
 import { leerPeticion, montarPrompt, tipoUso } from "@/modules/pm/informes/logic/peticiones";
 import { promptAnalisis, promptCoherencia, type MaterialInforme } from "@/modules/pm/informes/logic/prompts";
 import type { Analisis, Fuente } from "@/modules/pm/informes/types";
@@ -124,4 +124,25 @@ test("la coherencia numera los slides y los avisos se pueden comentar y aplicar"
   // Una revisión nueva sustituye los pendientes de la anterior, pero no los avisos de correcciones.
   const conCorreccion = { coherencia: [...qa.coherencia, ...normalizarCoherencia([{ slide: "c", problema: "x" }], "correccion")], fecha: "" };
   assert.deepEqual(nuevaRevision(conCorreccion, [], "f").coherencia.map((x) => x.origen), ["correccion"]);
+});
+
+test("los avisos que citan la slide por su número se traducen a su id", () => {
+  const porNumero = new Map([
+    [8, "calendario"],
+    [9, "kpis"],
+  ]);
+  const ids = new Set(["calendario", "kpis", "obra"]);
+  const [a, b, c] = resolverSlides(
+    normalizarCoherencia([
+      { slide: "8", slides: ["9", "8", "obra"], problema: "x" },
+      { slide: "Slide 9", problema: "y" },
+      { slide: "obra", problema: "z" },
+    ]),
+    porNumero,
+    ids,
+  );
+  assert.equal(a!.slide, "calendario");
+  assert.deepEqual(a!.slides, ["kpis", "obra"]);
+  assert.equal(b!.slide, "kpis");
+  assert.equal(c!.slide, "obra");
 });

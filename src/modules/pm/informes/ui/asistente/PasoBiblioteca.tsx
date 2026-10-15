@@ -51,6 +51,8 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
   const nClaude = sel.estructura.filter((e) => e.accion === "actualizar" || e.accion === "nueva").length + sel.anadir.length + 2;
   const [revisando, setRevisando] = useState<string | null>(null);
   const abortar = useRef<AbortController | null>(null);
+  // Análisis anteriores a las rondas no tienen fecha: lo aportado desde que se abrió el paso cuenta como nuevo.
+  const [abierto] = useState(() => new Date().toISOString());
 
   if (!a) {
     return (
@@ -60,7 +62,7 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
       </Tarjeta>
     );
   }
-  const analisis: Analisis = a;
+  const analisis: Analisis = a.fecha ? a : { ...a, fecha: abierto };
   const nuevas = fuentesNuevas(h.fuentes, analisis);
   const comentarios = comentariosActivos(analisis);
   const editados = new Set(analisis.editados ?? []);
@@ -150,7 +152,8 @@ export function PasoBiblioteca({ h }: { h: HerramientaInforme }) {
     h.avisar(null);
     abortar.current = new AbortController();
     try {
-      // La revisión se monta en el servidor con lo guardado: primero, que no quede nada en cola.
+      // La revisión se monta en el servidor con lo guardado: primero, que no quede nada en cola (y que el análisis tenga su fecha).
+      if (!a?.fecha) await h.guardar({ analisis });
       await h.guardadoAlDia();
       const { json } = await pedirClaude(
         { tipo: "analisis", informeId: informe.id, modo: "revision" },

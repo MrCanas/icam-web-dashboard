@@ -14,7 +14,7 @@ import {
   accionRevisiones,
 } from "../../actions/informes";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
-import { anadirAvisos, instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision, slidesDeAviso } from "../../logic/coherencia";
+import { anadirAvisos, instruccionDeAvisos, marcar, normalizarCoherencia, nuevaRevision, resolverSlides, slidesDeAviso } from "../../logic/coherencia";
 import { hitosObligatorios, reponerHitos, textoCambioHito } from "../../logic/cronograma";
 import { desmarcarAplicadas, marcarAplicadas, pendientesDirigidas, seleccionBase, slidesConDirigidas } from "../../logic/dirigidas";
 import { incidenciasExportacion, resumenIncidencias } from "../../logic/exportacion";
@@ -75,11 +75,11 @@ const TITULO_REVISION: Record<TipoRevision, string> = {
   analisis: "Análisis revisado",
 };
 
-/** Avisos que devuelve Claude junto a una corrección o revisión (texto suelto o {slide, problema}). */
-function avisosDeClaude(json: unknown): IncidenciaCoherencia[] {
+/** Avisos que devuelve Claude junto a una corrección o revisión (texto suelto o {slide, problema}), con las slides por id. */
+function avisosDeClaude(json: unknown, slides: SlideJson[]): IncidenciaCoherencia[] {
   const av = json && typeof json === "object" ? (json as { avisos?: unknown }).avisos : null;
   const lista = Array.isArray(av) ? av.map((x) => (typeof x === "string" ? { slide: "", problema: x } : x)) : [];
-  return normalizarCoherencia(lista, "correccion");
+  return resolverSlides(normalizarCoherencia(lista, "correccion"), mapaNumeros(slides).porNumero, new Set(slides.map((s) => s.id)));
 }
 
 function hitosQuitadosDe(json: unknown): string[] {
@@ -229,7 +229,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
       const crono = reponerHitos(conNueva, obligatorios, { quitados: hitosQuitadosDe(claude.json), soloSlides: [id] });
       nueva = crono.slides.find((x) => x.id === id) ?? nueva;
       const avisos = [
-        ...avisosDeClaude(claude.json),
+        ...avisosDeClaude(claude.json, contenido!.slides),
         ...normalizarCoherencia(crono.cambios.map((c) => ({ slide: c.slide, problema: textoCambioHito(c) })), "cronograma"),
       ];
       if (avisos.length) qa = anadirAvisos(informe.qa, avisos);
@@ -306,7 +306,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
       { tipo: "revision", informeId: informe.id, instruccion: p.instruccion, slides: contenido!.slides, ambito: p.ambito, adjuntos: p.adjuntos },
       { imagenes: p.imagenes },
     );
-    return integrar(leerResultado(json), { tipo: p.tipo, instruccion: p.instruccion, avisos: avisosDeClaude(json), qa: p.qa });
+    return integrar(leerResultado(json), { tipo: p.tipo, instruccion: p.instruccion, avisos: avisosDeClaude(json, contenido!.slides), qa: p.qa });
   }
 
   /** Lo mismo, desde los botones del editor: con el mensaje de «ocupado» y el error explicado. */
@@ -537,7 +537,8 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
     setOcupado("Claude está revisando la coherencia del informe…");
     try {
       const { json } = await pedirClaude({ tipo: "coherencia", informeId: informe.id, slides: contenido!.slides });
-      const lista = normalizarCoherencia(json).slice(0, 12);
+      const sl = contenido!.slides;
+      const lista = resolverSlides(normalizarCoherencia(json).slice(0, 12), mapaNumeros(sl).porNumero, new Set(sl.map((s) => s.id)));
       await h.guardar({ qa: nuevaRevision(informe.qa, lista, new Date().toISOString()) });
       setOcupado(lista.length ? "" : "Sin incoherencias detectadas.");
     } catch (e) {
@@ -728,6 +729,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
           puedeEditar={puedeEditar}
           ocupado={revisando}
           etiqueta={etiqueta}
+          existe={(id) => contenido.slides.some((s) => s.id === id)}
           irA={irA}
           guardarQa={(qa) => void h.guardar({ qa })}
           aplicar={aplicarAvisos}
@@ -862,7 +864,7 @@ export function Editor({ h, estadoGuardado, usoInicial }: Props) {
             ocultar={() => alternarOculto(s.id)}
             cambiar={(nueva, cambio, claude) => cambiarSlide(s.id, i + 1, nueva, cambio, false, undefined, claude)}
             revisar={revisar}
-            integrar={(r, meta) => integrar(r, { ...meta, avisos: avisosDeClaude(meta.json) })}
+            integrar={(r, meta) => integrar(r, { ...meta, avisos: avisosDeClaude(meta.json, contenido.slides) })}
             duplicar={() => duplicar(s.id)}
             alternarCerrada={() => alternarCerrada(s.id)}
             siguiente={visibles[i + 1] ?? null}

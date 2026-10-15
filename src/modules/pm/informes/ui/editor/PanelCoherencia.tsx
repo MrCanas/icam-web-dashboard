@@ -24,6 +24,7 @@ export function PanelCoherencia({
   puedeEditar,
   ocupado,
   etiqueta,
+  existe,
   irA,
   guardarQa,
   aplicar,
@@ -33,13 +34,16 @@ export function PanelCoherencia({
   ocupado: boolean;
   /** «Slide 5 · Calendario» para un id. */
   etiqueta: (id: string) => string;
+  /** La slide sigue en el informe (los avisos de slides que ya no están no se enseñan). */
+  existe: (id: string) => boolean;
   irA: (id: string) => void;
   guardarQa: (qa: QaInforme) => void;
   /** Aplica con Claude los avisos dados (y el comentario general). */
   aplicar: (avisos: IncidenciaCoherencia[], general: string) => void;
 }) {
   const todos = normalizarCoherencia(qa?.coherencia ?? []);
-  const pendientes = todos.filter((x) => x.estado === "pendiente");
+  // Un aviso sobre una slide que ya no existe (se fusionó o se quitó) ya no se puede aplicar.
+  const pendientes = todos.filter((x) => x.estado === "pendiente" && (!x.slide || existe(x.slide)));
   const cerrados = todos.filter((x) => x.estado !== "pendiente");
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const general = qa?.comentarioGeneral ?? "";
