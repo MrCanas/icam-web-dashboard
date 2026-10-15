@@ -35,3 +35,17 @@ test("validador de exportación: reúne revisión, coherencia, Finanzas pendient
   assert.deepEqual(incidenciasExportacion(limpias, { varianzas: { relleno: 100 } }, periodo), []);
   assert.equal(resumenIncidencias([]), "sin incidencias");
 });
+
+test("validador de exportación: los avisos de coherencia aplicados o descartados no cuentan", () => {
+  const slides = [{ id: "a", c: "Disclaimer" }];
+  const periodo = { trimestre: "Q3 2026", trimestreAnterior: "Q2 2026", siguiente: "Q4 2026" };
+  const r = incidenciasExportacion(slides, { a: { relleno: 90 } }, periodo, [
+    { slide: "a", problema: "pendiente" },
+    { slide: "a", problema: "aplicado", estado: "aplicado" },
+    { slide: "a", problema: "descartado", estado: "descartado" },
+  ]);
+  assert.deepEqual(
+    r.map((x) => x.texto),
+    ["Incoherencia señalada en la revisión: pendiente"],
+  );
+});

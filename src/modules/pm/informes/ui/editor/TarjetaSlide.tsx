@@ -6,6 +6,7 @@ import { accionAnadirFuente } from "../../actions/informes";
 import { arbolBloques, desplegar, normalizar } from "../../logic/edicion";
 import { conFlotantesDe } from "../../logic/flotantes";
 import { actualizarPeriodo, tituloDe, validarSlide } from "../../logic/informe";
+import { slidesCitadas, type ResultadoRevision } from "../../logic/operaciones";
 import { urlFoto } from "../../logic/paths";
 import { componentesPermitidos } from "../../slides/components";
 import type { MedidaSlide } from "../../slides/motor";
@@ -18,6 +19,8 @@ import { mensajeErrorClaude, pedirClaude, type ImagenClaude } from "../lib/claud
 import { aBase64, ACEPTA_DOCUMENTOS, extraerTexto, redimensionar } from "../lib/ficheros";
 import { VisorSlide, type ResultadoVisor } from "../slides/VisorSlide";
 import { CapaEdicion, type ModoEdicion } from "./CapaEdicion";
+import type { OrigenClaude, PeticionRevision } from "./Editor";
+import { VistaComparar } from "./VistaComparar";
 import { CapaFlotantes } from "./CapaFlotantes";
 import { CapaMarcas } from "./CapaMarcas";
 import { ListaTextos } from "./ListaTextos";
@@ -41,8 +44,27 @@ interface Props {
   onPintado: (r: ResultadoVisor) => void;
   mover: (delta: number) => void;
   ocultar: () => void;
-  /** Sustituye esta slide por otra: comprueba que pinta, la guarda y deja la anterior para «Deshacer». */
-  cambiar: (nueva: SlideJson, cambio: string) => Promise<MedidaSlide>;
+  /**
+   * Sustituye esta slide por otra: comprueba que pinta, la guarda y deja la
+   * anterior para «Deshacer». Si la ha hecho Claude, con su origen: se
+   * comprueba el cronograma, sus avisos van a Coherencia y queda en el historial.
+   */
+  cambiar: (nueva: SlideJson, cambio: string, claude?: OrigenClaude) => Promise<MedidaSlide>;
+  /** Revisión con Claude que puede tocar varias slides (desdoblar, fusionar, nueva…). Devuelve el resumen; lanza si falla. */
+  revisar: (p: PeticionRevision) => Promise<string>;
+  /** Aplica un resultado de varias slides que ya ha devuelto Claude (una corrección que desdobla). */
+  integrar: (r: ResultadoRevision, meta: OrigenClaude) => Promise<string>;
+  duplicar: () => void;
+  alternarCerrada: () => void;
+  /** La slide visible siguiente (para «Fusionar con la siguiente»). */
+  siguiente: SlideJson | null;
+  /** Esta slide en el informe anterior, si la había (para «Comparar»). */
+  previa: SlideJson | null;
+  metaPrevia: MetaInforme | null;
+  /** «Slide 5» para un id. */
+  numeroDe: (id: string) => string;
+  /** Hay otra revisión con Claude en marcha en el editor. */
+  ocupadoGlobal: boolean;
   /** Vuelve a la slide anterior al último cambio; null si no hay nada que deshacer. */
   deshacer: (() => Promise<MedidaSlide>) | null;
   /** Documentos dirigidos a esta slide que todavía no se han usado para montarla. */
@@ -52,7 +74,34 @@ interface Props {
 }
 
 /** Una slide del editor: vista, chips de relleno/pendientes/origen, edición a mano, marcas y corrección con Claude. */
-export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado, mover, ocultar, cambiar, deshacer, dirigida, montarDirigida }: Props) {
+type Operacion = "desdoblar" | "fusionar" | "nueva";
+
+const PALABRAS_VARIAS = /\b(junt|fusion|unir|une\b|unifica|agrup|combina)/i;
+
+export function TarjetaSlide({
+  h,
+  slide,
+  pagina,
+  total,
+  meta,
+  medida,
+  onPintado,
+  mover,
+  ocultar,
+  cambiar,
+  deshacer,
+  dirigida,
+  montarDirigida,
+  revisar,
+  integrar,
+  duplicar,
+  alternarCerrada,
+  siguiente,
+  previa,
+  metaPrevia,
+  numeroDe,
+  ocupadoGlobal,
+}: Props) {
   const { informe, puedeEditar } = h;
   const [marcando, setMarcando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
@@ -62,6 +111,11 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [estado, setEstado] = useState("");
   const [trabajando, setTrabajando] = useState(false);
+  const [mas, setMas] = useState(false);
+  const [operacion, setOperacion] = useState<{ tipo: Operacion; texto: string } | null>(null);
+  const [comparando, setComparando] = useState(false);
+  const cerrada = !!slide.cerrada;
+  const n = numeroDe(slide.id);
   const lienzo = useRef<HTMLElement | null>(null);
   // «flotantes»: las imágenes libres, que van por encima de la slide y tienen su propia capa.
   const [editando, setEditando] = useState<ModoEdicion | "flotantes" | null>(null);
@@ -197,6 +251,24 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
           "== MATERIAL ADJUNTO A ESTA CORRECCIÓN (úsalo como fuente; prevalece sobre lo anterior si se contradicen) ==\n" +
           docs.map((a) => `### ${a.tipo === "tabla" ? "TABLA" : "DOCUMENTO"}: ${a.nombre}\n${a.texto}`).join("\n\n");
       }
+      // Si la corrección habla de otras slides (o de juntarla con otra), va como revisión del informe.
+      const otras = slidesCitadas(instr, informe.contenido?.slides ?? []).filter((id) => id !== slide.id);
+      if (otras.length || PALABRAS_VARIAS.test(instr)) {
+        setEstado("Claude está aplicando la corrección a varias slides…");
+        const resumen = await revisar({
+          instruccion: `En la ${n} («${tituloDe(slide)}»): ${instr}`,
+          ambito: [slide.id, ...otras],
+          tipo: "correccion",
+          adjuntos: [marcas.length ? marcasTexto(marcas, !!captura) : "", adjTexto].filter(Boolean).join("\n\n") || undefined,
+          imagenes: [...(captura ? [captura] : []), ...imagenes].slice(0, 4),
+        });
+        setEstado(resumen);
+        setInstruccion("");
+        adjuntos.forEach((a) => a.url && URL.revokeObjectURL(a.url));
+        setAdjuntos([]);
+        setMarcas([]);
+        return;
+      }
       setEstado("Claude está aplicando la corrección…");
       const { json } = await pedirClaude(
         {
@@ -209,16 +281,62 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         },
         { imagenes: [...(captura ? [captura] : []), ...imagenes].slice(0, 4) },
       );
-      const avisos = json && typeof json === "object" && Array.isArray((json as { avisos?: unknown }).avisos) ? ((json as { avisos: string[] }).avisos) : [];
-      // Claude rehace el contenido; las imágenes colocadas a mano encima se quedan como estaban.
-      const s = conFlotantesDe(slide, actualizarPeriodo(validarSlide(json, slide.id, componentesPermitidos()), informe));
-      s.origen = slide.origen === "nueva" ? "nueva" : "actualizada";
-      const m = await cambiar(s, `${tituloDe(s)}: ${instr}${marcas.length ? ` (${marcas.length} marca${marcas.length > 1 ? "s" : ""})` : ""}`);
-      setEstado((m.desborde ? "Aplicada, pero ahora desborda: pide acortarla. " : "Aplicada. ") + (avisos.length ? "Revisa también: " + avisos.join(" · ") : ""));
+      const o = (json && typeof json === "object" ? json : {}) as { slides?: unknown; avisos?: unknown };
+      const nAvisos = Array.isArray(o.avisos) ? o.avisos.length : 0;
+      const textoAvisos = nAvisos ? ` ${nAvisos} aviso(s) para otras slides en «Coherencia entre slides».` : "";
+      const origen: OrigenClaude = { tipo: "correccion", instruccion: `${n}: ${instr}`, json };
+      if (Array.isArray(o.slides) && o.slides.length > 1) {
+        // La corrección pedía desdoblarla: una slide pasa a varias.
+        const resumen = await integrar(
+          { reemplazos: [{ id: slide.id, slides: o.slides }], eliminar: [], nuevas: [], hitosQuitados: [], resumen: `${n} desdoblada en ${o.slides.length}.` },
+          { ...origen, tipo: "desdoblar" },
+        );
+        setEstado(resumen);
+      } else {
+        const unico = Array.isArray(o.slides) ? o.slides[0] : json;
+        // Claude rehace el contenido; las imágenes colocadas a mano encima se quedan como estaban.
+        const s = conFlotantesDe(slide, actualizarPeriodo(validarSlide(unico, slide.id, componentesPermitidos()), informe));
+        s.origen = slide.origen === "nueva" ? "nueva" : "actualizada";
+        const m = await cambiar(s, `${tituloDe(s)}: ${instr}${marcas.length ? ` (${marcas.length} marca${marcas.length > 1 ? "s" : ""})` : ""}`, origen);
+        setEstado((m.desborde ? "Aplicada, pero ahora desborda: pide acortarla." : "Aplicada.") + textoAvisos);
+      }
       setInstruccion("");
       adjuntos.forEach((a) => a.url && URL.revokeObjectURL(a.url));
       setAdjuntos([]);
       setMarcas([]);
+    } catch (e) {
+      setEstado(e instanceof Error && !("code" in e) ? `No se pudo aplicar: ${e.message}` : mensajeErrorClaude(e));
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  function abrirOperacion(tipo: Operacion) {
+    const textos: Record<Operacion, string> = {
+      desdoblar: `Desdobla la ${n} («${tituloDe(slide)}») en dos slides, repartiendo el contenido sin perder nada.`,
+      fusionar: siguiente
+        ? `Junta la ${n} («${tituloDe(slide)}») y la ${numeroDe(siguiente.id)} («${tituloDe(siguiente)}») en una sola slide con lo esencial de las dos.`
+        : "",
+      nueva: `Crea una slide nueva detrás de la ${n} sobre: `,
+    };
+    setOperacion({ tipo, texto: textos[tipo] });
+    setMas(false);
+  }
+
+  async function lanzarOperacion() {
+    if (!operacion?.texto.trim()) return;
+    setTrabajando(true);
+    setEstado(
+      operacion.tipo === "desdoblar"
+        ? "Claude está desdoblando la slide…"
+        : operacion.tipo === "fusionar"
+          ? "Claude está juntando las dos slides…"
+          : "Claude está creando la slide…",
+    );
+    try {
+      const ambito = operacion.tipo === "fusionar" && siguiente ? [slide.id, siguiente.id] : [slide.id];
+      setEstado(await revisar({ instruccion: operacion.texto.trim(), ambito, tipo: operacion.tipo }));
+      setOperacion(null);
     } catch (e) {
       setEstado(e instanceof Error && !("code" in e) ? `No se pudo aplicar: ${e.message}` : mensajeErrorClaude(e));
     } finally {
@@ -232,6 +350,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
   else if (medida?.medida) chips.push(<Chip key="r" tono={medida.medida.relleno < 80 ? "aviso" : "ok"}>Relleno {medida.medida.relleno} %</Chip>);
   if (medida?.pendientes) chips.push(<Chip key="p" tono="aviso">{medida.pendientes} pendiente{medida.pendientes > 1 ? "s" : ""}</Chip>);
   if (slide.origen) chips.push(<Chip key="o">{slide.origen}</Chip>);
+  if (cerrada) chips.push(<Chip key="c" tono="marca">🔒 cerrada</Chip>);
   if (dirigida?.length) chips.push(<Chip key="i" tono="marca">información nueva</Chip>);
 
   return (
@@ -255,6 +374,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
             ) : null}
             <Boton
               pequeno
+              disabled={cerrada}
               aria-pressed={marcando}
               className={marcando ? "!border-red-600 !bg-red-600 !text-white" : ""}
               title="Pinta, subraya o recuadra sobre la slide lo que quieres cambiar"
@@ -268,6 +388,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
             </Boton>
             <Boton
               pequeno
+              disabled={cerrada}
               aria-pressed={!!editando}
               className={editando ? "!border-icam-900 !bg-icam-900 !text-white" : ""}
               title="Cambia a mano un texto, el sitio de un bloque o una foto, sin pasar por Claude"
@@ -284,8 +405,11 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
                 Deshacer
               </Boton>
             ) : null}
-            <Boton pequeno onClick={() => setCorrigiendo(!corrigiendo)}>
+            <Boton pequeno disabled={cerrada} onClick={() => setCorrigiendo(!corrigiendo)}>
               Corregir
+            </Boton>
+            <Boton pequeno aria-expanded={mas} title="Desdoblar, juntar, duplicar, cerrar, comparar…" onClick={() => setMas(!mas)}>
+              Más ▾
             </Boton>
             <Boton pequeno aria-label="Subir" disabled={pagina === 1} onClick={() => mover(-1)}>
               ↑
@@ -301,6 +425,70 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
           </span>
         ) : null}
       </div>
+
+      {mas && puedeEditar ? (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-subtle bg-card px-2.5 py-2 text-sm shadow-sm" role="toolbar" aria-label={`Más acciones de la ${n}`}>
+          <Boton pequeno disabled={cerrada || trabajando || ocupadoGlobal} title="Claude reparte su contenido en dos slides" onClick={() => abrirOperacion("desdoblar")}>
+            Desdoblar
+          </Boton>
+          <Boton
+            pequeno
+            disabled={cerrada || !siguiente || !!siguiente.cerrada || trabajando || ocupadoGlobal}
+            title={siguiente ? `Claude junta esta slide y la ${numeroDe(siguiente.id)} en una` : "No hay slide siguiente"}
+            onClick={() => abrirOperacion("fusionar")}
+          >
+            Fusionar con la siguiente
+          </Boton>
+          <Boton pequeno disabled={trabajando || ocupadoGlobal} title="Claude crea una slide nueva justo detrás de esta" onClick={() => abrirOperacion("nueva")}>
+            ＋ Slide detrás
+          </Boton>
+          <Boton pequeno disabled={trabajando || ["portada", "indice", "disclaimer", "cierre"].includes(slide.id)} onClick={() => (duplicar(), setMas(false))}>
+            Duplicar
+          </Boton>
+          <Boton
+            pequeno
+            title={cerrada ? "Vuelve a permitir cambios en esta slide" : "Ninguna revisión, corrección ni regeneración la toca"}
+            onClick={() => (alternarCerrada(), setMas(false))}
+          >
+            {cerrada ? "🔓 Abrir" : "🔒 Cerrar"}
+          </Boton>
+          <Boton pequeno disabled={!previa} title={previa ? `Compárala con la del ${informe.trimestreAnterior}` : "No estaba en el informe anterior"} onClick={() => (setComparando(true), setMas(false))}>
+            Comparar con el {informe.trimestreAnterior}
+          </Boton>
+        </div>
+      ) : null}
+
+      {operacion && puedeEditar ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-card p-3 shadow-sm">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
+            {operacion.tipo === "desdoblar" ? "Desdoblar" : operacion.tipo === "fusionar" ? "Fusionar" : "Slide nueva"} · puedes ajustar la instrucción
+            <textarea className={`${claseCampo} min-h-[60px]`} value={operacion.texto} onChange={(e) => setOperacion({ ...operacion, texto: e.target.value })} />
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Boton variante="primario" pequeno disabled={trabajando || ocupadoGlobal} onClick={() => void lanzarOperacion()}>
+              {trabajando ? "Aplicando…" : "Aplicar"}
+            </Boton>
+            <Boton pequeno disabled={trabajando} onClick={() => setOperacion(null)}>
+              Cancelar
+            </Boton>
+            <span className="text-sm text-text-muted" aria-live="polite">
+              {estado}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {comparando && previa ? (
+        <VistaComparar
+          actual={slide}
+          previa={previa}
+          pagina={pagina}
+          meta={meta}
+          metaPrevia={metaPrevia}
+          trimestreAnterior={informe.trimestreAnterior}
+          onCerrar={() => setComparando(false)}
+        />
+      ) : null}
 
       {marcando ? (
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-subtle bg-card px-2.5 py-2 text-sm shadow-sm" role="toolbar" aria-label="Herramientas de marcado">
@@ -472,7 +660,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
         <ListaTextos slide={normalizado} trabajando={trabajando} aplicar={(nueva, cambio) => void aplicarManual(nueva, cambio)} />
       ) : null}
 
-      {corrigiendo && puedeEditar ? (
+      {corrigiendo && puedeEditar && !cerrada ? (
         <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-card p-3 shadow-sm">
           {marcas.length ? (
             <p className="text-sm text-text-muted">
@@ -492,7 +680,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
               className={`${claseCampo} min-h-[70px]`}
               value={instruccion}
               onChange={(e) => setInstruccion(e.target.value)}
-              placeholder="Ej.: la entrega al operador es en noviembre de 2026; quita el párrafo de seguros. Puedes pegar aquí una tabla copiada de Excel."
+              placeholder="Ej.: la entrega al operador es en noviembre de 2026; quita el párrafo de seguros. También: «desdóblala en dos» o «júntala con la slide 8». Puedes pegar aquí una tabla copiada de Excel."
             />
           </label>
           <ZonaSoltar acepta={`image/jpeg,image/png,image/webp,${ACEPTA_DOCUMENTOS}`} multiple pequena onFicheros={(f) => void adjuntar(f)} deshabilitado={trabajando}>
@@ -532,7 +720,7 @@ export function TarjetaSlide({ h, slide, pagina, total, meta, medida, onPintado,
             </span>
           </div>
         </div>
-      ) : estado ? (
+      ) : estado && !operacion ? (
         <p className="text-sm text-text-muted">{estado}</p>
       ) : null}
       {slide.fuentes ? <p className="text-xs text-text-muted">Fuentes: {slide.fuentes}</p> : null}

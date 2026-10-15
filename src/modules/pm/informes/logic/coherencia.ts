@@ -7,10 +7,11 @@ import type { IncidenciaCoherencia, QaInforme } from "../types";
  * al leer.
  */
 
-let contador = 0;
-function idNuevo(): string {
-  contador = (contador + 1) % 1_000_000;
-  return `c${Date.now().toString(36)}${contador.toString(36)}`;
+/** Id estable de un aviso sin id: el mismo aviso da siempre el mismo (los antiguos se leen igual en cada render). */
+function idDe(origen: string, slide: string, problema: string): string {
+  let h = 0;
+  for (const c of `${origen}|${slide}|${problema}`) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
+  return `c${(h >>> 0).toString(36)}`;
 }
 
 /** Lee la respuesta de Claude (o un QA guardado) como avisos con id y estado. */
@@ -24,7 +25,7 @@ export function normalizarCoherencia(lista: unknown, origen: IncidenciaCoherenci
         slide: typeof x.slide === "string" ? x.slide : "",
         problema: x.problema as string,
         ...(typeof x.sugerencia === "string" && x.sugerencia ? { sugerencia: x.sugerencia } : {}),
-        id: typeof x.id === "string" && x.id ? x.id : idNuevo(),
+        id: typeof x.id === "string" && x.id ? x.id : idDe(String(x.origen ?? origen), typeof x.slide === "string" ? x.slide : "", x.problema as string),
         estado: x.estado === "aplicado" || x.estado === "descartado" ? x.estado : "pendiente",
         ...(typeof x.comentario === "string" && x.comentario ? { comentario: x.comentario } : {}),
         ...(slides.length ? { slides } : {}),

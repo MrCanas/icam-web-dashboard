@@ -1,7 +1,7 @@
 import type { SlideJson } from "../slides/tipos";
 import { ESTRUCTURALES } from "./biblioteca";
 import { conFlotantesDe } from "./flotantes";
-import { clon, renumerar, tituloDe } from "./informe";
+import { clon, renumerar, textos, tituloDe } from "./informe";
 
 /**
  * Operaciones de estructura sobre las slides del informe: referirse a ellas por
@@ -212,6 +212,24 @@ export function aplicarResultado(
 
   renumerar(out);
   return { slides: out, antes, despues, rechazos };
+}
+
+/** Textos que entran y salen de una slide respecto a otra (para «Comparar con el trimestre anterior»). */
+export function diferenciasTexto(antes: SlideJson, despues: SlideJson): { quitados: string[]; anadidos: string[]; iguales: number } {
+  const trozos = (s: SlideJson) =>
+    textos(s)
+      .split(" · ")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 1 && !/^\d+$/.test(t));
+  const a = trozos(antes);
+  const b = trozos(despues);
+  const enB = new Set(b);
+  const enA = new Set(a);
+  return {
+    quitados: [...new Set(a.filter((t) => !enB.has(t)))],
+    anadidos: [...new Set(b.filter((t) => !enA.has(t)))],
+    iguales: new Set(a.filter((t) => enB.has(t))).size,
+  };
 }
 
 /** Copia una slide justo detrás de ella, con id nuevo (no muta). */

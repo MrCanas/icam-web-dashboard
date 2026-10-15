@@ -105,6 +105,9 @@ Aditiva. RLS activa y **sin políticas** (se accede solo con service role desde 
 
 **Paso 3 · Biblioteca y GO**
 - Resumen, objetivos, estructura editable, biblioteca con ★ sugeridas, datos que faltan, contradicciones y estimación de peticiones.
+- Todo lo entendido se edita y se comenta (💬): resumen, objetivos, hechos (antes ocultos), omitidos, faltan, contradicciones, cronograma del informe anterior y título y motivo de cada slide de la estructura. Más un comentario general.
+- Claves de comentario estables (`logic/analisis.ts`): `resumen.3`, `hechos.7`, `estructura.<id>`, `general`… Lo editado a mano queda en `analisis.editados` y Claude lo respeta.
+- «Añadir más información» (texto o ficheros) sin salir del paso y **«Revisar con lo nuevo»**: nueva ronda (`analisis.ronda`) que parte del análisis editado, atiende los comentarios y las fuentes posteriores a `analisis.fecha`, y devuelve `respuestas` (lo que hizo con cada comentario, se ve bajo él). Los comentarios sin revisar también llegan a la redacción de cada slide.
 
 **Generación**
 - Slides deterministas sin Claude: portada (foto de categoría Portada), índice, disclaimer, cierre, `mantener`, y las bloqueadas de Finanzas (`SlideBloqueado` con la página aportada o «Pendiente de Finanzas»).
@@ -118,6 +121,14 @@ Aditiva. RLS activa y **sin políticas** (se accede solo con service role desde 
 - Mover, ocultar, añadir desde la biblioteca, revisar coherencia, guardar versión y aprobar (bloqueado si hay errores de QA mecánico: desborde, `[pendiente]`, trimestres mal, falta disclaimer).
 - **Corregir** con instrucción, adjuntos y **marcas** sobre la slide (resaltar, subrayar, recuadro, lápiz, con el texto que queda debajo). Se envía a Claude una captura con las marcas. Devuelve `{slide, avisos}`.
 - Historial de cambios y coste acumulado de Claude.
+- **Slides citadas por número** («slide 5», «la 7 y la 8», «de la 3 a la 6»; `logic/operaciones.ts`). Los prompts que ven varias slides las numeran igual que el editor.
+- **Instrucción al informe**: petición `revision` que puede tocar varias slides y devuelve `{reemplazos, eliminar, nuevas, hitosQuitados, avisos, resumen}`: modificar, desdoblar (1 → n, la primera conserva id e imágenes puestas a mano), fusionar, crear. Botones por slide (Más ▾): desdoblar, fusionar con la siguiente, slide detrás, duplicar, cerrar 🔒 (nada de Claude la toca, tampoco al regenerar) y comparar con el trimestre anterior. Una corrección que pide desdoblar devuelve `{slides:[…]}`; si cita otras slides o pide juntar, va como `revision`. El coste de `revision` se anota como `correccion` (CHECK de la 043).
+- **Coherencia entre slides** como lista de trabajo (`logic/coherencia.ts`): cada aviso con id, estado (pendiente/aplicado/descartado), comentario, Aplicar, Descartar, varios a la vez y comentario general. Los avisos de una corrección y los del cronograma también entran aquí. El validador de exportación ignora los aplicados y descartados.
+- **Historial de revisiones** (migración 050, `informe_revision`): lo pedido, las slides de antes y de después y «Deshacer» la revisión entera si lo creado no ha cambiado después.
+
+**Cronograma del informe anterior** (`logic/cronograma.ts`)
+- Se conservan todos los hitos de sus Timeline salvo que el equipo diga otra cosa. Con previo en PDF/PPTX los extrae el análisis (`hitosPrevios`); en el paso 3 se editan y esa lista manda.
+- El prompt de las slides con cronograma lleva la lista obligatoria; tras generar, corregir o revisar, los hitos que falten se reponen en su sitio (salvo `hitosQuitados` por instrucción) y los cambios de fecha quedan como aviso.
 
 **PDF**
 - Nombre: `YYYYMMDD_<CODIGO>_<Qn AAAA>_Informe Trimestral Inversores[ (borrador vN)].pdf`.

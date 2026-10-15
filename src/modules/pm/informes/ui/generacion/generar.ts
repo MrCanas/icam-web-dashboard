@@ -5,11 +5,13 @@ import { medirFuera, type MedidaSlide } from "../../slides/motor";
 import type { InformeJson, MetaInforme, SlideJson } from "../../slides/tipos";
 import type { EntradaBiblioteca } from "../../logic/biblioteca";
 import { ESTRUCTURALES } from "../../logic/biblioteca";
+import { anadirAvisos, normalizarCoherencia, nuevaRevision } from "../../logic/coherencia";
+import { hitosObligatorios, reponerHitos, textoCambioHito } from "../../logic/cronograma";
 import { conFlotantesDe, flotantesAlHeredar, flotantesValidos } from "../../logic/flotantes";
 import { actualizarPeriodo, clon, idNuevo, ordenar, renumerar, slideDeterminista, tituloDe, validarSlide } from "../../logic/informe";
 import { urlFoto } from "../../logic/paths";
 import { qCierre } from "../../logic/trimestre";
-import type { Foto, Informe, IncidenciaCoherencia, PrevioEstructurado } from "../../types";
+import type { Foto, Informe, PrevioEstructurado, QaInforme } from "../../types";
 import { esCancelado, mensajeErrorClaude, pedirClaude } from "../lib/claude";
 
 /**
@@ -50,7 +52,7 @@ export interface OpcionesGeneracion {
   dirigidas: Set<string>;
   signal: AbortSignal;
   /** Guarda el informe (en cola). */
-  guardar: (contenido: InformeJson, extra?: { estado?: "generando" | "borrador"; qa?: { coherencia: IncidenciaCoherencia[]; fecha: string } }, cambio?: string) => Promise<boolean>;
+  guardar: (contenido: InformeJson, extra?: { estado?: "generando" | "borrador"; qa?: QaInforme }, cambio?: string) => Promise<boolean>;
   onFilas: (filas: FilaGeneracion[]) => void;
   onFase: (fase: string) => void;
 }
@@ -104,6 +106,12 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
     // Imágenes colocadas a mano: si este informe ya tenía slides (se regenera), las suyas; si no, las que se heredan del anterior.
     const propias = d.contenido?.slides?.length ? new Map(d.contenido.slides.map((s) => [s.id, s])) : null;
     for (const e of sel.estructura) {
+      // Una slide que el equipo ha cerrado se queda tal cual aunque se regenere el informe.
+      const cerrada = propias?.get(e.id);
+      if (cerrada?.cerrada) {
+        slides.push(clon(cerrada));
+        continue;
+      }
       const prev = prevPorId.get(e.id) ?? null;
       const s: SlideJson = prev ? clon(prev) : { id: e.id };
       const flotantes = propias ? flotantesValidos(propias.get(e.id)?.flotantes) : flotantesAlHeredar(e.accion, e.id, prev);
@@ -270,15 +278,24 @@ export async function generarInforme(o: OpcionesGeneracion): Promise<"hecho" | "
     return "parado";
   }
 
+  // El cronograma del informe anterior se conserva: si a Claude se le ha caído algún hito, vuelve a su sitio.
+  const cronograma = reponerHitos(slides, hitosObligatorios(d.analisis, previo));
+  if (cronograma.cambios.some((c) => c.tipo === "repuesto")) slides = cronograma.slides;
+  const avisosCronograma = normalizarCoherencia(
+    cronograma.cambios.map((c) => ({ slide: c.slide, problema: textoCambioHito(c) })),
+    "cronograma",
+  );
+
   renumerar(slides);
   o.onFase("Revisando la coherencia entre slides");
-  let qa: { coherencia: IncidenciaCoherencia[]; fecha: string } | undefined;
+  let qa: QaInforme | undefined;
   try {
     const { json } = await pedirClaude({ tipo: "coherencia", informeId: d.id, slides }, { signal: o.signal });
-    qa = { coherencia: Array.isArray(json) ? (json as IncidenciaCoherencia[]).slice(0, 12) : [], fecha: new Date().toISOString() };
+    qa = nuevaRevision(null, normalizarCoherencia(json).slice(0, 12), new Date().toISOString());
   } catch {
     // La coherencia se puede repetir desde el editor.
   }
+  if (avisosCronograma.length) qa = anadirAvisos(qa ?? { coherencia: [], fecha: new Date().toISOString() }, avisosCronograma);
   const fallidas = filas.filter((f) => f.estado === "error").length;
   await o.guardar(contenido(), { estado: "borrador", qa }, `v${d.version} generada${fallidas ? ` (${fallidas} slide(s) sin redactar)` : ""}`);
   return "hecho";
