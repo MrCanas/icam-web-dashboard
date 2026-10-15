@@ -57,7 +57,7 @@ export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
       .map(([name, n]) => ({ name, n }))
       .sort((a, b) => b.n - a.n);
   const funnel = buildFunnel(d.stages);
-  const base = funnel[0]?.reached ?? 0;
+  const base = d.total;
   const descarte = discardRate(d);
   const leido = new Date(fetchedAt).toLocaleString("es-ES", {
     day: "2-digit",
@@ -112,17 +112,16 @@ export function AdquisicionesDashboard({ assets, catastro, fetchedAt }: Props) {
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Tarjeta titulo="Avance de etapas" subtitulo="Acumulado: cada activo cuenta en las etapas por las que ya ha pasado">
+        <Tarjeta titulo="Situación actual" subtitulo="Activos en cada etapa hoy, según Monday">
           <div className="space-y-2.5">
             {funnel.map((s, i) => {
-              if (s.reached === 0 && i > 0) return null;
-              const pct = base > 0 ? (s.reached / base) * 100 : 0;
+              const pct = base > 0 ? (s.count / base) * 100 : 0;
               return (
                 <div key={s.name}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-text-body">{s.name}</span>
                     <span className="font-semibold text-text-primary">
-                      {fmtInt(s.reached)} · {Math.round(pct)}%
+                      {fmtInt(s.count)} · {Math.round(pct)}%
                     </span>
                   </div>
                   <div className="h-4 rounded bg-subtle">

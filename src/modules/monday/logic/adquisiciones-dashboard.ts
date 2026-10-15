@@ -70,7 +70,7 @@ export interface AdqData {
 
 export interface AdqFunnelStep {
   name: string;
-  reached: number;
+  count: number;
 }
 
 export interface AdqCard {
@@ -189,18 +189,19 @@ export function discardRate(d: AdqData): { rate: number; base: number } {
 }
 
 /**
- * Embudo acumulado: un activo en LOI cuenta en todas las etapas anteriores.
- * Las etapas fuera del pipeline (Stand by, Descartado…) solo suman en Recibido.
+ * Situación actual: cuántos activos hay hoy en cada etapa, sin suponer por
+ * qué etapas pasaron antes. Orden del pipeline, luego el resto (Stand by, Descartado…).
+ * Las etapas sin activos no salen.
  */
 export function buildFunnel(stages: Record<string, number>): AdqFunnelStep[] {
-  const reached: Record<string, number> = {};
-  PIPELINE.forEach((s) => (reached[s] = 0));
-  for (const [name, count] of Object.entries(stages)) {
-    const idx = (PIPELINE as readonly string[]).indexOf(name);
-    if (idx === -1) reached["Recibido"]! += count;
-    else for (let i = 0; i <= idx; i++) reached[PIPELINE[i]!]! += count;
-  }
-  return PIPELINE.map((s) => ({ name: s, reached: reached[s]! }));
+  const order = (s: string) => {
+    const i = (PIPELINE as readonly string[]).indexOf(s);
+    return i === -1 ? PIPELINE.length : i;
+  };
+  return Object.entries(stages)
+    .filter(([, count]) => count > 0)
+    .sort(([a], [b]) => order(a) - order(b))
+    .map(([name, count]) => ({ name, count }));
 }
 
 /** Tarjetas de los activos en las etapas pedidas, en el orden del embudo. */

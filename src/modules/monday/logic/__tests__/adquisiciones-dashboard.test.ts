@@ -54,15 +54,16 @@ test("KPIs de la foto del 13 oct 2026", () => {
   assert.deepEqual(discardRate(d), { rate: 24, base: 17 });
 });
 
-test("embudo acumulado; Stand by y Descartado solo en Recibido", () => {
+test("situación actual: activos por etapa hoy, sin acumular", () => {
   const f = buildFunnel(buildAdqData(ASSETS).stages);
-  const by = Object.fromEntries(f.map((s) => [s.name, s.reached]));
-  assert.equal(by["Recibido"], 18);
-  assert.equal(by["Info. Solicitada"], 6);
-  assert.equal(by["Servilleta"], 5);
-  assert.equal(by["Comité"], 4);
-  assert.equal(by["LOI"], 2);
-  assert.equal(by["Adquirido"], 0);
+  assert.deepEqual(f.map((s) => [s.name, s.count]), [
+    ["Info. Solicitada", 1],
+    ["Servilleta", 1],
+    ["Comité", 2],
+    ["LOI", 2],
+    ["Stand by", 8],
+    ["Descartado", 4],
+  ]);
 });
 
 test("usos múltiples cuentan en cada uso", () => {
