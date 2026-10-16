@@ -2,7 +2,7 @@ import { ELEMENT_STATUS_LABEL } from "@/modules/pm/actas/logic/element-status";
 import type { ActasActaViewData, ElementStatus } from "@/modules/pm/actas/types";
 
 /**
- * Actas del trimestre → texto para Claude.
+ * Actas del trimestre (o del trimestre y hasta hoy) → texto para Claude.
  *
  * Las «actas» del portal no son actas de reunión: son el registro de
  * seguimiento del proyecto (categoría → elemento → anotaciones fechadas con
@@ -26,14 +26,58 @@ export interface EntradaFuentesActas {
   proyecto: { code: string; name: string };
   trimestre: string;
   desde: string;
+  /** Último día leído: el cierre del trimestre o, si la PM lo pide, hoy. */
   hasta: string;
+  /** Cierre del trimestre, cuando `hasta` es posterior (actas «hasta hoy»). */
+  cierreTrimestre?: string;
   vista: ActasActaViewData;
   /** Estado de cada elemento al empezar el trimestre (día anterior al inicio). */
   estadoInicio: EstadoElemento[];
-  /** Estado de cada elemento al cierre del trimestre. */
+  /** Estado de cada elemento en `hasta`. */
   estadoCierre: EstadoElemento[];
   /** Nombre visible de cada categoría (para los bloqueados sin anotaciones). */
   categorias: Record<string, string>;
+}
+
+/**
+ * Qué actas se incorporan: las del trimestre natural o, si el informe se hace
+ * después del cierre, también lo anotado desde el cierre hasta hoy.
+ */
+export type AlcanceActas = "trimestre" | "hasta_hoy";
+export const ALCANCES_ACTAS: AlcanceActas[] = ["trimestre", "hasta_hoy"];
+
+/** Hoy en Madrid (YYYY-MM-DD): el servidor corre en UTC. */
+export function hoyMadrid(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/**
+ * Días que se leen de las actas. «Hasta hoy» solo alarga el rango si hoy es
+ * posterior al cierre; si el trimestre no ha terminado, es lo mismo que el trimestre.
+ */
+export function rangoActas(
+  rango: { desde: string; hasta: string },
+  alcance: AlcanceActas,
+  hoy: string,
+): { desde: string; hasta: string; cierreTrimestre?: string } {
+  if (alcance === "hasta_hoy" && hoy > rango.hasta) return { desde: rango.desde, hasta: hoy, cierreTrimestre: rango.hasta };
+  return { ...rango };
+}
+
+/** ¿Tiene sentido preguntar «hasta hoy»? Solo si el trimestre ya ha cerrado. */
+export function hayActasTrasElCierre(cierreTrimestre: string, hoy: string): boolean {
+  return hoy > cierreTrimestre;
+}
+
+/** Nombre de la fuente: el «hasta el …» es lo que distingue las actas que siguen tras el cierre. */
+export function nombreFuenteActas(etiquetaTrimestre: string, codigo: string, cierreTrimestre: string | undefined, hasta: string): string {
+  const periodo = cierreTrimestre ? `${etiquetaTrimestre} y hasta el ${fechaEs(hasta)}` : etiquetaTrimestre;
+  return `Actas ${periodo} · ${codigo} (portal)`;
+}
+
+/** Alcance de unas actas ya cargadas, leído de su nombre (sin migración). */
+export function alcanceDeNombre(nombre: string): AlcanceActas {
+  return / y hasta el \d{2}\/\d{2}\/\d{4} · /.test(nombre) ? "hasta_hoy" : "trimestre";
 }
 
 export function fechaEs(ymdOIso: string): string {
@@ -70,6 +114,12 @@ export function formatearActas(e: EntradaFuentesActas): string {
     `### ACTAS DEL PROYECTO ${e.proyecto.code} (${e.proyecto.name}) · ${e.trimestre} (${fechaEs(e.desde)}–${fechaEs(e.hasta)})`,
     "Origen: módulo Actas del portal ICAM (seguimiento del equipo de proyecto). Cada línea «·» es una anotación fechada; entre corchetes, el cambio de estado que registró. Para cada elemento se indica su estado al inicio y al cierre del trimestre.",
   ];
+  const tras = e.cierreTrimestre && e.hasta > e.cierreTrimestre ? e.cierreTrimestre : null;
+  if (tras) {
+    lineas.push(
+      `Incluye también lo anotado después del cierre del trimestre (${fechaEs(tras)}) hasta el ${fechaEs(e.hasta)}, marcado «[posterior al cierre]»; el estado «al cierre» es el del ${fechaEs(e.hasta)}. Son hechos posteriores al trimestre: cuéntalos como tales («a fecha de este informe…») y no como logros del ${e.trimestre}.`,
+    );
+  }
 
   let elementosConActividad = 0;
   let pasanAHecho = 0;
@@ -91,8 +141,9 @@ export function formatearActas(e: EntradaFuentesActas): string {
             ? ` [${etiqueta(en.statusBefore)} → ${etiqueta(en.statusAfter)}]`
             : "";
         const autor = en.author?.label ? ` (${en.author.label})` : "";
+        const posterior = tras && en.entryDate.slice(0, 10) > tras ? " [posterior al cierre]" : "";
         bloque.push(
-          `${sangria}  · ${fechaEs(en.entryDate)}${autor}: ${recortar(en.content, MAX_CARACTERES_ENTRADA)}${cambio}`,
+          `${sangria}  · ${fechaEs(en.entryDate)}${autor}${posterior}: ${recortar(en.content, MAX_CARACTERES_ENTRADA)}${cambio}`,
         );
       }
     }
@@ -111,7 +162,7 @@ export function formatearActas(e: EntradaFuentesActas): string {
   }
   lineas.push(...cuerpo);
   if (bloqueados.length) {
-    lineas.push("\n## Elementos bloqueados al cierre del trimestre");
+    lineas.push(tras ? `\n## Elementos bloqueados a ${fechaEs(e.hasta)}` : "\n## Elementos bloqueados al cierre del trimestre");
     for (const b of bloqueados) {
       const cat = e.categorias[b.categoriaId];
       lineas.push(`- ${b.nombre}${cat ? ` (${cat})` : ""}`);

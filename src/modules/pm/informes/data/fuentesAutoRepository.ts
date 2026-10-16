@@ -7,14 +7,21 @@ import { asOfDateToTimestamptz } from "@/modules/pm/actas/logic/operativo-asof";
 import { fetchAvanceObraAFecha } from "@/modules/pm/avance/data/avanceRepository";
 import { fetchPmPortfolio } from "@/modules/pm/data/pmRepository";
 
-import { formatearActas, type EstadoElemento } from "../logic/fuentes-actas";
+import {
+  formatearActas,
+  hoyMadrid,
+  nombreFuenteActas,
+  rangoActas,
+  type AlcanceActas,
+  type EstadoElemento,
+} from "../logic/fuentes-actas";
 import { formatearPlanificacion } from "../logic/fuentes-planificacion";
 import { rangoTrimestre, trimestreAnterior, type Trimestre } from "../logic/trimestre";
 import type { FuenteAutomatica, FuentesAutomaticasResultado, TipoFuenteAuto } from "../types";
 import { getInformesSupabase } from "./client";
 
 /**
- * Fuentes del portal del paso 2 de la app: las actas del trimestre y la
+ * Fuentes del portal del paso 2 de la app: las actas (del trimestre o hasta hoy) y la
  * planificación del activo, que se incorporan si la PM lo pide. Cada una falla
  * por separado: si una no se puede leer, la otra llega igual y la PM ve un aviso.
  */
@@ -49,11 +56,17 @@ async function estadosAFecha(
   }));
 }
 
+/** Lo que la PM ha elegido al decir que sí; hoy solo afecta a las actas. */
+export interface OpcionesFuentesAuto {
+  actas?: AlcanceActas;
+}
+
 async function fuenteActas(
   ctx: UserContext,
   idActivo: string,
   trimestre: Trimestre,
   etiqueta: string,
+  opciones: OpcionesFuentesAuto = {},
 ): Promise<{ doc: FuenteAutomatica | null; aviso: string | null }> {
   const link = await fetchActasLinkForPmActivo(ctx, idActivo);
   if (!link) {
@@ -69,7 +82,7 @@ async function fuenteActas(
     return { doc: null, aviso: `No se ha podido leer el proyecto de Actas ${link.code}.` };
   }
 
-  const { desde, hasta } = rangoTrimestre(trimestre);
+  const { desde, hasta, cierreTrimestre } = rangoActas(rangoTrimestre(trimestre), opciones.actas ?? "trimestre", hoyMadrid());
   const [vista, inicio, cierre, categorias] = await Promise.all([
     fetchActasActaView(ctx, { projectId: proyecto.id as string, dateFrom: desde, dateTo: hasta }),
     estadosAFecha(ctx, proyecto.id as string, diaAnterior(desde)),
@@ -93,13 +106,14 @@ async function fuenteActas(
     trimestre: etiqueta,
     desde,
     hasta,
+    cierreTrimestre,
     vista: vista.data,
     estadoInicio: inicio,
     estadoCierre: cierre,
     categorias: nombresCategoria,
   });
   return {
-    doc: { tipo: "actas", nombre: `Actas ${etiqueta} · ${proyecto.code} (portal)`, texto },
+    doc: { tipo: "actas", nombre: nombreFuenteActas(etiqueta, proyecto.code as string, cierreTrimestre, hasta), texto },
     aviso: link.archived ? `El proyecto de Actas ${link.code} está archivado.` : null,
   };
 }
@@ -153,8 +167,9 @@ export async function cargarFuentesAutomaticas(
   trimestre: Trimestre,
   etiqueta: string,
   tipos: TipoFuenteAuto[],
+  opciones: OpcionesFuentesAuto = {},
 ): Promise<FuentesAutomaticasResultado> {
-  const resultados = await Promise.allSettled(tipos.map((t) => CARGADORES[t].cargar(ctx, idActivo, trimestre, etiqueta)));
+  const resultados = await Promise.allSettled(tipos.map((t) => CARGADORES[t].cargar(ctx, idActivo, trimestre, etiqueta, opciones)));
   const documentos: FuenteAutomatica[] = [];
   const avisos: string[] = [];
   resultados.forEach((r, i) => {
