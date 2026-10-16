@@ -33,12 +33,13 @@ export function rutaInformesProyecto(idActivo: string): string {
 }
 
 /** Tab «Acta» del proyecto con el trimestre «Qn AAAA» completo: lo mismo que se incorpora al informe. */
-export function rutaActasTrimestre(idActivo: string, trimestre: string): string {
+/** Actas del trimestre natural; con `hasta`, hasta ese día (actas «hasta hoy»). */
+export function rutaActasTrimestre(idActivo: string, trimestre: string, hasta?: string): string {
   const base = `/dashboard/pm/proyecto/${encodeURIComponent(idActivo)}/actas`;
   const t = parseTrimestre(trimestre);
   if (!t) return `${base}?tab=acta`;
-  const { desde, hasta } = rangoTrimestre(t);
-  return `${base}?tab=acta&range=custom&from=${desde}&to=${hasta}`;
+  const rango = rangoTrimestre(t);
+  return `${base}?tab=acta&range=custom&from=${rango.desde}&to=${hasta ?? rango.hasta}`;
 }
 
 export function rutaPlanificacionProyecto(idActivo: string): string {

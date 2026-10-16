@@ -28,6 +28,7 @@ import {
 import { listarExportaciones, registrarExportacion } from "../data/exportacionesRepository";
 import { listarRevisiones, marcarDeshecha, registrarRevision, type NuevaRevision } from "../data/revisionesRepository";
 import { resumenUsoInforme } from "../data/usoRepository";
+import { ALCANCES_ACTAS, type AlcanceActas } from "../logic/fuentes-actas";
 import { esIdInforme, limpiarCodigo, parseTrimestre, qSig } from "../logic/trimestre";
 import type { Pie } from "../slides/tipos";
 import {
@@ -299,12 +300,17 @@ export async function accionBorrarFuente(id: string, fuenteId: number): Promise<
   return r.error !== null ? mal(r.error) : { ok: true, data: undefined };
 }
 
-/** Incorpora (o recarga) las actas o la planificación del trimestre como fuentes «del portal». */
+/**
+ * Incorpora (o recarga) las actas o la planificación del trimestre como fuentes «del portal».
+ * Las actas pueden ser las del trimestre o llegar hasta hoy (`opciones.actas`).
+ */
 export async function accionCargarFuentesAuto(
   id: string,
   tipos: TipoFuenteAuto[],
+  opciones?: { actas?: AlcanceActas },
 ): Promise<Resultado<{ fuentes: Fuente[]; avisos: string[] }>> {
   try {
+    const alcance = ALCANCES_ACTAS.find((a) => a === opciones?.actas) ?? "trimestre";
     if (!esIdInforme(id)) return mal("Informe no válido.");
     const pedidos = TIPOS_AUTO.filter((t) => Array.isArray(tipos) && tipos.includes(t));
     if (!pedidos.length) return mal("Indica qué quieres incorporar.");
@@ -325,7 +331,7 @@ export async function accionCargarFuentesAuto(
       };
     }
     const t = parseTrimestre(inf.data.trimestre)!;
-    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre, pedidos);
+    const r = await cargarFuentesAutomaticas(ctx, idActivo, t, inf.data.trimestre, pedidos, { actas: alcance });
     const g = await reemplazarAutomaticas(ctx, id, r.documentos);
     if (g.error !== null) return mal(g.error);
     const fuentes = await listarFuentes(ctx, id);

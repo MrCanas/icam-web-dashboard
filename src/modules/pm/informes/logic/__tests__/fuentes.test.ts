@@ -5,7 +5,17 @@ import type { PmHitoEnriched, PmPortfolioRow } from "@/modules/pm/data/pmReposit
 import type { ActasActaViewData, ActasLogEntryItem } from "@/modules/pm/actas/types";
 import type { PmAvanceProyecto } from "@/modules/pm/avance/types";
 
-import { fechaEs, formatearActas, MAX_CARACTERES_ACTAS } from "../fuentes-actas";
+import {
+  alcanceDeNombre,
+  fechaEs,
+  formatearActas,
+  hayActasTrasElCierre,
+  hoyMadrid,
+  MAX_CARACTERES_ACTAS,
+  nombreFuenteActas,
+  rangoActas,
+} from "../fuentes-actas";
+import { rutaActasTrimestre } from "../paths";
 import { formatearPlanificacion, snapshotDeComparacion } from "../fuentes-planificacion";
 import { parseTrimestre } from "../trimestre";
 
@@ -204,4 +214,67 @@ test("un elemento sin estados en uso no lleva marca de estado", () => {
 test("fechaEs", () => {
   assert.equal(fechaEs("2026-09-30"), "30/09/2026");
   assert.equal(fechaEs("2026-07-15T10:00:00Z"), "15/07/2026");
+});
+
+test("actas hasta hoy: el rango solo se alarga si el trimestre ya ha cerrado", () => {
+  const q3 = { desde: "2026-07-01", hasta: "2026-09-30" };
+  assert.deepEqual(rangoActas(q3, "trimestre", "2026-10-16"), q3);
+  assert.deepEqual(rangoActas(q3, "hasta_hoy", "2026-10-16"), { desde: "2026-07-01", hasta: "2026-10-16", cierreTrimestre: "2026-09-30" });
+  // Antes del cierre «hasta hoy» no recorta el trimestre ni lo alarga.
+  assert.deepEqual(rangoActas(q3, "hasta_hoy", "2026-09-10"), q3);
+  assert.equal(hayActasTrasElCierre("2026-09-30", "2026-10-16"), true);
+  assert.equal(hayActasTrasElCierre("2026-09-30", "2026-09-30"), false);
+});
+
+test("hoyMadrid usa la hora de Madrid, no la UTC del servidor", () => {
+  // 30/09 a las 23:30 UTC ya es 1/10 en Madrid (UTC+2 en verano).
+  assert.equal(hoyMadrid(new Date("2026-09-30T23:30:00Z")), "2026-10-01");
+  assert.equal(hoyMadrid(new Date("2026-09-30T12:00:00Z")), "2026-09-30");
+});
+
+test("el nombre de la fuente guarda el periodo de las actas", () => {
+  const trimestre = nombreFuenteActas("Q3 2026", "CSP10", undefined, "2026-09-30");
+  const hastaHoy = nombreFuenteActas("Q3 2026", "CSP10", "2026-09-30", "2026-10-16");
+  assert.equal(trimestre, "Actas Q3 2026 · CSP10 (portal)");
+  assert.equal(hastaHoy, "Actas Q3 2026 y hasta el 16/10/2026 · CSP10 (portal)");
+  assert.equal(alcanceDeNombre(trimestre), "trimestre");
+  assert.equal(alcanceDeNombre(hastaHoy), "hasta_hoy");
+});
+
+test("formatearActas hasta hoy marca lo posterior al cierre", () => {
+  const texto = formatearActas({
+    proyecto: { code: "SE84", name: "Santa Engracia 84" },
+    trimestre: "Q3 2026",
+    desde: "2026-07-01",
+    hasta: "2026-10-16",
+    cierreTrimestre: "2026-09-30",
+    vista: vista([entrada(), entrada({ id: "e2", content: "Se recibe la licencia.", entryDate: "2026-10-05T09:00:00.000Z" })]),
+    estadoInicio: [],
+    estadoCierre: [{ elementId: "el3", nombre: "Licencia de primera ocupación", categoriaId: "c1", estado: "stuck" }],
+    categorias: { c1: "Obra" },
+  });
+  assert.match(texto, /· Q3 2026 \(01\/07\/2026–16\/10\/2026\)/);
+  assert.match(texto, /después del cierre del trimestre \(30\/09\/2026\) hasta el 16\/10\/2026/);
+  assert.match(texto, /· 05\/10\/2026 \(pm\) \[posterior al cierre\]: Se recibe la licencia\./);
+  assert.match(texto, /· 15\/07\/2026 \(pm\): Se firma/);
+  assert.match(texto, /## Elementos bloqueados a 16\/10\/2026/);
+
+  const soloTrimestre = formatearActas({
+    proyecto: { code: "SE84", name: "SE84" },
+    trimestre: "Q3 2026",
+    desde: "2026-07-01",
+    hasta: "2026-09-30",
+    vista: vista([entrada()]),
+    estadoInicio: [],
+    estadoCierre: [],
+    categorias: {},
+  });
+  assert.ok(!soloTrimestre.includes("posterior al cierre"));
+});
+
+test("el enlace a las actas llega hasta hoy si se piden así", () => {
+  assert.equal(
+    rutaActasTrimestre("CA1", "Q3 2026", "2026-10-16"),
+    "/dashboard/pm/proyecto/CA1/actas?tab=acta&range=custom&from=2026-07-01&to=2026-10-16",
+  );
 });

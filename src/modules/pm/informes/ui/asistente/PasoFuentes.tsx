@@ -14,7 +14,7 @@ import {
   accionIncluirFuente,
 } from "../../actions/informes";
 import { dirigirFuente, pendientesDirigidas, seleccionBase, slidesDeFuente } from "../../logic/dirigidas";
-import { fechaEs } from "../../logic/fuentes-actas";
+import { alcanceDeNombre, fechaEs, hayActasTrasElCierre, hoyMadrid, type AlcanceActas } from "../../logic/fuentes-actas";
 import { respuestaAuto } from "../../logic/fuentes-auto";
 import { normalizarAnalisis } from "../../logic/analisis";
 import { tituloDe } from "../../logic/informe";
@@ -46,26 +46,30 @@ export async function subirFotoInforme(informeId: string, file: File, categoria:
 
 const ETIQUETA_AUTO: Record<TipoFuenteAuto, string> = { actas: "las actas", planificacion: "la planificación" };
 
-/** Pregunta de sí o no sobre una fuente del portal. */
+interface OpcionPregunta {
+  etiqueta: string;
+  activa: boolean;
+  onElegir: () => void;
+}
+
+/** Pregunta sobre una fuente del portal: sí o no o, en las actas, qué periodo. */
 function PreguntaAuto({
   pregunta,
   detalle,
   enlace,
   textoEnlace,
-  respuesta,
+  opciones,
   cargada,
   deshabilitada,
-  onResponder,
   onRecargar,
 }: {
   pregunta: string;
   detalle: string;
   enlace: string;
   textoEnlace: string;
-  respuesta: boolean | null;
+  opciones: OpcionPregunta[];
   cargada: boolean;
   deshabilitada: boolean;
-  onResponder: (si: boolean) => void;
   onRecargar: () => void;
 }) {
   const clase = (activa: boolean) =>
@@ -88,13 +92,12 @@ function PreguntaAuto({
           </button>
         ) : null}
       </div>
-      <div className="flex gap-2" role="group" aria-label={pregunta}>
-        <button type="button" className={clase(respuesta === true)} aria-pressed={respuesta === true} disabled={deshabilitada} onClick={() => onResponder(true)}>
-          Sí
-        </button>
-        <button type="button" className={clase(respuesta === false)} aria-pressed={respuesta === false} disabled={deshabilitada} onClick={() => onResponder(false)}>
-          No
-        </button>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={pregunta}>
+        {opciones.map((o) => (
+          <button key={o.etiqueta} type="button" className={clase(o.activa)} aria-pressed={o.activa} disabled={deshabilitada} onClick={o.onElegir}>
+            {o.etiqueta}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -107,6 +110,7 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const [avisosAuto, setAvisosAuto] = useState<string[]>([]);
   // Lo respondido en esta visita que todavía no ha dejado fuente guardada (un «no», o un «sí» que no se pudo cargar).
   const [respondido, setRespondido] = useState<Partial<Record<TipoFuenteAuto, boolean>>>({});
+  const [alcanceElegido, setAlcanceElegido] = useState<AlcanceActas | null>(null);
   const [analizando, setAnalizando] = useState<string | null>(null);
   const notasIniciales = fuentes.find((f) => f.tipo === "notas")?.texto ?? "";
   const [notas, setNotas] = useState(notasIniciales);
@@ -121,6 +125,15 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
   const rango = trimestre ? rangoTrimestre(trimestre) : null;
   const respuesta = (tipo: TipoFuenteAuto) => respuestaAuto(fuentes, tipo) ?? respondido[tipo] ?? null;
   const sinResponder = !!idActivo && (respuesta("actas") === null || respuesta("planificacion") === null);
+  // Con el trimestre ya cerrado, las actas pueden llegar hasta hoy: lo anotado después del cierre también cuenta.
+  const hoy = hoyMadrid();
+  const actasTrasCierre = !!rango && hayActasTrasElCierre(rango.hasta, hoy);
+  const actasCargadas = fuentes.find((f) => f.auto && f.tipo === "actas" && f.incluida);
+  const alcanceActas: AlcanceActas = actasTrasCierre
+    ? actasCargadas
+      ? alcanceDeNombre(actasCargadas.nombre)
+      : (alcanceElegido ?? "trimestre")
+    : "trimestre";
   const documentos = fuentes.filter((f) => f.tipo !== "notas" && f.tipo !== "previo" && f.tipo !== "no_reportar");
   // Con el informe ya generado se vuelve aquí desde la revisión: los documentos se pueden dirigir a slides concretas.
   const slides = (informe.contenido?.slides ?? []).filter((s) => !s.oculto);
@@ -143,10 +156,10 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     }
   }
 
-  async function cargarAuto(tipo: TipoFuenteAuto) {
+  async function cargarAuto(tipo: TipoFuenteAuto, alcance: AlcanceActas = alcanceActas) {
     setOcupado(`Cargando ${ETIQUETA_AUTO[tipo]} del portal…`);
     try {
-      const r = await accionCargarFuentesAuto(informe.id, [tipo]);
+      const r = await accionCargarFuentesAuto(informe.id, [tipo], tipo === "actas" ? { actas: alcance } : undefined);
       if (!r.ok) setAvisosAuto([r.error]);
       else {
         h.setFuentes(r.data.fuentes);
@@ -159,11 +172,14 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
     }
   }
 
-  async function responder(tipo: TipoFuenteAuto, si: boolean) {
+  async function responder(tipo: TipoFuenteAuto, si: boolean, alcance: AlcanceActas = "trimestre") {
     setRespondido((r) => ({ ...r, [tipo]: si }));
+    if (si && tipo === "actas") setAlcanceElegido(alcance);
     setAvisosAuto([]);
     const fuente = fuentes.find((f) => f.auto && f.tipo === tipo);
-    if (si && (!fuente || !fuente.incluida)) await cargarAuto(tipo);
+    // Pasar de «el trimestre» a «hasta hoy» (o al revés) vuelve a leer las actas con el otro periodo.
+    const otroPeriodo = tipo === "actas" && !!fuente?.incluida && alcanceDeNombre(fuente.nombre) !== alcance;
+    if (si && (!fuente || !fuente.incluida || otroPeriodo)) await cargarAuto(tipo, alcance);
     else if (!si && fuente?.incluida) {
       h.setFuentes((fs) => fs.map((x) => (x.id === fuente.id ? { ...x, incluida: false } : x)));
       const r = await accionIncluirFuente(informe.id, fuente.id, false);
@@ -288,18 +304,38 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
         {idActivo ? (
           <div className="space-y-2">
             <PreguntaAuto
-              pregunta="¿Quieres incorporar las actas del trimestre?"
+              pregunta={actasTrasCierre ? "¿Quieres incorporar las actas? ¿Solo las del trimestre o hasta hoy?" : "¿Quieres incorporar las actas del trimestre?"}
               detalle={
-                rango
-                  ? `Se añaden todas las anotaciones de las actas del ${fechaEs(rango.desde)} al ${fechaEs(rango.hasta)}, con el estado de cada elemento al inicio y al cierre.`
-                  : "Se añaden todas las anotaciones de las actas del trimestre."
+                rango && actasTrasCierre
+                  ? `«Solo el ${informe.trimestre}» añade las anotaciones del ${fechaEs(rango.desde)} al ${fechaEs(rango.hasta)}. «Hasta hoy» añade además las posteriores al cierre, hasta el ${fechaEs(hoy)}, marcadas como tales para que no se cuenten como logros del trimestre. Va también el estado de cada elemento al inicio y al final del periodo.`
+                  : rango
+                    ? `Se añaden todas las anotaciones de las actas del ${fechaEs(rango.desde)} al ${fechaEs(rango.hasta)}, con el estado de cada elemento al inicio y al cierre.`
+                    : "Se añaden todas las anotaciones de las actas del trimestre."
               }
-              enlace={rutaActasTrimestre(idActivo, informe.trimestre)}
-              textoEnlace="Ver las actas del trimestre"
-              respuesta={respuesta("actas")}
+              enlace={rutaActasTrimestre(idActivo, informe.trimestre, alcanceActas === "hasta_hoy" ? hoy : undefined)}
+              textoEnlace={alcanceActas === "hasta_hoy" ? "Ver las actas hasta hoy" : "Ver las actas del trimestre"}
+              opciones={
+                actasTrasCierre
+                  ? [
+                      {
+                        etiqueta: `Sí, solo el ${informe.trimestre}`,
+                        activa: respuesta("actas") === true && alcanceActas === "trimestre",
+                        onElegir: () => void responder("actas", true, "trimestre"),
+                      },
+                      {
+                        etiqueta: `Sí, hasta hoy (${fechaEs(hoy)})`,
+                        activa: respuesta("actas") === true && alcanceActas === "hasta_hoy",
+                        onElegir: () => void responder("actas", true, "hasta_hoy"),
+                      },
+                      { etiqueta: "No", activa: respuesta("actas") === false, onElegir: () => void responder("actas", false) },
+                    ]
+                  : [
+                      { etiqueta: "Sí", activa: respuesta("actas") === true, onElegir: () => void responder("actas", true) },
+                      { etiqueta: "No", activa: respuesta("actas") === false, onElegir: () => void responder("actas", false) },
+                    ]
+              }
               cargada={respuestaAuto(fuentes, "actas") === true}
               deshabilitada={!puedeEditar || !!ocupado || !!analizando}
-              onResponder={(si) => void responder("actas", si)}
               onRecargar={() => void cargarAuto("actas")}
             />
             <PreguntaAuto
@@ -307,10 +343,12 @@ export function PasoFuentes({ h }: { h: HerramientaInforme }) {
               detalle="Se añaden los hitos con su fecha vigente, la comparación con la previsión anterior y el avance de obra al cierre del trimestre."
               enlace={rutaPlanificacionProyecto(idActivo)}
               textoEnlace="Ver la planificación"
-              respuesta={respuesta("planificacion")}
+              opciones={[
+                { etiqueta: "Sí", activa: respuesta("planificacion") === true, onElegir: () => void responder("planificacion", true) },
+                { etiqueta: "No", activa: respuesta("planificacion") === false, onElegir: () => void responder("planificacion", false) },
+              ]}
               cargada={respuestaAuto(fuentes, "planificacion") === true}
               deshabilitada={!puedeEditar || !!ocupado || !!analizando}
-              onResponder={(si) => void responder("planificacion", si)}
               onRecargar={() => void cargarAuto("planificacion")}
             />
           </div>
